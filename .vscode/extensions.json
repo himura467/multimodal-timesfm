@@ -1,0 +1,12 @@
+{
+  "recommendations": [
+    // IntelliSense
+    "ms-python.python",
+    // Linting / Formatting
+    "ms-python.mypy-type-checker",
+    "charliermarsh.ruff",
+    "streetsidesoftware.code-spell-checker",
+    // Showing todo comments
+    "gruntfuggly.todo-tree"
+  ]
+}
