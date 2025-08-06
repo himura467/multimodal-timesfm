@@ -176,6 +176,12 @@ Use YAML files to manage:
 - Document any architectural changes made to accommodate multimodal inputs
 - Keep detailed logs of hyperparameter choices and their impact
 
+## Bash Commands
+
+- `uv run mypy .`: Type checking
+- `uv run ruff check`: Linting
+- `uv run ruff format`: Code formatting
+
 # Home folder CLAUDE.md
 
 - @~/.claude/CLAUDE.md
