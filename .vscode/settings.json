@@ -1,5 +1,27 @@
 {
+  // https://github.com/astral-sh/ruff-vscode
+  "[python]": {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit",
+      "source.organizeImports": "explicit"
+    },
+    "editor.defaultFormatter": "charliermarsh.ruff"
+  },
   "[markdown]": {
     "editor.formatOnSave": true
+  },
+  "ruff.configuration": "${workspaceFolder}/pyproject.toml",
+  // https://github.com/microsoft/vscode-mypy
+  "mypy-type-checker.args": [
+    "--config-file=pyproject.toml"
+  ],
+  // Ensure enough terminal history is preserved when running tests
+  "terminal.integrated.scrollback": 10000,
+  // Configure todo-tree to exclude .venv
+  "todo-tree.filtering.excludeGlobs": ["**/.venv"],
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.venv/**": true
   }
 }
