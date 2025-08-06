@@ -184,6 +184,16 @@ Use YAML files to manage:
 - `uv run ruff check`: Linting
 - `uv run ruff format`: Code formatting
 
+## Documentation Conventions
+
+- Use docstrings for all functions, classes, and modules
+- Include type hints for all function parameters and return values
+- Follow Google-style docstring format
+- Provide clear, concise descriptions of purpose and functionality
+- Document any non-obvious implementation details or design choices
+- Include examples where helpful
+- Explain parameters, return values, and potential exceptions
+
 # Home folder CLAUDE.md
 
 - @~/.claude/CLAUDE.md
