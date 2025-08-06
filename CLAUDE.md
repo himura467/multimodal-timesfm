@@ -145,7 +145,7 @@ Use YAML files to manage:
 
 ## Success Criteria
 
-- [ ] Wrapper class successfully extends TimesFM functionality
+- [x] Wrapper class successfully extends TimesFM functionality
 - [ ] Wrapper class validation passes with Time-MMD dataset
 - [ ] Forward pass produces expected output shapes and ranges
 - [ ] Training loop integrates smoothly with wrapper class
@@ -157,17 +157,19 @@ Use YAML files to manage:
 
 ## Next Steps
 
-1. Initialize the uv project and set up basic structure
-2. Install TimesFM and verify compatibility
-3. Implement basic wrapper class skeleton
-4. Set up Time-MMD dataset loading and preprocessing
-5. Validate wrapper class functionality with Time-MMD data
-   - Test basic forward pass with time series data only
-   - Verify input/output shapes and data flow
-   - Ensure wrapper properly delegates to underlying TimesFM
-   - Run sanity checks with small subset of Time-MMD dataset
-   - Confirm training loop works with wrapper class
-6. Begin model architecture enhancements
+1. - [x] Initialize the uv project and set up basic structure
+2. - [x] Install TimesFM and verify compatibility
+3. - [x] Implement basic wrapper class skeleton
+4. - [ ] Set up Time-MMD dataset loading and preprocessing
+   - [ ] Implement Time-MMD dataset loader
+   - [ ] Create data preprocessing utilities
+5. - [ ] Validate wrapper class functionality with Time-MMD data
+   - [ ] Test basic forward pass with time series data only
+   - [ ] Verify input/output shapes and data flow
+   - [ ] Ensure wrapper properly delegates to underlying TimesFM
+   - [ ] Run sanity checks with small subset of Time-MMD dataset
+   - [ ] Confirm training loop works with wrapper class
+6. - [ ] Begin model architecture enhancements
 
 ## Notes
 
