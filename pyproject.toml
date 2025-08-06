@@ -20,7 +20,7 @@ strict = true
 exclude = [".venv"]
 
 [[tool.mypy.overrides]]
-module = "timesfm"
+module = "timesfm.*"
 ignore_missing_imports = true
 
 [tool.ruff]
