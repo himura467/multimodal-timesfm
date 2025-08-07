@@ -146,9 +146,9 @@ Use YAML files to manage:
 ## Success Criteria
 
 - [x] Wrapper class successfully extends TimesFM functionality
-- [ ] Wrapper class validation passes with Time-MMD dataset
-- [ ] Forward pass produces expected output shapes and ranges
-- [ ] Training loop integrates smoothly with wrapper class
+- [x] Wrapper class validation passes with Time-MMD dataset
+- [x] Forward pass produces expected output shapes and ranges
+- [x] Training loop integrates smoothly with wrapper class
 - [ ] Model can process both time series and text inputs
 - [ ] Training pipeline completes without errors
 - [ ] Ablation study shows meaningful performance comparison
@@ -157,20 +157,26 @@ Use YAML files to manage:
 
 ## Next Steps
 
-1. - [x] Initialize the uv project and set up basic structure
-2. - [x] Install TimesFM and verify compatibility
-3. - [x] Implement basic wrapper class skeleton
-4. - [x] Set up Time-MMD dataset loading and preprocessing
-   - [x] Implement Time-MMD dataset loader
-   - [x] Create data preprocessing utilities
-   - [x] Add comprehensive test suite with pytest
-5. - [ ] Validate wrapper class functionality with Time-MMD data
-   - [ ] Test basic forward pass with time series data only
-   - [ ] Verify input/output shapes and data flow
-   - [ ] Ensure wrapper properly delegates to underlying TimesFM
-   - [ ] Run sanity checks with small subset of Time-MMD dataset
-   - [ ] Confirm training loop works with wrapper class
-6. - [ ] Begin model architecture enhancements
+**Phase 2: Model Architecture Enhancement**
+
+1. - [ ] Implement text encoder using sentence transformers
+2. - [ ] Design fusion mechanism for time series and text features  
+3. - [ ] Extend MultimodalTimesFM to handle text inputs
+4. - [ ] Add multimodal forward pass functionality
+5. - [ ] Create text preprocessing utilities
+6. - [ ] Add tests for multimodal components
+
+**Phase 3: Training Pipeline**
+
+7. - [ ] Implement training loop for multimodal inputs
+8. - [ ] Set up checkpointing and logging
+9. - [ ] Configure hyperparameters for fine-tuning
+
+**Phase 4: Evaluation**
+
+10. - [ ] Implement evaluation metrics
+11. - [ ] Create ablation study framework
+12. - [ ] Generate performance comparison reports
 
 ## Notes
 
