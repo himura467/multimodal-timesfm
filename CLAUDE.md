@@ -160,9 +160,10 @@ Use YAML files to manage:
 1. - [x] Initialize the uv project and set up basic structure
 2. - [x] Install TimesFM and verify compatibility
 3. - [x] Implement basic wrapper class skeleton
-4. - [ ] Set up Time-MMD dataset loading and preprocessing
-   - [ ] Implement Time-MMD dataset loader
-   - [ ] Create data preprocessing utilities
+4. - [x] Set up Time-MMD dataset loading and preprocessing
+   - [x] Implement Time-MMD dataset loader
+   - [x] Create data preprocessing utilities
+   - [x] Add comprehensive test suite with pytest
 5. - [ ] Validate wrapper class functionality with Time-MMD data
    - [ ] Test basic forward pass with time series data only
    - [ ] Verify input/output shapes and data flow
@@ -183,6 +184,7 @@ Use YAML files to manage:
 - `uv run mypy .`: Type checking
 - `uv run ruff check`: Linting
 - `uv run ruff format`: Code formatting
+- `uv run pytest tests/ -v`: Run test suite
 
 ## Documentation Conventions
 
