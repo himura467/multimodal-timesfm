@@ -24,7 +24,6 @@ class MultimodalTimesFM:
         checkpoint: TimesFmCheckpoint,
         text_encoder_model: str = "all-MiniLM-L6-v2",
         text_embedding_dim: int = 384,
-        fusion_type: str = "concat",
         enable_multimodal: bool = True,
     ) -> None:
         """Initializes MultimodalTimesFM wrapper.
@@ -34,7 +33,6 @@ class MultimodalTimesFM:
             checkpoint: Checkpoint to load. checkpoint.version decides which TimesFM version to use.
             text_encoder_model: Name of the sentence transformer model for text encoding.
             text_embedding_dim: Dimension of text embeddings.
-            fusion_type: Type of fusion mechanism ('concat', 'attention', 'gated').
             enable_multimodal: Whether to enable multimodal functionality.
         """
         # Initialize the underlying TimesFM model
@@ -47,14 +45,12 @@ class MultimodalTimesFM:
                 model_name=text_encoder_model, embedding_dim=text_embedding_dim
             )
 
-            # Initialize fusion mechanism
+            # Initialize fusion mechanism using addition-based fusion
             # Note: We'll need to determine the actual TimesFM feature dimensions
             # For now, using placeholder values that will need to be adjusted
             self.fusion: MultimodalFusion | None = MultimodalFusion(
                 ts_feature_dim=512,  # Placeholder - needs actual TimesFM feature dim
                 text_feature_dim=text_embedding_dim,
-                output_dim=512,  # Placeholder - needs actual TimesFM feature dim
-                fusion_type=fusion_type,
             )
         else:
             self.text_encoder = None

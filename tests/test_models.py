@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 import torch
+import torch.nn as nn
 from timesfm import TimesFmCheckpoint, TimesFmHparams
 
 from src.data.time_mmd_dataset import TimeMmdDataset
@@ -377,60 +378,147 @@ class TestTextEncoder:
 
 
 class TestMultimodalFusion:
-    """Test cases for MultimodalFusion component."""
+    """Test cases for addition-based MultimodalFusion component."""
 
     @pytest.fixture
-    def fusion_concat(self) -> MultimodalFusion:
-        """Creates concatenation fusion module."""
-        return MultimodalFusion(ts_feature_dim=256, text_feature_dim=384, output_dim=512, fusion_type="concat")
+    def fusion_module(self) -> MultimodalFusion:
+        """Creates addition-based fusion module."""
+        return MultimodalFusion(ts_feature_dim=256, text_feature_dim=384)
 
-    @pytest.fixture
-    def fusion_attention(self) -> MultimodalFusion:
-        """Creates attention fusion module."""
-        return MultimodalFusion(ts_feature_dim=256, text_feature_dim=384, output_dim=256, fusion_type="attention")
+    def test_fusion_initialization(self) -> None:
+        """Tests fusion module initialization."""
+        fusion = MultimodalFusion(ts_feature_dim=256, text_feature_dim=384)
 
-    @pytest.fixture
-    def fusion_gated(self) -> MultimodalFusion:
-        """Creates gated fusion module."""
-        return MultimodalFusion(ts_feature_dim=256, text_feature_dim=384, output_dim=256, fusion_type="gated")
+        assert fusion.ts_feature_dim == 256
+        assert fusion.text_feature_dim == 384
+        assert isinstance(fusion.text_projection, nn.Linear)
+        assert isinstance(fusion.activation, nn.ReLU)
 
-    def test_concat_fusion(self, fusion_concat: MultimodalFusion) -> None:
-        """Tests concatenation fusion."""
+        # Check projection layer dimensions
+        assert fusion.text_projection.in_features == 384
+        assert fusion.text_projection.out_features == 256
+
+    def test_addition_fusion(self, fusion_module: MultimodalFusion) -> None:
+        """Tests addition-based fusion."""
         batch_size, seq_len = 2, 10
         ts_features = torch.randn(batch_size, seq_len, 256)
         text_features = torch.randn(batch_size, 384)
 
-        fused = fusion_concat(ts_features, text_features)
+        fused = fusion_module(ts_features, text_features)
 
-        assert fused.shape == (batch_size, seq_len, 512)
-        assert not torch.isnan(fused).any()
-
-    def test_attention_fusion(self, fusion_attention: MultimodalFusion) -> None:
-        """Tests attention-based fusion."""
-        batch_size, seq_len = 2, 10
-        ts_features = torch.randn(batch_size, seq_len, 256)
-        text_features = torch.randn(batch_size, 384)
-
-        fused = fusion_attention(ts_features, text_features)
-
+        # Output should have same shape as input time series
         assert fused.shape == (batch_size, seq_len, 256)
         assert not torch.isnan(fused).any()
+        assert not torch.isinf(fused).any()
 
-    def test_gated_fusion(self, fusion_gated: MultimodalFusion) -> None:
-        """Tests gated fusion."""
-        batch_size, seq_len = 2, 10
+    def test_fusion_different_batch_sizes(self, fusion_module: MultimodalFusion) -> None:
+        """Tests fusion with different batch sizes."""
+        for batch_size in [1, 3, 8]:
+            ts_features = torch.randn(batch_size, 20, 256)
+            text_features = torch.randn(batch_size, 384)
+
+            fused = fusion_module(ts_features, text_features)
+            assert fused.shape == (batch_size, 20, 256)
+
+    def test_fusion_different_sequence_lengths(self, fusion_module: MultimodalFusion) -> None:
+        """Tests fusion with different sequence lengths."""
+        for seq_len in [1, 32, 100]:
+            ts_features = torch.randn(2, seq_len, 256)
+            text_features = torch.randn(2, 384)
+
+            fused = fusion_module(ts_features, text_features)
+            assert fused.shape == (2, seq_len, 256)
+
+    def test_parameter_management(self, fusion_module: MultimodalFusion) -> None:
+        """Tests parameter access and modification methods."""
+        # Test parameter retrieval
+        params = fusion_module.get_projection_parameters()
+        assert "weight" in params
+        assert "bias" in params
+        assert params["weight"].shape == (256, 384)
+        assert params["bias"].shape == (256,)
+
+        # Test parameter setting
+        new_weight = torch.ones(256, 384) * 0.5
+        new_bias = torch.ones(256) * 0.1
+        new_params = {"weight": new_weight, "bias": new_bias}
+
+        fusion_module.set_projection_parameters(new_params)
+
+        # Verify parameters were set
+        retrieved_params = fusion_module.get_projection_parameters()
+        assert torch.allclose(retrieved_params["weight"], new_weight)
+        assert torch.allclose(retrieved_params["bias"], new_bias)
+
+    def test_freeze_unfreeze_functionality(self, fusion_module: MultimodalFusion) -> None:
+        """Tests parameter freezing and unfreezing."""
+        # Initially should not be frozen
+        assert not fusion_module.is_projection_frozen()
+
+        # Test freezing
+        fusion_module.freeze_projection()
+        assert fusion_module.is_projection_frozen()
+
+        # Verify parameters are actually frozen
+        for param in fusion_module.text_projection.parameters():
+            assert not param.requires_grad
+
+        # Test unfreezing
+        fusion_module.unfreeze_projection()
+        assert not fusion_module.is_projection_frozen()
+
+        # Verify parameters are unfrozen
+        for param in fusion_module.text_projection.parameters():
+            assert param.requires_grad
+
+    def test_fusion_loss_computation(self, fusion_module: MultimodalFusion) -> None:
+        """Tests fusion loss computation."""
+        batch_size, seq_len = 2, 50
         ts_features = torch.randn(batch_size, seq_len, 256)
         text_features = torch.randn(batch_size, 384)
+        target = torch.randn(batch_size, seq_len, 256)
 
-        fused = fusion_gated(ts_features, text_features)
+        # Test with default MSE loss
+        loss = fusion_module.compute_fusion_loss(ts_features, text_features, target)
+        assert isinstance(loss, torch.Tensor)
+        assert loss.dim() == 0  # Scalar loss
+        assert loss >= 0  # MSE loss should be non-negative
 
-        assert fused.shape == (batch_size, seq_len, 256)
-        assert not torch.isnan(fused).any()
+    def test_input_validation(self, fusion_module: MultimodalFusion) -> None:
+        """Tests input validation."""
+        valid_ts = torch.randn(2, 10, 256)
+        valid_text = torch.randn(2, 384)
 
-    def test_invalid_fusion_type(self) -> None:
-        """Tests error handling for invalid fusion type."""
-        with pytest.raises(ValueError):
-            MultimodalFusion(ts_feature_dim=256, text_feature_dim=384, output_dim=512, fusion_type="invalid")
+        # Test wrong tensor dimensions
+        with pytest.raises(ValueError, match="ts_features must be 3D"):
+            fusion_module(torch.randn(2, 256), valid_text)  # 2D instead of 3D
+
+        with pytest.raises(ValueError, match="text_features must be 2D"):
+            fusion_module(valid_ts, torch.randn(2, 1, 384))  # 3D instead of 2D
+
+        # Test mismatched feature dimensions
+        with pytest.raises(ValueError, match="Time series feature dimension mismatch"):
+            fusion_module(torch.randn(2, 10, 128), valid_text)  # 128 != 256
+
+        with pytest.raises(ValueError, match="Text feature dimension mismatch"):
+            fusion_module(valid_ts, torch.randn(2, 512))  # 512 != 384
+
+        # Test batch size mismatch
+        with pytest.raises(ValueError, match="Batch size mismatch"):
+            fusion_module(torch.randn(2, 10, 256), torch.randn(3, 384))
+
+    def test_initialization_validation(self) -> None:
+        """Tests initialization parameter validation."""
+        # Test zero dimensions
+        with pytest.raises(ValueError, match="ts_feature_dim must be a positive integer"):
+            MultimodalFusion(ts_feature_dim=0, text_feature_dim=128)
+
+        with pytest.raises(ValueError, match="text_feature_dim must be a positive integer"):
+            MultimodalFusion(ts_feature_dim=256, text_feature_dim=0)
+
+        # Test negative dimensions
+        with pytest.raises(ValueError, match="ts_feature_dim must be a positive integer"):
+            MultimodalFusion(ts_feature_dim=-1, text_feature_dim=128)
 
 
 class TestMultimodalTimesFMEnhanced:
