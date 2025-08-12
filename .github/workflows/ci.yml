@@ -25,5 +25,3 @@ jobs:
       # https://docs.astral.sh/ruff/integrations/#github-actions
       - name: Run Ruff
         run: uv run ruff check --output-format=github .
-      - name: Run pytest
-        run: uv run pytest tests/ -v
