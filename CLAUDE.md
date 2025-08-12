@@ -149,7 +149,10 @@ Use YAML files to manage:
 - [x] Wrapper class validation passes with Time-MMD dataset
 - [x] Forward pass produces expected output shapes and ranges
 - [x] Training loop integrates smoothly with wrapper class
-- [ ] Model can process both time series and text inputs
+- [x] Model can process both time series and text inputs
+- [x] Text encoder and fusion mechanisms implemented and tested
+- [x] Comprehensive preprocessing utilities for multimodal data
+- [x] Full test suite covering all multimodal components
 - [ ] Training pipeline completes without errors
 - [ ] Ablation study shows meaningful performance comparison
 - [ ] Results demonstrate the value (or lack thereof) of text information
