@@ -2,10 +2,13 @@
 
 import numpy as np
 import pytest
+import torch
+import torch.nn as nn
 from timesfm import TimesFmCheckpoint, TimesFmHparams
 
 from src.data.time_mmd_dataset import TimeMmdDataset
 from src.models.multimodal_timesfm import MultimodalTimesFM
+from src.models.text_encoder import MultimodalFusion, TextEncoder
 
 
 class TestMultimodalTimesFM:
@@ -311,3 +314,290 @@ class TestEndToEndIntegration:
 
         assert train_sample["time_series"].shape == test_sample["time_series"].shape
         assert train_sample["target"].shape == test_sample["target"].shape
+
+
+class TestTextEncoder:
+    """Test cases for TextEncoder component."""
+
+    @pytest.fixture
+    def text_encoder(self) -> TextEncoder:
+        """Creates TextEncoder instance for testing."""
+        return TextEncoder(model_name="all-MiniLM-L6-v2", embedding_dim=384)
+
+    def test_text_encoder_initialization(self) -> None:
+        """Tests TextEncoder initialization."""
+        encoder = TextEncoder(embedding_dim=256)
+        assert encoder.embedding_dim == 256
+        assert encoder.sentence_transformer is not None
+
+    def test_text_encoding(self, text_encoder: TextEncoder) -> None:
+        """Tests text encoding functionality."""
+        texts = ["This is a test sentence.", "Another test sentence with more words."]
+
+        embeddings = text_encoder(texts)
+
+        assert isinstance(embeddings, torch.Tensor)
+        assert embeddings.shape == (2, 384)
+        assert not torch.isnan(embeddings).any()
+        assert not torch.isinf(embeddings).any()
+
+    def test_single_text_encoding(self, text_encoder: TextEncoder) -> None:
+        """Tests encoding of single text."""
+        text = ["Climate data shows temperature trends."]
+
+        embeddings = text_encoder(text)
+
+        assert embeddings.shape == (1, 384)
+        assert not torch.isnan(embeddings).any()
+
+    def test_empty_text_handling(self, text_encoder: TextEncoder) -> None:
+        """Tests handling of empty text list."""
+        # sentence-transformers handles empty lists gracefully, returning a 1D tensor
+        result = text_encoder([])
+        assert result.shape == torch.Size([0]) or result.shape == (0, 384)
+        assert result.numel() == 0  # Should be empty tensor
+
+    def test_embedding_dimension_consistency(self) -> None:
+        """Tests that different embedding dimensions work correctly."""
+        # Use CPU to avoid MPS device issues in tests
+        encoder_128 = TextEncoder(embedding_dim=128)
+        encoder_512 = TextEncoder(embedding_dim=512)
+
+        # Move to CPU explicitly
+        encoder_128.to("cpu")
+        encoder_512.to("cpu")
+
+        texts = ["Test sentence"]
+
+        with torch.no_grad():  # Disable gradients for inference
+            emb_128 = encoder_128(texts)
+            emb_512 = encoder_512(texts)
+
+        assert emb_128.shape == (1, 128)
+        assert emb_512.shape == (1, 512)
+
+
+class TestMultimodalFusion:
+    """Test cases for addition-based MultimodalFusion component."""
+
+    @pytest.fixture
+    def fusion_module(self) -> MultimodalFusion:
+        """Creates addition-based fusion module."""
+        return MultimodalFusion(ts_feature_dim=256, text_feature_dim=384)
+
+    def test_fusion_initialization(self) -> None:
+        """Tests fusion module initialization."""
+        fusion = MultimodalFusion(ts_feature_dim=256, text_feature_dim=384)
+
+        assert fusion.ts_feature_dim == 256
+        assert fusion.text_feature_dim == 384
+        assert isinstance(fusion.text_projection, nn.Linear)
+        assert isinstance(fusion.activation, nn.ReLU)
+
+        # Check projection layer dimensions
+        assert fusion.text_projection.in_features == 384
+        assert fusion.text_projection.out_features == 256
+
+    def test_addition_fusion(self, fusion_module: MultimodalFusion) -> None:
+        """Tests addition-based fusion."""
+        batch_size, seq_len = 2, 10
+        ts_features = torch.randn(batch_size, seq_len, 256)
+        text_features = torch.randn(batch_size, 384)
+
+        fused = fusion_module(ts_features, text_features)
+
+        # Output should have same shape as input time series
+        assert fused.shape == (batch_size, seq_len, 256)
+        assert not torch.isnan(fused).any()
+        assert not torch.isinf(fused).any()
+
+    def test_fusion_different_batch_sizes(self, fusion_module: MultimodalFusion) -> None:
+        """Tests fusion with different batch sizes."""
+        for batch_size in [1, 3, 8]:
+            ts_features = torch.randn(batch_size, 20, 256)
+            text_features = torch.randn(batch_size, 384)
+
+            fused = fusion_module(ts_features, text_features)
+            assert fused.shape == (batch_size, 20, 256)
+
+    def test_fusion_different_sequence_lengths(self, fusion_module: MultimodalFusion) -> None:
+        """Tests fusion with different sequence lengths."""
+        for seq_len in [1, 32, 100]:
+            ts_features = torch.randn(2, seq_len, 256)
+            text_features = torch.randn(2, 384)
+
+            fused = fusion_module(ts_features, text_features)
+            assert fused.shape == (2, seq_len, 256)
+
+    def test_parameter_management(self, fusion_module: MultimodalFusion) -> None:
+        """Tests parameter access and modification methods."""
+        # Test parameter retrieval
+        params = fusion_module.get_projection_parameters()
+        assert "weight" in params
+        assert "bias" in params
+        assert params["weight"].shape == (256, 384)
+        assert params["bias"].shape == (256,)
+
+        # Test parameter setting
+        new_weight = torch.ones(256, 384) * 0.5
+        new_bias = torch.ones(256) * 0.1
+        new_params = {"weight": new_weight, "bias": new_bias}
+
+        fusion_module.set_projection_parameters(new_params)
+
+        # Verify parameters were set
+        retrieved_params = fusion_module.get_projection_parameters()
+        assert torch.allclose(retrieved_params["weight"], new_weight)
+        assert torch.allclose(retrieved_params["bias"], new_bias)
+
+    def test_freeze_unfreeze_functionality(self, fusion_module: MultimodalFusion) -> None:
+        """Tests parameter freezing and unfreezing."""
+        # Initially should not be frozen
+        assert not fusion_module.is_projection_frozen()
+
+        # Test freezing
+        fusion_module.freeze_projection()
+        assert fusion_module.is_projection_frozen()
+
+        # Verify parameters are actually frozen
+        for param in fusion_module.text_projection.parameters():
+            assert not param.requires_grad
+
+        # Test unfreezing
+        fusion_module.unfreeze_projection()
+        assert not fusion_module.is_projection_frozen()
+
+        # Verify parameters are unfrozen
+        for param in fusion_module.text_projection.parameters():
+            assert param.requires_grad
+
+    def test_fusion_loss_computation(self, fusion_module: MultimodalFusion) -> None:
+        """Tests fusion loss computation."""
+        batch_size, seq_len = 2, 50
+        ts_features = torch.randn(batch_size, seq_len, 256)
+        text_features = torch.randn(batch_size, 384)
+        target = torch.randn(batch_size, seq_len, 256)
+
+        # Test with default MSE loss
+        loss = fusion_module.compute_fusion_loss(ts_features, text_features, target)
+        assert isinstance(loss, torch.Tensor)
+        assert loss.dim() == 0  # Scalar loss
+        assert loss >= 0  # MSE loss should be non-negative
+
+    def test_input_validation(self, fusion_module: MultimodalFusion) -> None:
+        """Tests input validation."""
+        valid_ts = torch.randn(2, 10, 256)
+        valid_text = torch.randn(2, 384)
+
+        # Test wrong tensor dimensions
+        with pytest.raises(ValueError, match="ts_features must be 3D"):
+            fusion_module(torch.randn(2, 256), valid_text)  # 2D instead of 3D
+
+        with pytest.raises(ValueError, match="text_features must be 2D"):
+            fusion_module(valid_ts, torch.randn(2, 1, 384))  # 3D instead of 2D
+
+        # Test mismatched feature dimensions
+        with pytest.raises(ValueError, match="Time series feature dimension mismatch"):
+            fusion_module(torch.randn(2, 10, 128), valid_text)  # 128 != 256
+
+        with pytest.raises(ValueError, match="Text feature dimension mismatch"):
+            fusion_module(valid_ts, torch.randn(2, 512))  # 512 != 384
+
+        # Test batch size mismatch
+        with pytest.raises(ValueError, match="Batch size mismatch"):
+            fusion_module(torch.randn(2, 10, 256), torch.randn(3, 384))
+
+    def test_initialization_validation(self) -> None:
+        """Tests initialization parameter validation."""
+        # Test zero dimensions
+        with pytest.raises(ValueError, match="ts_feature_dim must be a positive integer"):
+            MultimodalFusion(ts_feature_dim=0, text_feature_dim=128)
+
+        with pytest.raises(ValueError, match="text_feature_dim must be a positive integer"):
+            MultimodalFusion(ts_feature_dim=256, text_feature_dim=0)
+
+        # Test negative dimensions
+        with pytest.raises(ValueError, match="ts_feature_dim must be a positive integer"):
+            MultimodalFusion(ts_feature_dim=-1, text_feature_dim=128)
+
+
+class TestMultimodalTimesFMEnhanced:
+    """Test cases for enhanced MultimodalTimesFM with text support."""
+
+    @pytest.fixture
+    def hparams(self) -> TimesFmHparams:
+        """Creates TimesFM hyperparameters for testing."""
+        return TimesFmHparams(
+            backend="cpu",
+            context_len=512,
+            horizon_len=128,
+            num_layers=50,
+            model_dims=1280,
+        )
+
+    @pytest.fixture
+    def checkpoint(self) -> TimesFmCheckpoint:
+        """Creates TimesFM checkpoint for testing."""
+        return TimesFmCheckpoint(huggingface_repo_id="google/timesfm-2.0-500m-pytorch")
+
+    @pytest.fixture
+    def multimodal_wrapper(self, hparams: TimesFmHparams, checkpoint: TimesFmCheckpoint) -> MultimodalTimesFM:
+        """Creates MultimodalTimesFM wrapper with multimodal enabled."""
+        return MultimodalTimesFM(hparams, checkpoint, enable_multimodal=True)
+
+    @pytest.fixture
+    def unimodal_wrapper(self, hparams: TimesFmHparams, checkpoint: TimesFmCheckpoint) -> MultimodalTimesFM:
+        """Creates MultimodalTimesFM wrapper with multimodal disabled."""
+        return MultimodalTimesFM(hparams, checkpoint, enable_multimodal=False)
+
+    def test_multimodal_initialization(self, multimodal_wrapper: MultimodalTimesFM) -> None:
+        """Tests multimodal wrapper initialization."""
+        assert multimodal_wrapper.is_multimodal_enabled()
+        assert multimodal_wrapper.get_text_encoder() is not None
+        assert multimodal_wrapper.get_fusion_module() is not None
+
+    def test_unimodal_initialization(self, unimodal_wrapper: MultimodalTimesFM) -> None:
+        """Tests unimodal wrapper initialization."""
+        assert not unimodal_wrapper.is_multimodal_enabled()
+        assert unimodal_wrapper.get_text_encoder() is None
+        assert unimodal_wrapper.get_fusion_module() is None
+
+    def test_text_encoding_functionality(self, multimodal_wrapper: MultimodalTimesFM) -> None:
+        """Tests text encoding through wrapper."""
+        texts = ["Climate data shows temperature trends.", "Weather patterns indicate seasonal changes."]
+
+        embeddings = multimodal_wrapper.encode_text(texts)
+
+        assert isinstance(embeddings, torch.Tensor)
+        assert embeddings.shape == (2, 384)
+        assert not torch.isnan(embeddings).any()
+
+    def test_text_encoding_disabled(self, unimodal_wrapper: MultimodalTimesFM) -> None:
+        """Tests that text encoding raises error when disabled."""
+        texts = ["Test text"]
+
+        with pytest.raises(RuntimeError):
+            unimodal_wrapper.encode_text(texts)
+
+    def test_forecast_with_text_inputs(self, multimodal_wrapper: MultimodalTimesFM) -> None:
+        """Tests forecasting with text inputs (currently falls back to TimesFM)."""
+        # Create dummy time series data
+        ts_data = [np.random.randn(512).astype(np.float32)]
+        text_data = ["Climate data showing temperature trends over time."]
+
+        # This should work but currently falls back to regular TimesFM
+        mean_forecast, quantile_forecast = multimodal_wrapper.forecast(ts_data, text_inputs=text_data)
+
+        assert isinstance(mean_forecast, np.ndarray)
+        assert isinstance(quantile_forecast, np.ndarray)
+        assert mean_forecast.shape == (1, 128)
+
+    def test_forecast_without_text_inputs(self, multimodal_wrapper: MultimodalTimesFM) -> None:
+        """Tests forecasting without text inputs."""
+        ts_data = [np.random.randn(512).astype(np.float32)]
+
+        mean_forecast, quantile_forecast = multimodal_wrapper.forecast(ts_data)
+
+        assert isinstance(mean_forecast, np.ndarray)
+        assert isinstance(quantile_forecast, np.ndarray)
+        assert mean_forecast.shape == (1, 128)
