@@ -7,7 +7,7 @@ import torch
 from timesfm import TimesFmCheckpoint, TimesFmHparams
 from timesfm.timesfm_torch import TimesFmTorch as TimesFm
 
-from .text_encoder import MultimodalFusion, TextEncoder
+from src.models.text_encoder import MultimodalFusion, TextEncoder
 
 
 class MultimodalTimesFM:

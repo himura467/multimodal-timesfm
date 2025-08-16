@@ -1,7 +1,5 @@
 """Text encoding components for multimodal TimesFM."""
 
-from typing import Dict, Optional
-
 import torch
 import torch.nn as nn
 from sentence_transformers import SentenceTransformer
@@ -195,7 +193,7 @@ class MultimodalFusion(nn.Module):
                 f"got {text_features.dim()}D with shape {text_features.shape}"
             )
 
-    def get_projection_parameters(self) -> Dict[str, torch.Tensor]:
+    def get_projection_parameters(self) -> dict[str, torch.Tensor]:
         """Get projection layer parameters for TimesFM integration.
 
         Returns:
@@ -203,7 +201,7 @@ class MultimodalFusion(nn.Module):
         """
         return {"weight": self.text_projection.weight.clone(), "bias": self.text_projection.bias.clone()}
 
-    def set_projection_parameters(self, parameters: Dict[str, torch.Tensor]) -> None:
+    def set_projection_parameters(self, parameters: dict[str, torch.Tensor]) -> None:
         """Set projection layer parameters for TimesFM integration.
 
         Args:
@@ -266,7 +264,7 @@ class MultimodalFusion(nn.Module):
         ts_features: torch.Tensor,
         text_features: torch.Tensor,
         target: torch.Tensor,
-        loss_fn: Optional[nn.Module] = None,
+        loss_fn: nn.Module | None = None,
     ) -> torch.Tensor:
         """Compute fusion loss for TimesFM integration.
 
