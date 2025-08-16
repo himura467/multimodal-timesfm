@@ -33,9 +33,9 @@ multimodal-timesfm/
 │   ├── evaluate.py                  # Evaluation script
 │   └── run_ablation.py              # Ablation study runner
 ├── configs/
-│   ├── base_config.yaml             # Base configuration
-│   ├── training_config.yaml         # Training parameters
-│   └── model_config.yaml            # Model architecture settings
+│   ├── base.yml                     # Base configuration
+│   ├── train.yml                    # Training parameters
+│   └── model.yml                    # Model architecture settings
 ├── tests/
 │   ├── __init__.py
 │   ├── test_models.py
@@ -165,7 +165,7 @@ Use YAML files to manage:
 **Phase 2: Model Architecture Enhancement** ✅ COMPLETED
 
 1. - [x] Implement text encoder using sentence transformers
-2. - [x] Design fusion mechanism for time series and text features  
+2. - [x] Design fusion mechanism for time series and text features
 3. - [x] Extend MultimodalTimesFM to handle text inputs
 4. - [x] Add multimodal forward pass functionality
 5. - [x] Create text preprocessing utilities
@@ -186,6 +186,7 @@ Use YAML files to manage:
 ## Implementation Notes
 
 **Completed Architecture:**
+
 - Addition-based MultimodalFusion with TimesFM integration capabilities
 - Comprehensive input validation and error handling implemented
 - Full test coverage with 57 tests passing across all components
@@ -193,6 +194,7 @@ Use YAML files to manage:
 - Production-ready code with proper documentation
 
 **Training Considerations:**
+
 - Consider using mixed precision training for efficiency
 - Fusion layer parameters can be selectively trained via freeze/unfreeze methods
 - Keep detailed logs of hyperparameter choices and their impact
