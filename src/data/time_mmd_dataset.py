@@ -5,9 +5,10 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from torch.utils.data import Dataset
 
 
-class TimeMmdDataset:
+class TimeMmdDataset(Dataset[dict[str, Any]]):
     """Dataset loader for Time-MMD dataset with time series and text data.
 
     This class loads multimodal time series data from the Time-MMD dataset structure,
