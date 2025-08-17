@@ -44,20 +44,13 @@ class TextEncoder(nn.Module):
             Tensor of shape (batch_size, embedding_dim) containing text embeddings.
         """
         # Generate embeddings using sentence transformer
-        try:
-            device_str = str(next(self.parameters()).device)
-        except StopIteration:
-            device_str = "cpu"
-        embeddings = self.sentence_transformer.encode(texts, convert_to_tensor=True, device=device_str)
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        embeddings = self.sentence_transformer.encode(texts, convert_to_tensor=True, device=device)
 
         # Apply projection if needed
         projected_embeddings = self.projection(embeddings)
 
         return torch.as_tensor(projected_embeddings)
-
-    def get_embedding_dim(self) -> int:
-        """Get the output embedding dimension."""
-        return self.embedding_dim
 
 
 class MultimodalFusion(nn.Module):
@@ -251,14 +244,6 @@ class MultimodalFusion(nn.Module):
         """
         return all(not param.requires_grad for param in self.text_projection.parameters())
 
-    def get_projection_layer(self) -> nn.Linear:
-        """Get direct access to the projection layer for TimesFM integration.
-
-        Returns:
-            The internal Linear projection layer.
-        """
-        return self.text_projection
-
     def compute_fusion_loss(
         self,
         ts_features: torch.Tensor,
@@ -283,11 +268,3 @@ class MultimodalFusion(nn.Module):
         fused_features = self(ts_features, text_features)
         loss_result = loss_fn(fused_features, target)
         return torch.as_tensor(loss_result)
-
-    def extra_repr(self) -> str:
-        """Return extra representation string for debugging."""
-        return (
-            f"ts_feature_dim={self.ts_feature_dim}, "
-            f"text_feature_dim={self.text_feature_dim}, "
-            f"projection_frozen={self.is_projection_frozen()}"
-        )
