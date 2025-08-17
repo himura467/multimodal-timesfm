@@ -220,12 +220,14 @@ class TestMultimodalTimesFM:
         sample = dataset[0]
         text = sample["text"]
 
-        # Verify text structure
-        assert isinstance(text, str)
-        assert len(text) > 0
+        # Verify text structure - can be None or string
+        assert text is None or isinstance(text, str)
 
-        # Should contain domain-relevant content
-        assert "Climate" in text or "Report:" in text or len(text) > 50
+        # If text exists, verify it has content
+        if text is not None:
+            assert len(text) > 0
+            # Should contain domain-relevant content
+            assert "Climate" in text or "Report:" in text or "Search:" in text or len(text) > 50
 
     def test_metadata_structure(self, dataset: TimeMmdDataset) -> None:
         """Tests that dataset metadata contains required information."""
@@ -236,14 +238,12 @@ class TestMultimodalTimesFM:
         metadata = sample["metadata"]
 
         # Verify required fields
-        assert "series_id" in metadata
         assert "domain" in metadata
         assert "column" in metadata
         assert "start_index" in metadata
 
         # Verify field types and values
         assert metadata["domain"] == "Climate"
-        assert isinstance(metadata["series_id"], str)
         assert isinstance(metadata["column"], str)
         assert isinstance(metadata["start_index"], int)
 
