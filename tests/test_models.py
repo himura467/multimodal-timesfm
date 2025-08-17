@@ -39,7 +39,7 @@ class TestMultimodalTimesFM:
     def dataset(self) -> TimeMmdDataset:
         """Creates Time-MMD dataset for testing."""
         return TimeMmdDataset(
-            data_dir="/Users/himura/Desktop/Time-MMD", domain="Climate", split="train", context_len=512, horizon_len=128
+            data_dir="data/Time-MMD", domain="Climate", split="train", context_len=512, horizon_len=128
         )
 
     def test_wrapper_initialization(self, hparams: MultimodalTimesFmHparams, checkpoint: TimesFmCheckpoint) -> None:
@@ -255,7 +255,7 @@ class TestEndToEndIntegration:
         """Tests the complete pipeline from data loading to forecasting."""
         # Create dataset
         dataset = TimeMmdDataset(
-            data_dir="/Users/himura/Desktop/Time-MMD", domain="Climate", split="train", context_len=512, horizon_len=128
+            data_dir="data/Time-MMD", domain="Climate", split="train", context_len=512, horizon_len=128
         )
 
         if len(dataset) == 0:
@@ -285,7 +285,7 @@ class TestEndToEndIntegration:
         """Tests that train/test splits work correctly with the wrapper."""
         # Create both splits using Environment dataset (has more data)
         train_dataset = TimeMmdDataset(
-            data_dir="/Users/himura/Desktop/Time-MMD",
+            data_dir="data/Time-MMD",
             domain="Environment",
             split="train",
             split_ratio=0.7,
@@ -294,7 +294,7 @@ class TestEndToEndIntegration:
         )
 
         test_dataset = TimeMmdDataset(
-            data_dir="/Users/himura/Desktop/Time-MMD",
+            data_dir="data/Time-MMD",
             domain="Environment",
             split="test",
             split_ratio=0.7,

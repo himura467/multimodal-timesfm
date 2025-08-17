@@ -11,7 +11,7 @@ class TestTimeMmdDataset:
     def test_agriculture_dataset_loading(self) -> None:
         """Tests loading Agriculture domain from Time-MMD dataset."""
         dataset = TimeMmdDataset(
-            data_dir="/Users/himura/Desktop/Time-MMD",
+            data_dir="data/Time-MMD",
             domain="Agriculture",
             split="train",
             context_len=50,  # Smaller for testing
@@ -49,7 +49,7 @@ class TestTimeMmdDataset:
     def test_split_functionality(self) -> None:
         """Tests train/test split functionality."""
         train_dataset = TimeMmdDataset(
-            data_dir="/Users/himura/Desktop/Time-MMD",
+            data_dir="data/Time-MMD",
             domain="Agriculture",
             split="train",
             split_ratio=0.7,
@@ -58,7 +58,7 @@ class TestTimeMmdDataset:
         )
 
         test_dataset = TimeMmdDataset(
-            data_dir="/Users/himura/Desktop/Time-MMD",
+            data_dir="data/Time-MMD",
             domain="Agriculture",
             split="test",
             split_ratio=0.7,
@@ -76,7 +76,7 @@ class TestTimeMmdDataset:
     def test_configurable_window_sizes(self) -> None:
         """Tests that window sizes are configurable."""
         dataset = TimeMmdDataset(
-            data_dir="/Users/himura/Desktop/Time-MMD",
+            data_dir="data/Time-MMD",
             domain="Agriculture",
             split="train",
             context_len=100,
@@ -91,7 +91,7 @@ class TestTimeMmdDataset:
     def test_get_split_info(self) -> None:
         """Tests dataset split information."""
         dataset = TimeMmdDataset(
-            data_dir="/Users/himura/Desktop/Time-MMD",
+            data_dir="data/Time-MMD",
             domain="Agriculture",
             split="train",
             context_len=50,
@@ -115,7 +115,7 @@ class TestTimeMmdDataset:
     def test_text_extraction(self) -> None:
         """Tests that textual data is properly extracted and formatted."""
         dataset = TimeMmdDataset(
-            data_dir="/Users/himura/Desktop/Time-MMD",
+            data_dir="data/Time-MMD",
             domain="Agriculture",
             split="train",
             context_len=50,
