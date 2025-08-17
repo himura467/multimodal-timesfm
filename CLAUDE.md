@@ -18,10 +18,10 @@ multimodal-timesfm/
 │   │   ├── __init__.py
 │   │   ├── time_mmd_dataset.py      # Time-MMD dataset loader
 │   │   └── preprocessing.py         # Data preprocessing utilities
-│   ├── training/
+│   ├── train/
 │   │   ├── __init__.py
 │   │   ├── trainer.py               # Training logic
-│   │   └── fine_tuner.py            # Fine-tuning specific code
+│   │   └── finetuner.py            # Fine-tuning specific code
 │   └── evaluation/
 │       ├── __init__.py
 │       ├── evaluator.py             # Evaluation metrics
@@ -43,7 +43,7 @@ multimodal-timesfm/
 │   ├── __init__.py
 │   ├── test_models.py
 │   ├── test_data.py
-│   └── test_training.py
+│   └── test_train.py
 ├── .gitmodules                      # Git submodule configuration
 ├── .python-version                  # Python 3.11
 ├── pyproject.toml                   # uv configuration
