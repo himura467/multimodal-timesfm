@@ -26,8 +26,11 @@ multimodal-timesfm/
 │       ├── __init__.py
 │       ├── evaluator.py             # Evaluation metrics
 │       └── ablation_study.py        # Ablation study implementation
+├── data/
+│   └── Time-MMD/                    # Time-MMD dataset submodule
+│       ├── numerical/               # Time series data by domain
+│       └── textual/                 # Text descriptions by domain
 ├── scripts/
-│   ├── setup_data.py                # Download and prepare Time-MMD data
 │   ├── validate_wrapper.py          # Wrapper class validation script
 │   ├── train.py                     # Main training script
 │   ├── evaluate.py                  # Evaluation script
@@ -41,6 +44,7 @@ multimodal-timesfm/
 │   ├── test_models.py
 │   ├── test_data.py
 │   └── test_training.py
+├── .gitmodules                      # Git submodule configuration
 ├── .python-version                  # Python 3.11
 ├── pyproject.toml                   # uv configuration
 ├── README.md
@@ -60,6 +64,7 @@ multimodal-timesfm/
    - Initially delegate all functionality to underlying TimesFM model
    - Define interfaces for multimodal input handling
 3. **Data pipeline setup**
+   - Add Time-MMD dataset as git submodule
    - Implement Time-MMD dataset loader
    - Create data preprocessing utilities
    - Set up train/test split (70/30)
@@ -156,6 +161,7 @@ Use YAML files to manage:
 - [x] Addition-based fusion with TimesFM integration capabilities
 - [x] Parameter management for selective training
 - [x] Production-ready code with comprehensive documentation
+- [x] Time-MMD dataset integrated as git submodule
 - [ ] Training pipeline completes without errors
 - [ ] Ablation study shows meaningful performance comparison
 - [ ] Results demonstrate the value (or lack thereof) of text information
@@ -185,11 +191,12 @@ Use YAML files to manage:
 
 ## Implementation Notes
 
-**Completed Architecture:**
+**Completed Infrastructure:**
 
 - Addition-based MultimodalFusion with TimesFM integration capabilities
 - Comprehensive input validation and error handling implemented
-- Full test coverage with 57 tests passing across all components
+- Streamlined preprocessing pipeline without unnecessary alignment/feature extraction
+- Time-MMD dataset integrated as git submodule for easy access
 - Type-safe implementation with mypy validation
 - Production-ready code with proper documentation
 
@@ -205,6 +212,15 @@ Use YAML files to manage:
 - `uv run ruff check`: Linting
 - `uv run ruff format`: Code formatting
 - `uv run pytest tests/ -v`: Run test suite
+
+## Data Access
+
+The Time-MMD dataset is included as a git submodule in `data/Time-MMD/`. It contains:
+
+- **Numerical data**: `data/Time-MMD/numerical/[domain]/[domain].csv` - Time series data for 10 domains
+- **Textual data**: `data/Time-MMD/textual/[domain]/[domain]_report.csv` and `[domain]_search.csv` - Text descriptions
+
+Domains include: Agriculture, Climate, Economy, Energy, Environment, Health_AFR, Health_US, Security, SocialGood, Traffic.
 
 ## Documentation Conventions
 
