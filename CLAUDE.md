@@ -206,6 +206,11 @@ Use YAML files to manage:
 - Fusion layer parameters can be selectively trained via freeze/unfreeze methods
 - Keep detailed logs of hyperparameter choices and their impact
 
+**Known Architecture Issues:**
+
+- Current text expansion fusion (line 156 in text_encoder.py) inappropriately assumes text context is equally relevant to all time steps
+- Need to replace with temporally-aware fusion mechanism (e.g., attention-based, cross-modal attention, or temporal text alignment)
+
 ## Bash Commands
 
 - `uv run mypy .`: Type checking
