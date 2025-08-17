@@ -123,25 +123,3 @@ def prepare_multimodal_batch(
         return standardized_ts, validated_text, metadata
 
     return timeseries_batch, validated_text, metadata
-
-
-def extract_text_features(text: str) -> dict[str, Any]:
-    """Extract basic features from text for analysis.
-
-    Args:
-        text: Input text string.
-
-    Returns:
-        Dictionary containing text features.
-    """
-    cleaned = clean_text(text)
-
-    features = {
-        "length": len(cleaned),
-        "word_count": len(cleaned.split()),
-        "has_numbers": bool(re.search(r"\d", cleaned)),
-        "has_punctuation": bool(re.search(r"[.,!?]", cleaned)),
-        "avg_word_length": np.mean([len(word) for word in cleaned.split()]) if cleaned.split() else 0.0,
-    }
-
-    return features

@@ -6,7 +6,6 @@ import pytest
 from src.data.preprocessing import (
     clean_text,
     denormalize_timeseries,
-    extract_text_features,
     prepare_multimodal_batch,
     standardize_timeseries,
     validate_text_inputs,
@@ -150,54 +149,3 @@ class TestBatchPreparation:
             if isinstance(ts, np.ndarray):
                 assert abs(np.mean(ts)) < 1e-10  # Should be ~0
                 assert abs(np.std(ts) - 1.0) < 1e-10  # Should be ~1
-
-
-class TestTextFeatureExtraction:
-    """Test cases for text feature extraction."""
-
-    def test_extract_basic_features(self) -> None:
-        """Tests extraction of basic text features."""
-        text = "Climate data shows temperature trends over time."
-
-        features = extract_text_features(text)
-
-        assert "length" in features
-        assert "word_count" in features
-        assert "has_numbers" in features
-        assert "has_punctuation" in features
-        assert "avg_word_length" in features
-
-        assert features["word_count"] == 7  # Adjusted based on actual cleaning behavior
-        assert features["has_punctuation"] is True
-        assert features["has_numbers"] is False
-        assert features["avg_word_length"] > 0
-
-    def test_extract_features_with_numbers(self) -> None:
-        """Tests feature extraction for text with numbers."""
-        text = "Temperature increased by 2.5 degrees in 2023"
-
-        features = extract_text_features(text)
-
-        assert features["has_numbers"] is True
-        assert features["word_count"] == 7
-
-    def test_extract_features_empty_text(self) -> None:
-        """Tests feature extraction for empty text."""
-        features = extract_text_features("")
-
-        assert features["length"] == 0
-        assert features["word_count"] == 0
-        assert features["has_numbers"] is False
-        assert features["has_punctuation"] is False
-        assert features["avg_word_length"] == 0.0
-
-    def test_extract_features_text_cleaning(self) -> None:
-        """Tests that feature extraction applies text cleaning."""
-        dirty_text = "  Climate   data!!!  @#$  "
-
-        features = extract_text_features(dirty_text)
-
-        # Should work with cleaned text
-        assert features["word_count"] == 2
-        assert features["has_punctuation"] is True  # ! remains
-        assert features["length"] > 0
