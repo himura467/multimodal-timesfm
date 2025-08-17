@@ -94,6 +94,21 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
             if col not in date_cols and pd.api.types.is_numeric_dtype(numerical_df[col])
         ]
 
+        # Prepare date series for efficient lookup
+        if "start_date" in numerical_df.columns:
+            full_start_dates = numerical_df["start_date"]
+        elif "Date" in numerical_df.columns:
+            full_start_dates = numerical_df["Date"]
+        elif "date" in numerical_df.columns:
+            full_start_dates = numerical_df["date"]
+        else:
+            raise ValueError("No start_date column found. Expected at least one of: 'start_date', 'Date', 'date'")
+
+        if "end_date" in numerical_df.columns:
+            full_end_dates = numerical_df["end_date"]
+        else:
+            raise ValueError("No end_date column found in numerical data")
+
         # Process each numeric column as a separate time series
         for col_idx, column in enumerate(numeric_cols):
             # Extract time series from this column
@@ -109,8 +124,12 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
 
             if self.split == "train":
                 ts_data = time_series_values[:split_idx]
+                start_dates = full_start_dates.iloc[:split_idx]
+                end_dates = full_end_dates.iloc[:split_idx]
             else:  # test
                 ts_data = time_series_values[split_idx:]
+                start_dates = full_start_dates.iloc[split_idx:]
+                end_dates = full_end_dates.iloc[split_idx:]
 
             # Skip if insufficient data after split
             if len(ts_data) < min_length:
@@ -129,15 +148,17 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
                 target_end = context_end + self.horizon_len
                 target = np.asarray(ts_data[context_end:target_end]).reshape(-1, 1)
 
-                # Get associated text for this column/variable
-                text_description = self._get_text_for_series(col_idx, textual_data, column)
+                # Get associated text for this time period
+                window_start_date = str(start_dates.iloc[start_idx])
+                window_end_date = str(end_dates.iloc[target_end - 1])
+
+                text_description = self._get_text_for_period(window_start_date, window_end_date, textual_data)
 
                 sample = {
                     "time_series": time_series.astype(np.float32),
                     "text": text_description,
                     "target": target.astype(np.float32),
                     "metadata": {
-                        "series_id": f"{self.domain}_{column}_{start_idx}",
                         "domain": self.domain,
                         "column": column,
                         "start_index": start_idx,
@@ -145,48 +166,63 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
                 }
                 self.data.append(sample)
 
-    def _get_text_for_series(
-        self, series_idx: int, textual_data: dict[str, pd.DataFrame], column_name: str = ""
-    ) -> str:
-        """Gets textual description for a time series.
+    def _get_text_for_period(self, start_date: str, end_date: str, textual_data: dict[str, pd.DataFrame]) -> str | None:
+        """Gets textual description for a specific time period.
 
         Args:
-            series_idx: Index of the time series.
+            start_date: Start date of the time period (YYYY-MM-DD format).
+            end_date: End date of the time period (YYYY-MM-DD format).
             textual_data: Dictionary containing textual dataframes.
-            column_name: Name of the column/variable for this time series.
 
         Returns:
-            Combined textual description for the series.
+            Combined textual description for the period, or None if no matching text data.
         """
         descriptions = []
 
-        # Add report text if available
+        # Convert dates to pandas datetime for comparison
+        period_start = pd.to_datetime(start_date)
+        period_end = pd.to_datetime(end_date)
+
+        # Add report text if available and within period
         if "reports" in textual_data:
             reports_df = textual_data["reports"]
-            if len(reports_df) > 0:
-                # Use the first available report entry (not tied to series_idx)
-                row = reports_df.iloc[0]
-                if "fact" in reports_df.columns and pd.notna(row["fact"]):
-                    descriptions.append(f"Report: {str(row['fact'])}")
-                if "preds" in reports_df.columns and pd.notna(row["preds"]):
-                    descriptions.append(f"Prediction: {str(row['preds'])}")
+            if "start_date" in reports_df.columns and "end_date" in reports_df.columns:
+                # Filter reports that overlap with the target period
+                reports_df = reports_df.copy()
+                reports_df["start_date"] = pd.to_datetime(reports_df["start_date"])
+                reports_df["end_date"] = pd.to_datetime(reports_df["end_date"])
 
-        # Add search text if available
+                matching_reports = reports_df[
+                    (reports_df["start_date"] <= period_end) & (reports_df["end_date"] >= period_start)
+                ]
+
+                for _, row in matching_reports.iterrows():
+                    if "fact" in reports_df.columns and pd.notna(row["fact"]):
+                        descriptions.append(f"Report: {str(row['fact'])}")
+                    if "preds" in reports_df.columns and pd.notna(row["preds"]):
+                        descriptions.append(f"Prediction: {str(row['preds'])}")
+
+        # Add search text if available and within period
         if "search" in textual_data:
             search_df = textual_data["search"]
-            if len(search_df) > 0:
-                # Use the first available search entry (not tied to series_idx)
-                row = search_df.iloc[0]
-                if "fact" in search_df.columns and pd.notna(row["fact"]) and str(row["fact"]) != "NA":
-                    descriptions.append(f"Search: {str(row['fact'])}")
-                if "preds" in search_df.columns and pd.notna(row["preds"]) and str(row["preds"]) != "NA":
-                    descriptions.append(f"Search prediction: {str(row['preds'])}")
+            if "start_date" in search_df.columns and "end_date" in search_df.columns:
+                # Filter search results that overlap with the target period
+                search_df = search_df.copy()
+                search_df["start_date"] = pd.to_datetime(search_df["start_date"])
+                search_df["end_date"] = pd.to_datetime(search_df["end_date"])
 
-        # Return combined description or default
-        if descriptions:
-            return " ".join(descriptions)
-        else:
-            return f"Time series from {self.domain} domain, variable: {column_name}"
+                matching_search = search_df[
+                    (search_df["start_date"] <= period_end) & (search_df["end_date"] >= period_start)
+                ]
+
+                for _, row in matching_search.iterrows():
+                    if "fact" in search_df.columns and pd.notna(row["fact"]) and str(row["fact"]) != "NA":
+                        descriptions.append(f"Search: {str(row['fact'])}")
+                    if "preds" in search_df.columns and pd.notna(row["preds"]) and str(row["preds"]) != "NA":
+                        descriptions.append(f"Search prediction: {str(row['preds'])}")
+
+        # Return combined description or None if no matching text data
+        return " ".join(descriptions) if descriptions else None
 
     def __len__(self) -> int:
         """Returns dataset size."""
@@ -202,20 +238,3 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
             Dictionary containing time series, text, target, and metadata.
         """
         return self.data[idx]
-
-    def get_split_info(self) -> dict[str, Any]:
-        """Gets information about the dataset split.
-
-        Returns:
-            Dictionary with split information including size, shapes, and metadata.
-        """
-        return {
-            "domain": self.domain,
-            "split": self.split,
-            "split_ratio": self.split_ratio,
-            "size": len(self.data),
-            "data_dir": str(self.data_dir),
-            "has_text": len(self.data) > 0 and "text" in self.data[0],
-            "time_series_shape": self.data[0]["time_series"].shape if self.data else None,
-            "target_shape": self.data[0]["target"].shape if self.data else None,
-        }
