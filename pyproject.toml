@@ -38,6 +38,7 @@ ignore_missing_imports = true
 
 [tool.ruff]
 target-version = "py311"
+exclude = ["data/Time-MMD"]
 
 line-length = 120
 
