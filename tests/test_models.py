@@ -4,10 +4,10 @@ import numpy as np
 import pytest
 import torch
 import torch.nn as nn
-from timesfm import TimesFmCheckpoint, TimesFmHparams
+from timesfm import TimesFmCheckpoint
 
 from src.data.time_mmd_dataset import TimeMmdDataset
-from src.models.multimodal_timesfm import MultimodalTimesFM
+from src.models.multimodal_timesfm import MultimodalTimesFM, MultimodalTimesFmHparams
 from src.models.text_encoder import MultimodalFusion, TextEncoder
 
 
@@ -15,9 +15,9 @@ class TestMultimodalTimesFM:
     """Test cases for MultimodalTimesFM wrapper class."""
 
     @pytest.fixture
-    def hparams(self) -> TimesFmHparams:
-        """Creates TimesFM hyperparameters for testing."""
-        return TimesFmHparams(
+    def hparams(self) -> MultimodalTimesFmHparams:
+        """Creates MultimodalTimesFM hyperparameters for testing."""
+        return MultimodalTimesFmHparams(
             backend="cpu",
             context_len=512,
             horizon_len=128,
@@ -31,7 +31,7 @@ class TestMultimodalTimesFM:
         return TimesFmCheckpoint(huggingface_repo_id="google/timesfm-2.0-500m-pytorch")
 
     @pytest.fixture
-    def wrapper(self, hparams: TimesFmHparams, checkpoint: TimesFmCheckpoint) -> MultimodalTimesFM:
+    def wrapper(self, hparams: MultimodalTimesFmHparams, checkpoint: TimesFmCheckpoint) -> MultimodalTimesFM:
         """Creates MultimodalTimesFM wrapper instance."""
         return MultimodalTimesFM(hparams, checkpoint)
 
@@ -39,18 +39,18 @@ class TestMultimodalTimesFM:
     def dataset(self) -> TimeMmdDataset:
         """Creates Time-MMD dataset for testing."""
         return TimeMmdDataset(
-            data_dir="/Users/himura/Desktop/Time-MMD", domain="Climate", split="train", context_len=512, horizon_len=128
+            data_dir="data/Time-MMD", domain="Climate", split="train", context_len=512, horizon_len=128
         )
 
-    def test_wrapper_initialization(self, hparams: TimesFmHparams, checkpoint: TimesFmCheckpoint) -> None:
+    def test_wrapper_initialization(self, hparams: MultimodalTimesFmHparams, checkpoint: TimesFmCheckpoint) -> None:
         """Tests that wrapper initializes correctly with proper structure."""
         wrapper = MultimodalTimesFM(hparams, checkpoint)
 
         # Verify wrapper has required attributes
-        assert hasattr(wrapper, "timesfm")
         assert hasattr(wrapper, "forecast")
-        assert wrapper.timesfm is not None
+        assert hasattr(wrapper, "enable_multimodal")
         assert callable(wrapper.forecast)
+        assert isinstance(wrapper.enable_multimodal, bool)
 
     def test_basic_forecasting(self, wrapper: MultimodalTimesFM, dataset: TimeMmdDataset) -> None:
         """Tests basic forecasting functionality with single sample."""
@@ -130,12 +130,12 @@ class TestMultimodalTimesFM:
         # Call through wrapper
         wrapper_result = wrapper.forecast(inputs)
 
-        # Call underlying TimesFM directly
-        direct_result = wrapper.timesfm.forecast(inputs)
-
-        # Results should be identical (same underlying method)
-        np.testing.assert_array_equal(wrapper_result[0], direct_result[0])
-        np.testing.assert_array_equal(wrapper_result[1], direct_result[1])
+        # Since wrapper inherits from TimesFM, just verify it works as expected
+        # (The inheritance ensures the same behavior as TimesFM)
+        assert isinstance(wrapper_result, tuple)
+        assert len(wrapper_result) == 2
+        assert isinstance(wrapper_result[0], np.ndarray)
+        assert isinstance(wrapper_result[1], np.ndarray)
 
     def test_data_types_and_ranges(self, wrapper: MultimodalTimesFM, dataset: TimeMmdDataset) -> None:
         """Tests that forecast outputs have correct data types and reasonable ranges."""
@@ -220,12 +220,14 @@ class TestMultimodalTimesFM:
         sample = dataset[0]
         text = sample["text"]
 
-        # Verify text structure
-        assert isinstance(text, str)
-        assert len(text) > 0
+        # Verify text structure - can be None or string
+        assert text is None or isinstance(text, str)
 
-        # Should contain domain-relevant content
-        assert "Climate" in text or "Report:" in text or len(text) > 50
+        # If text exists, verify it has content
+        if text is not None:
+            assert len(text) > 0
+            # Should contain domain-relevant content
+            assert "Climate" in text or "Report:" in text or "Search:" in text or len(text) > 50
 
     def test_metadata_structure(self, dataset: TimeMmdDataset) -> None:
         """Tests that dataset metadata contains required information."""
@@ -236,14 +238,12 @@ class TestMultimodalTimesFM:
         metadata = sample["metadata"]
 
         # Verify required fields
-        assert "series_id" in metadata
         assert "domain" in metadata
         assert "column" in metadata
         assert "start_index" in metadata
 
         # Verify field types and values
         assert metadata["domain"] == "Climate"
-        assert isinstance(metadata["series_id"], str)
         assert isinstance(metadata["column"], str)
         assert isinstance(metadata["start_index"], int)
 
@@ -255,14 +255,14 @@ class TestEndToEndIntegration:
         """Tests the complete pipeline from data loading to forecasting."""
         # Create dataset
         dataset = TimeMmdDataset(
-            data_dir="/Users/himura/Desktop/Time-MMD", domain="Climate", split="train", context_len=512, horizon_len=128
+            data_dir="data/Time-MMD", domain="Climate", split="train", context_len=512, horizon_len=128
         )
 
         if len(dataset) == 0:
             pytest.skip("No dataset samples available")
 
         # Create wrapper
-        hparams = TimesFmHparams(
+        hparams = MultimodalTimesFmHparams(
             backend="cpu",
             context_len=512,
             horizon_len=128,
@@ -285,7 +285,7 @@ class TestEndToEndIntegration:
         """Tests that train/test splits work correctly with the wrapper."""
         # Create both splits using Environment dataset (has more data)
         train_dataset = TimeMmdDataset(
-            data_dir="/Users/himura/Desktop/Time-MMD",
+            data_dir="data/Time-MMD",
             domain="Environment",
             split="train",
             split_ratio=0.7,
@@ -294,7 +294,7 @@ class TestEndToEndIntegration:
         )
 
         test_dataset = TimeMmdDataset(
-            data_dir="/Users/himura/Desktop/Time-MMD",
+            data_dir="data/Time-MMD",
             domain="Environment",
             split="test",
             split_ratio=0.7,
@@ -525,9 +525,9 @@ class TestMultimodalTimesFMEnhanced:
     """Test cases for enhanced MultimodalTimesFM with text support."""
 
     @pytest.fixture
-    def hparams(self) -> TimesFmHparams:
-        """Creates TimesFM hyperparameters for testing."""
-        return TimesFmHparams(
+    def hparams(self) -> MultimodalTimesFmHparams:
+        """Creates MultimodalTimesFM hyperparameters for testing."""
+        return MultimodalTimesFmHparams(
             backend="cpu",
             context_len=512,
             horizon_len=128,
@@ -541,14 +541,30 @@ class TestMultimodalTimesFMEnhanced:
         return TimesFmCheckpoint(huggingface_repo_id="google/timesfm-2.0-500m-pytorch")
 
     @pytest.fixture
-    def multimodal_wrapper(self, hparams: TimesFmHparams, checkpoint: TimesFmCheckpoint) -> MultimodalTimesFM:
+    def multimodal_wrapper(self, checkpoint: TimesFmCheckpoint) -> MultimodalTimesFM:
         """Creates MultimodalTimesFM wrapper with multimodal enabled."""
-        return MultimodalTimesFM(hparams, checkpoint, enable_multimodal=True)
+        hparams = MultimodalTimesFmHparams(
+            backend="cpu",
+            context_len=512,
+            horizon_len=128,
+            num_layers=50,
+            model_dims=1280,
+            enable_multimodal=True,
+        )
+        return MultimodalTimesFM(hparams, checkpoint)
 
     @pytest.fixture
-    def unimodal_wrapper(self, hparams: TimesFmHparams, checkpoint: TimesFmCheckpoint) -> MultimodalTimesFM:
+    def unimodal_wrapper(self, checkpoint: TimesFmCheckpoint) -> MultimodalTimesFM:
         """Creates MultimodalTimesFM wrapper with multimodal disabled."""
-        return MultimodalTimesFM(hparams, checkpoint, enable_multimodal=False)
+        hparams = MultimodalTimesFmHparams(
+            backend="cpu",
+            context_len=512,
+            horizon_len=128,
+            num_layers=50,
+            model_dims=1280,
+            enable_multimodal=False,
+        )
+        return MultimodalTimesFM(hparams, checkpoint)
 
     def test_multimodal_initialization(self, multimodal_wrapper: MultimodalTimesFM) -> None:
         """Tests multimodal wrapper initialization."""

@@ -18,29 +18,33 @@ multimodal-timesfm/
 │   │   ├── __init__.py
 │   │   ├── time_mmd_dataset.py      # Time-MMD dataset loader
 │   │   └── preprocessing.py         # Data preprocessing utilities
-│   ├── training/
+│   ├── train/
 │   │   ├── __init__.py
 │   │   ├── trainer.py               # Training logic
-│   │   └── fine_tuner.py            # Fine-tuning specific code
+│   │   └── finetuner.py            # Fine-tuning specific code
 │   └── evaluation/
 │       ├── __init__.py
 │       ├── evaluator.py             # Evaluation metrics
 │       └── ablation_study.py        # Ablation study implementation
+├── data/
+│   └── Time-MMD/                    # Time-MMD dataset submodule
+│       ├── numerical/               # Time series data by domain
+│       └── textual/                 # Text descriptions by domain
 ├── scripts/
-│   ├── setup_data.py                # Download and prepare Time-MMD data
 │   ├── validate_wrapper.py          # Wrapper class validation script
 │   ├── train.py                     # Main training script
 │   ├── evaluate.py                  # Evaluation script
 │   └── run_ablation.py              # Ablation study runner
 ├── configs/
-│   ├── base_config.yaml             # Base configuration
-│   ├── training_config.yaml         # Training parameters
-│   └── model_config.yaml            # Model architecture settings
+│   ├── base.yml                     # Base configuration
+│   ├── train.yml                    # Training parameters
+│   └── model.yml                    # Model architecture settings
 ├── tests/
 │   ├── __init__.py
 │   ├── test_models.py
 │   ├── test_data.py
-│   └── test_training.py
+│   └── test_train.py
+├── .gitmodules                      # Git submodule configuration
 ├── .python-version                  # Python 3.11
 ├── pyproject.toml                   # uv configuration
 ├── README.md
@@ -60,6 +64,7 @@ multimodal-timesfm/
    - Initially delegate all functionality to underlying TimesFM model
    - Define interfaces for multimodal input handling
 3. **Data pipeline setup**
+   - Add Time-MMD dataset as git submodule
    - Implement Time-MMD dataset loader
    - Create data preprocessing utilities
    - Set up train/test split (70/30)
@@ -156,6 +161,7 @@ Use YAML files to manage:
 - [x] Addition-based fusion with TimesFM integration capabilities
 - [x] Parameter management for selective training
 - [x] Production-ready code with comprehensive documentation
+- [x] Time-MMD dataset integrated as git submodule
 - [ ] Training pipeline completes without errors
 - [ ] Ablation study shows meaningful performance comparison
 - [ ] Results demonstrate the value (or lack thereof) of text information
@@ -165,7 +171,7 @@ Use YAML files to manage:
 **Phase 2: Model Architecture Enhancement** ✅ COMPLETED
 
 1. - [x] Implement text encoder using sentence transformers
-2. - [x] Design fusion mechanism for time series and text features  
+2. - [x] Design fusion mechanism for time series and text features
 3. - [x] Extend MultimodalTimesFM to handle text inputs
 4. - [x] Add multimodal forward pass functionality
 5. - [x] Create text preprocessing utilities
@@ -185,17 +191,25 @@ Use YAML files to manage:
 
 ## Implementation Notes
 
-**Completed Architecture:**
+**Completed Infrastructure:**
+
 - Addition-based MultimodalFusion with TimesFM integration capabilities
 - Comprehensive input validation and error handling implemented
-- Full test coverage with 57 tests passing across all components
+- Streamlined preprocessing pipeline without unnecessary alignment/feature extraction
+- Time-MMD dataset integrated as git submodule for easy access
 - Type-safe implementation with mypy validation
 - Production-ready code with proper documentation
 
 **Training Considerations:**
+
 - Consider using mixed precision training for efficiency
 - Fusion layer parameters can be selectively trained via freeze/unfreeze methods
 - Keep detailed logs of hyperparameter choices and their impact
+
+**Known Architecture Issues:**
+
+- Current text expansion fusion (line 156 in text_encoder.py) inappropriately assumes text context is equally relevant to all time steps
+- Need to replace with temporally-aware fusion mechanism (e.g., attention-based, cross-modal attention, or temporal text alignment)
 
 ## Bash Commands
 
@@ -203,6 +217,15 @@ Use YAML files to manage:
 - `uv run ruff check`: Linting
 - `uv run ruff format`: Code formatting
 - `uv run pytest tests/ -v`: Run test suite
+
+## Data Access
+
+The Time-MMD dataset is included as a git submodule in `data/Time-MMD/`. It contains:
+
+- **Numerical data**: `data/Time-MMD/numerical/[domain]/[domain].csv` - Time series data for 10 domains
+- **Textual data**: `data/Time-MMD/textual/[domain]/[domain]_report.csv` and `[domain]_search.csv` - Text descriptions
+
+Domains include: Agriculture, Climate, Economy, Energy, Environment, Health_AFR, Health_US, Security, SocialGood, Traffic.
 
 ## Documentation Conventions
 

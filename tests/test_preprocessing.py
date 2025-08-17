@@ -4,10 +4,8 @@ import numpy as np
 import pytest
 
 from src.data.preprocessing import (
-    align_text_and_timeseries,
     clean_text,
     denormalize_timeseries,
-    extract_text_features,
     prepare_multimodal_batch,
     standardize_timeseries,
     validate_text_inputs,
@@ -77,48 +75,6 @@ class TestTextPreprocessing:
 
         with pytest.raises(ValueError, match="empty after cleaning"):
             validate_text_inputs(texts)
-
-
-class TestTextTimeseriesAlignment:
-    """Test cases for aligning text and time series data."""
-
-    def test_align_equal_lengths(self) -> None:
-        """Tests alignment when lengths are equal."""
-        ts_data = [np.array([1, 2, 3]), np.array([4, 5, 6])]
-        text_data = ["First series", "Second series"]
-
-        aligned_ts, aligned_text = align_text_and_timeseries(ts_data, text_data)
-
-        assert len(aligned_ts) == len(aligned_text) == 2
-        assert aligned_text == ["First series", "Second series"]
-
-    def test_align_single_text_multiple_ts(self) -> None:
-        """Tests alignment with single text for multiple time series."""
-        ts_data = [np.array([1, 2, 3]), np.array([4, 5, 6]), np.array([7, 8, 9])]
-        text_data = ["Climate data"]
-
-        aligned_ts, aligned_text = align_text_and_timeseries(ts_data, text_data)
-
-        assert len(aligned_ts) == len(aligned_text) == 3
-        assert all(text == "Climate data" for text in aligned_text)
-
-    def test_align_single_ts_multiple_text(self) -> None:
-        """Tests alignment with single time series for multiple texts."""
-        ts_data = [np.array([1, 2, 3])]
-        text_data = ["First description", "Second description"]
-
-        aligned_ts, aligned_text = align_text_and_timeseries(ts_data, text_data)
-
-        assert len(aligned_ts) == len(aligned_text) == 2
-        assert all(np.array_equal(ts, np.array([1, 2, 3])) for ts in aligned_ts)
-
-    def test_align_mismatched_lengths_error(self) -> None:
-        """Tests error for mismatched lengths that cannot be aligned."""
-        ts_data = [np.array([1, 2, 3]), np.array([4, 5, 6])]
-        text_data = ["First", "Second", "Third"]
-
-        with pytest.raises(ValueError, match="Cannot align"):
-            align_text_and_timeseries(ts_data, text_data)
 
 
 class TestTimeseriesNormalization:
@@ -193,64 +149,3 @@ class TestBatchPreparation:
             if isinstance(ts, np.ndarray):
                 assert abs(np.mean(ts)) < 1e-10  # Should be ~0
                 assert abs(np.std(ts) - 1.0) < 1e-10  # Should be ~1
-
-    def test_prepare_batch_alignment(self) -> None:
-        """Tests that batch preparation handles alignment."""
-        ts_batch = [np.array([1, 2, 3]), np.array([4, 5, 6])]
-        text_batch = ["Single description"]
-
-        processed_ts, processed_text, metadata = prepare_multimodal_batch(ts_batch, text_batch, standardize=False)
-
-        assert len(processed_ts) == len(processed_text) == 2
-        assert all(text == "Single description" for text in processed_text)
-
-
-class TestTextFeatureExtraction:
-    """Test cases for text feature extraction."""
-
-    def test_extract_basic_features(self) -> None:
-        """Tests extraction of basic text features."""
-        text = "Climate data shows temperature trends over time."
-
-        features = extract_text_features(text)
-
-        assert "length" in features
-        assert "word_count" in features
-        assert "has_numbers" in features
-        assert "has_punctuation" in features
-        assert "avg_word_length" in features
-
-        assert features["word_count"] == 7  # Adjusted based on actual cleaning behavior
-        assert features["has_punctuation"] is True
-        assert features["has_numbers"] is False
-        assert features["avg_word_length"] > 0
-
-    def test_extract_features_with_numbers(self) -> None:
-        """Tests feature extraction for text with numbers."""
-        text = "Temperature increased by 2.5 degrees in 2023"
-
-        features = extract_text_features(text)
-
-        assert features["has_numbers"] is True
-        assert features["word_count"] == 7
-
-    def test_extract_features_empty_text(self) -> None:
-        """Tests feature extraction for empty text."""
-        features = extract_text_features("")
-
-        assert features["length"] == 0
-        assert features["word_count"] == 0
-        assert features["has_numbers"] is False
-        assert features["has_punctuation"] is False
-        assert features["avg_word_length"] == 0.0
-
-    def test_extract_features_text_cleaning(self) -> None:
-        """Tests that feature extraction applies text cleaning."""
-        dirty_text = "  Climate   data!!!  @#$  "
-
-        features = extract_text_features(dirty_text)
-
-        # Should work with cleaned text
-        assert features["word_count"] == 2
-        assert features["has_punctuation"] is True  # ! remains
-        assert features["length"] > 0

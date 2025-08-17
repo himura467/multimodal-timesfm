@@ -1,5 +1,6 @@
 """MultimodalTimesFM wrapper class that extends TimesFM to support multimodal inputs."""
 
+import dataclasses
 from typing import Any, Sequence
 
 import numpy as np
@@ -10,7 +11,22 @@ from timesfm.timesfm_torch import TimesFmTorch as TimesFm
 from src.models.text_encoder import MultimodalFusion, TextEncoder
 
 
-class MultimodalTimesFM:
+@dataclasses.dataclass(kw_only=True)
+class MultimodalTimesFmHparams(TimesFmHparams):  # type: ignore[misc]
+    """Hyperparameters for MultimodalTimesFM that extend TimesFmHparams.
+
+    Attributes:
+        text_encoder_model: Name of the sentence transformer model for text encoding.
+        text_embedding_dim: Dimension of text embeddings.
+        enable_multimodal: Whether to enable multimodal functionality.
+    """
+
+    text_encoder_model: str = "all-MiniLM-L6-v2"
+    text_embedding_dim: int = 384
+    enable_multimodal: bool = True
+
+
+class MultimodalTimesFM(TimesFm):  # type: ignore[misc]
     """Wrapper class for TimesFM that supports multimodal inputs including text.
 
     This class extends TimesFM to handle both time series data and text descriptions,
@@ -20,29 +36,24 @@ class MultimodalTimesFM:
 
     def __init__(
         self,
-        hparams: TimesFmHparams,
+        hparams: MultimodalTimesFmHparams,
         checkpoint: TimesFmCheckpoint,
-        text_encoder_model: str = "all-MiniLM-L6-v2",
-        text_embedding_dim: int = 384,
-        enable_multimodal: bool = True,
     ) -> None:
         """Initializes MultimodalTimesFM wrapper.
 
         Args:
-            hparams: Hyperparameters of the model.
+            hparams: Multimodal hyperparameters of the model.
             checkpoint: Checkpoint to load. checkpoint.version decides which TimesFM version to use.
-            text_encoder_model: Name of the sentence transformer model for text encoding.
-            text_embedding_dim: Dimension of text embeddings.
-            enable_multimodal: Whether to enable multimodal functionality.
         """
-        # Initialize the underlying TimesFM model
-        self.timesfm = TimesFm(hparams, checkpoint)
-        self.enable_multimodal = enable_multimodal
+        # Initialize the parent TimesFM model
+        super().__init__(hparams, checkpoint)
 
-        if enable_multimodal:
+        self.enable_multimodal = hparams.enable_multimodal
+
+        if self.enable_multimodal:
             # Initialize text encoder
             self.text_encoder: TextEncoder | None = TextEncoder(
-                model_name=text_encoder_model, embedding_dim=text_embedding_dim
+                model_name=hparams.text_encoder_model, embedding_dim=hparams.text_embedding_dim
             )
 
             # Initialize fusion mechanism using addition-based fusion
@@ -50,7 +61,7 @@ class MultimodalTimesFM:
             # For now, using placeholder values that will need to be adjusted
             self.fusion: MultimodalFusion | None = MultimodalFusion(
                 ts_feature_dim=512,  # Placeholder - needs actual TimesFM feature dim
-                text_feature_dim=text_embedding_dim,
+                text_feature_dim=hparams.text_embedding_dim,
             )
         else:
             self.text_encoder = None
@@ -78,11 +89,11 @@ class MultimodalTimesFM:
         """
         # If multimodal is disabled or no text inputs provided, use original TimesFM
         if not self.enable_multimodal or text_inputs is None:
-            return self.timesfm.forecast(inputs, freq=freq, **kwargs)  # type: ignore[no-any-return]
+            return super().forecast(inputs, freq=freq, **kwargs)  # type: ignore[no-any-return]
 
         # For now, use original TimesFM as the underlying model doesn't support our fusion yet
         # TODO: Implement actual multimodal forecasting when we can access TimesFM internals
-        return self.timesfm.forecast(inputs, freq=freq, **kwargs)  # type: ignore[no-any-return]
+        return super().forecast(inputs, freq=freq, **kwargs)  # type: ignore[no-any-return]
 
     def encode_text(self, texts: list[str]) -> torch.Tensor:
         """Encode text inputs into embeddings.
