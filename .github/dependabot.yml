@@ -6,7 +6,7 @@ updates:
       interval: "daily"
       time: "12:00"
       timezone: "Asia/Tokyo"
-    target-branch: "develop"
+    target-branch: "main"
     open-pull-requests-limit: 1
   - package-ecosystem: "uv"
     directory: "/"
@@ -14,5 +14,5 @@ updates:
       interval: "daily"
       time: "12:00"
       timezone: "Asia/Tokyo"
-    target-branch: "develop"
+    target-branch: "main"
     open-pull-requests-limit: 1
