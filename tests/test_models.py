@@ -402,7 +402,7 @@ class TestMultimodalFusion:
         """Tests addition-based fusion."""
         batch_size, seq_len = 2, 10
         ts_features = torch.randn(batch_size, seq_len, 256)
-        text_features = torch.randn(batch_size, 384)
+        text_features = torch.randn(batch_size, seq_len, 384)
 
         fused = fusion_module(ts_features, text_features)
 
@@ -415,7 +415,7 @@ class TestMultimodalFusion:
         """Tests fusion with different batch sizes."""
         for batch_size in [1, 3, 8]:
             ts_features = torch.randn(batch_size, 20, 256)
-            text_features = torch.randn(batch_size, 384)
+            text_features = torch.randn(batch_size, 20, 384)
 
             fused = fusion_module(ts_features, text_features)
             assert fused.shape == (batch_size, 20, 256)
@@ -424,7 +424,7 @@ class TestMultimodalFusion:
         """Tests fusion with different sequence lengths."""
         for seq_len in [1, 32, 100]:
             ts_features = torch.randn(2, seq_len, 256)
-            text_features = torch.randn(2, 384)
+            text_features = torch.randn(2, seq_len, 384)
 
             fused = fusion_module(ts_features, text_features)
             assert fused.shape == (2, seq_len, 256)
@@ -475,7 +475,7 @@ class TestMultimodalFusion:
         """Tests fusion loss computation."""
         batch_size, seq_len = 2, 50
         ts_features = torch.randn(batch_size, seq_len, 256)
-        text_features = torch.randn(batch_size, 384)
+        text_features = torch.randn(batch_size, seq_len, 384)
         target = torch.randn(batch_size, seq_len, 256)
 
         # Test with default MSE loss
@@ -487,25 +487,29 @@ class TestMultimodalFusion:
     def test_input_validation(self, fusion_module: MultimodalFusion) -> None:
         """Tests input validation."""
         valid_ts = torch.randn(2, 10, 256)
-        valid_text = torch.randn(2, 384)
+        valid_text = torch.randn(2, 10, 384)
 
         # Test wrong tensor dimensions
         with pytest.raises(ValueError, match="ts_features must be 3D"):
             fusion_module(torch.randn(2, 256), valid_text)  # 2D instead of 3D
 
-        with pytest.raises(ValueError, match="text_features must be 2D"):
-            fusion_module(valid_ts, torch.randn(2, 1, 384))  # 3D instead of 2D
+        with pytest.raises(ValueError, match="text_features must be 3D"):
+            fusion_module(valid_ts, torch.randn(2, 384))  # 2D instead of 3D
 
         # Test mismatched feature dimensions
         with pytest.raises(ValueError, match="Time series feature dimension mismatch"):
             fusion_module(torch.randn(2, 10, 128), valid_text)  # 128 != 256
 
         with pytest.raises(ValueError, match="Text feature dimension mismatch"):
-            fusion_module(valid_ts, torch.randn(2, 512))  # 512 != 384
+            fusion_module(valid_ts, torch.randn(2, 10, 512))  # 512 != 384
 
         # Test batch size mismatch
         with pytest.raises(ValueError, match="Batch size mismatch"):
-            fusion_module(torch.randn(2, 10, 256), torch.randn(3, 384))
+            fusion_module(torch.randn(2, 10, 256), torch.randn(3, 10, 384))
+
+        # Test sequence length mismatch
+        with pytest.raises(ValueError, match="Sequence length mismatch"):
+            fusion_module(torch.randn(2, 10, 256), torch.randn(2, 5, 384))
 
     def test_initialization_validation(self) -> None:
         """Tests initialization parameter validation."""
