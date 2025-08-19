@@ -44,8 +44,7 @@ class TextEncoder(nn.Module):
             Tensor of shape (batch_size, embedding_dim) containing text embeddings.
         """
         # Generate embeddings using sentence transformer
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        embeddings = self.sentence_transformer.encode(texts, convert_to_tensor=True, device=device)
+        embeddings = self.sentence_transformer.encode(texts, convert_to_tensor=True)
 
         # Apply projection if needed
         projected_embeddings = self.projection(embeddings)
