@@ -68,11 +68,11 @@ class MultimodalFusion(nn.Module):
         text_feature_dim: Dimension of text features.
 
     Example:
-        >>> fusion = MultimodalFusion(ts_feature_dim=512, text_feature_dim=384)
-        >>> ts_features = torch.randn(2, 32, 512)  # (batch, seq_len, ts_dim)
+        >>> fusion = MultimodalFusion(ts_feature_dim=1280, text_feature_dim=384)
+        >>> ts_features = torch.randn(2, 32, 1280)  # (batch, seq_len, ts_dim)
         >>> text_features = torch.randn(2, 32, 384)     # (batch, seq_len, text_dim)
         >>> fused = fusion(ts_features, text_features)
-        >>> print(fused.shape)  # torch.Size([2, 32, 512])
+        >>> print(fused.shape)  # torch.Size([2, 32, 1280])
     """
 
     def __init__(self, ts_feature_dim: int, text_feature_dim: int) -> None:
@@ -128,13 +128,13 @@ class MultimodalFusion(nn.Module):
         self._validate_inputs(ts_features, text_features)
 
         batch_size, seq_len, ts_dim = ts_features.shape
-        batch_size_text, seq_len_text, text_dim = text_features.shape
+        text_batch_size, text_seq_len, text_dim = text_features.shape
 
         # Ensure batch sizes and sequence lengths match
-        if batch_size != batch_size_text:
-            raise ValueError(f"Batch size mismatch: ts_features has {batch_size}, text_features has {batch_size_text}")
-        if seq_len != seq_len_text:
-            raise ValueError(f"Sequence length mismatch: ts_features has {seq_len}, text_features has {seq_len_text}")
+        if batch_size != text_batch_size:
+            raise ValueError(f"Batch size mismatch: ts_features has {batch_size}, text_features has {text_batch_size}")
+        if seq_len != text_seq_len:
+            raise ValueError(f"Sequence length mismatch: ts_features has {seq_len}, text_features has {text_seq_len}")
 
         # Ensure feature dimensions match expected
         if ts_dim != self.ts_feature_dim:

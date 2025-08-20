@@ -36,6 +36,8 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
         split: str = "train",
         context_len: int = 512,
         horizon_len: int = 128,
+        patch_len: int = 32,
+        step_size: int = 32,
     ) -> None:
         """Initializes Time-MMD dataset loader.
 
@@ -46,6 +48,8 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
             split: Dataset split ('train' or 'test').
             context_len: Length of context window for input sequences.
             horizon_len: Length of forecasting horizon (target sequence length).
+            patch_len: Length of input patches for temporal alignment with time series data.
+            step_size: Step size for creating windowed samples, must be an integer multiple of patch_len.
         """
         self.data_dir = Path(data_dir)
         self.domain = domain
@@ -53,6 +57,8 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
         self.split = split
         self.context_len = context_len
         self.horizon_len = horizon_len
+        self.patch_len = patch_len
+        self.step_size = step_size
         self.data: list[dict[str, Any]] = []
         self._load_data()
 
@@ -66,6 +72,10 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
 
         # Load numerical time series data
         numerical_df = pd.read_csv(numerical_file)
+
+        # Sort numerical_df by end_date to ensure chronological order
+        if "end_date" in numerical_df.columns:
+            numerical_df = numerical_df.sort_values("end_date").reset_index(drop=True)
 
         # Load textual data if available
         report_file = textual_dir / f"{self.domain}_report.csv"
@@ -110,9 +120,9 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
             raise ValueError("No end_date column found in numerical data")
 
         # Process each numeric column as a separate time series
-        for col_idx, column in enumerate(numeric_cols):
+        for column in numeric_cols:
             # Extract time series from this column
-            time_series_values = numerical_df[column].dropna().values
+            time_series_values = numerical_df.loc[:, column].to_numpy()
 
             # Skip if insufficient data for context + horizon
             min_length = self.context_len + self.horizon_len
@@ -136,27 +146,29 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
                 continue
 
             # Create windowed samples from this time series
-            # Step size is horizon_len to avoid too much overlap
-            step_size = self.horizon_len
-
-            for start_idx in range(0, len(ts_data) - min_length + 1, step_size):
+            for start_idx in range(0, len(ts_data) - min_length + 1, self.step_size):
                 # Extract context window
                 context_end = start_idx + self.context_len
-                time_series = np.asarray(ts_data[start_idx:context_end]).reshape(-1, 1)
+                time_series = ts_data[start_idx:context_end].reshape(-1, 1)
 
-                # Extract target (next horizon_len values)
-                target_end = context_end + self.horizon_len
-                target = np.asarray(ts_data[context_end:target_end]).reshape(-1, 1)
+                # Extract target
+                target_end = context_end + self.step_size
+                target = ts_data[context_end:target_end].reshape(-1, 1)
 
                 # Get associated text for this time period
                 window_start_date = str(start_dates.iloc[start_idx])
                 window_end_date = str(end_dates.iloc[target_end - 1])
 
-                text_description = self._get_text_for_period(window_start_date, window_end_date, textual_data)
+                # Calculate number of text patches based on step_size / patch_len
+                text_patches_num = self.step_size // self.patch_len
+
+                patched_texts = self._get_patched_texts_for_period(
+                    window_start_date, window_end_date, textual_data, text_patches_num
+                )
 
                 sample = {
                     "time_series": time_series.astype(np.float32),
-                    "text": text_description,
+                    "patched_texts": patched_texts,
                     "target": target.astype(np.float32),
                     "metadata": {
                         "domain": self.domain,
@@ -166,63 +178,77 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
                 }
                 self.data.append(sample)
 
-    def _get_text_for_period(self, start_date: str, end_date: str, textual_data: dict[str, pd.DataFrame]) -> str | None:
-        """Gets textual description for a specific time period.
+    def _get_patched_texts_for_period(
+        self, start_date: str, end_date: str, textual_data: dict[str, pd.DataFrame], text_patches_num: int
+    ) -> list[list[str]]:
+        """Gets patched textual descriptions for a specific time period.
 
         Args:
             start_date: Start date of the time period (YYYY-MM-DD format).
             end_date: End date of the time period (YYYY-MM-DD format).
             textual_data: Dictionary containing textual dataframes.
+            text_patches_num: Number of text patches to generate for this period.
 
         Returns:
-            Combined textual description for the period, or None if no matching text data.
+            List of lists where each inner list contains text data for one patch period.
+            Returns text_patches_num number of lists.
         """
-        descriptions = []
-
         # Convert dates to pandas datetime for comparison
         period_start = pd.to_datetime(start_date)
         period_end = pd.to_datetime(end_date)
 
-        # Add report text if available and within period
-        if "reports" in textual_data:
-            reports_df = textual_data["reports"]
-            if "start_date" in reports_df.columns and "end_date" in reports_df.columns:
-                # Filter reports that overlap with the target period
-                reports_df = reports_df.copy()
-                reports_df["start_date"] = pd.to_datetime(reports_df["start_date"])
-                reports_df["end_date"] = pd.to_datetime(reports_df["end_date"])
+        # Divide the time period into equal parts
+        period_duration = period_end - period_start
+        patch_duration = period_duration / text_patches_num
 
-                matching_reports = reports_df[
-                    (reports_df["start_date"] <= period_end) & (reports_df["end_date"] >= period_start)
-                ]
+        patches = []
 
-                for _, row in matching_reports.iterrows():
-                    if "fact" in reports_df.columns and pd.notna(row["fact"]):
-                        descriptions.append(f"Report: {str(row['fact'])}")
-                    if "preds" in reports_df.columns and pd.notna(row["preds"]):
-                        descriptions.append(f"Prediction: {str(row['preds'])}")
+        for i in range(text_patches_num):
+            # Calculate patch time boundaries
+            patch_start = period_start + i * patch_duration
+            patch_end = period_start + (i + 1) * patch_duration
 
-        # Add search text if available and within period
-        if "search" in textual_data:
-            search_df = textual_data["search"]
-            if "start_date" in search_df.columns and "end_date" in search_df.columns:
-                # Filter search results that overlap with the target period
-                search_df = search_df.copy()
-                search_df["start_date"] = pd.to_datetime(search_df["start_date"])
-                search_df["end_date"] = pd.to_datetime(search_df["end_date"])
+            patch_reports = []
 
-                matching_search = search_df[
-                    (search_df["start_date"] <= period_end) & (search_df["end_date"] >= period_start)
-                ]
+            # Get reports that overlap with this patch period
+            if "reports" in textual_data:
+                reports_df = textual_data["reports"]
+                if "start_date" in reports_df.columns and "end_date" in reports_df.columns:
+                    reports_df = reports_df.copy()
+                    reports_df["start_date"] = pd.to_datetime(reports_df["start_date"])
+                    reports_df["end_date"] = pd.to_datetime(reports_df["end_date"])
 
-                for _, row in matching_search.iterrows():
-                    if "fact" in search_df.columns and pd.notna(row["fact"]) and str(row["fact"]) != "NA":
-                        descriptions.append(f"Search: {str(row['fact'])}")
-                    if "preds" in search_df.columns and pd.notna(row["preds"]) and str(row["preds"]) != "NA":
-                        descriptions.append(f"Search prediction: {str(row['preds'])}")
+                    matching_reports = reports_df[
+                        (reports_df["start_date"] <= patch_end) & (reports_df["end_date"] >= patch_start)
+                    ]
 
-        # Return combined description or None if no matching text data
-        return " ".join(descriptions) if descriptions else None
+                    for _, row in matching_reports.iterrows():
+                        if "fact" in reports_df.columns and pd.notna(row["fact"]):
+                            patch_reports.append(f"Report: {str(row['fact'])}")
+                        if "preds" in reports_df.columns and pd.notna(row["preds"]):
+                            patch_reports.append(f"Prediction: {str(row['preds'])}")
+
+            # Get search data that overlaps with this patch period
+            if "search" in textual_data:
+                search_df = textual_data["search"]
+                if "start_date" in search_df.columns and "end_date" in search_df.columns:
+                    search_df = search_df.copy()
+                    search_df["start_date"] = pd.to_datetime(search_df["start_date"])
+                    search_df["end_date"] = pd.to_datetime(search_df["end_date"])
+
+                    matching_search = search_df[
+                        (search_df["start_date"] <= patch_end) & (search_df["end_date"] >= patch_start)
+                    ]
+
+                    for _, row in matching_search.iterrows():
+                        if "fact" in search_df.columns and pd.notna(row["fact"]) and str(row["fact"]) != "NA":
+                            patch_reports.append(f"Search: {str(row['fact'])}")
+                        if "preds" in search_df.columns and pd.notna(row["preds"]) and str(row["preds"]) != "NA":
+                            patch_reports.append(f"Search prediction: {str(row['preds'])}")
+
+            patches.append(patch_reports)
+
+        return patches
 
     def __len__(self) -> int:
         """Returns dataset size."""
