@@ -44,8 +44,7 @@ class TextEncoder(nn.Module):
             Tensor of shape (batch_size, embedding_dim) containing text embeddings.
         """
         # Generate embeddings using sentence transformer
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        embeddings = self.sentence_transformer.encode(texts, convert_to_tensor=True, device=device)
+        embeddings = self.sentence_transformer.encode(texts, convert_to_tensor=True)
 
         # Apply projection if needed
         projected_embeddings = self.projection(embeddings)
@@ -56,23 +55,24 @@ class TextEncoder(nn.Module):
 class MultimodalFusion(nn.Module):
     """Addition-based fusion mechanism for combining time series and text features.
 
-    This module implements a simple yet effective fusion strategy where text features
-    are projected to match time series feature dimensions, then added element-wise.
-    The projection layer is designed to be trainable within TimesFM's loss function.
+    This module implements a temporally-aware fusion strategy where text features
+    with temporal dimension are projected to match time series feature dimensions,
+    then added element-wise. The projection layer is designed to be trainable within
+    TimesFM's loss function.
 
     Architecture:
-        text_features -> Linear(text_dim -> ts_dim) -> ReLU -> expand -> add with ts_features
+        text_features(batch, seq_len, text_dim) -> Linear(text_dim -> ts_dim) -> ReLU -> add with ts_features
 
     Args:
         ts_feature_dim: Dimension of time series features.
         text_feature_dim: Dimension of text features.
 
     Example:
-        >>> fusion = MultimodalFusion(ts_feature_dim=512, text_feature_dim=384)
-        >>> ts_features = torch.randn(2, 100, 512)  # (batch, seq_len, ts_dim)
-        >>> text_features = torch.randn(2, 384)     # (batch, text_dim)
+        >>> fusion = MultimodalFusion(ts_feature_dim=1280, text_feature_dim=384)
+        >>> ts_features = torch.randn(2, 32, 1280)  # (batch, seq_len, ts_dim)
+        >>> text_features = torch.randn(2, 32, 384)     # (batch, seq_len, text_dim)
         >>> fused = fusion(ts_features, text_features)
-        >>> print(fused.shape)  # torch.Size([2, 100, 512])
+        >>> print(fused.shape)  # torch.Size([2, 32, 1280])
     """
 
     def __init__(self, ts_feature_dim: int, text_feature_dim: int) -> None:
@@ -115,7 +115,7 @@ class MultimodalFusion(nn.Module):
 
         Args:
             ts_features: Time series features of shape (batch_size, seq_len, ts_feature_dim).
-            text_features: Text features of shape (batch_size, text_feature_dim).
+            text_features: Text features of shape (batch_size, seq_len, text_feature_dim).
 
         Returns:
             Fused features of shape (batch_size, seq_len, ts_feature_dim).
@@ -128,11 +128,13 @@ class MultimodalFusion(nn.Module):
         self._validate_inputs(ts_features, text_features)
 
         batch_size, seq_len, ts_dim = ts_features.shape
-        batch_size_text, text_dim = text_features.shape
+        text_batch_size, text_seq_len, text_dim = text_features.shape
 
-        # Ensure batch sizes match
-        if batch_size != batch_size_text:
-            raise ValueError(f"Batch size mismatch: ts_features has {batch_size}, text_features has {batch_size_text}")
+        # Ensure batch sizes and sequence lengths match
+        if batch_size != text_batch_size:
+            raise ValueError(f"Batch size mismatch: ts_features has {batch_size}, text_features has {text_batch_size}")
+        if seq_len != text_seq_len:
+            raise ValueError(f"Sequence length mismatch: ts_features has {seq_len}, text_features has {text_seq_len}")
 
         # Ensure feature dimensions match expected
         if ts_dim != self.ts_feature_dim:
@@ -146,17 +148,14 @@ class MultimodalFusion(nn.Module):
                 f"Device mismatch: ts_features on {ts_features.device}, text_features on {text_features.device}"
             )
 
-        # Project text features to time series dimension: (batch_size, text_dim) -> (batch_size, ts_dim)
+        # Project text features to time series dimension: (batch_size, seq_len, text_dim) -> (batch_size, seq_len, ts_dim)
         projected_text = self.text_projection(text_features)
 
         # Apply ReLU activation
         projected_text = self.activation(projected_text)
 
-        # Expand text features to match sequence length: (batch_size, ts_dim) -> (batch_size, seq_len, ts_dim)
-        expanded_text = projected_text.unsqueeze(1).expand(-1, seq_len, -1)
-
         # Add time series and text features element-wise
-        fused_features = ts_features + expanded_text
+        fused_features = ts_features + projected_text
 
         return torch.as_tensor(fused_features)
 
@@ -180,9 +179,9 @@ class MultimodalFusion(nn.Module):
                 f"ts_features must be 3D (batch_size, seq_len, feature_dim), "
                 f"got {ts_features.dim()}D with shape {ts_features.shape}"
             )
-        if text_features.dim() != 2:
+        if text_features.dim() != 3:
             raise ValueError(
-                f"text_features must be 2D (batch_size, feature_dim), "
+                f"text_features must be 3D (batch_size, seq_len, feature_dim), "
                 f"got {text_features.dim()}D with shape {text_features.shape}"
             )
 

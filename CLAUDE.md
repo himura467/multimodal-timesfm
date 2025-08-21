@@ -41,9 +41,14 @@ multimodal-timesfm/
 │   └── model.yml                    # Model architecture settings
 ├── tests/
 │   ├── __init__.py
-│   ├── test_models.py
-│   ├── test_data.py
-│   └── test_train.py
+│   ├── test_multimodal_timesfm.py
+│   ├── test_text_encoder.py
+│   ├── test_time_mmd_dataset.py
+│   ├── test_preprocessing.py
+│   ├── test_trainer.py
+│   ├── test_finetuner.py
+│   ├── test_evaluator.py
+│   └── test_ablation_study.py
 ├── .gitmodules                      # Git submodule configuration
 ├── .python-version                  # Python 3.11
 ├── pyproject.toml                   # uv configuration
@@ -205,11 +210,6 @@ Use YAML files to manage:
 - Consider using mixed precision training for efficiency
 - Fusion layer parameters can be selectively trained via freeze/unfreeze methods
 - Keep detailed logs of hyperparameter choices and their impact
-
-**Known Architecture Issues:**
-
-- Current text expansion fusion (line 156 in text_encoder.py) inappropriately assumes text context is equally relevant to all time steps
-- Need to replace with temporally-aware fusion mechanism (e.g., attention-based, cross-modal attention, or temporal text alignment)
 
 ## Bash Commands
 
