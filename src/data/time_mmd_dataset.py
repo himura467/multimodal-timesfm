@@ -37,7 +37,6 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
         context_len: int = 512,
         horizon_len: int = 128,
         patch_len: int = 32,
-        step_size: int = 32,
     ) -> None:
         """Initializes Time-MMD dataset loader.
 
@@ -48,9 +47,13 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
             split: Dataset split ('train' or 'test').
             context_len: Length of context window for input sequences.
             horizon_len: Length of forecasting horizon (target sequence length).
+                         horizon_len must be an integer multiple of patch_len.
             patch_len: Length of input patches for temporal alignment with time series data.
-            step_size: Step size for creating windowed samples, must be an integer multiple of patch_len.
         """
+        # Validate that horizon_len is an integer multiple of patch_len
+        if horizon_len % patch_len != 0:
+            raise ValueError(f"horizon_len ({horizon_len}) must be an integer multiple of patch_len ({patch_len})")
+
         self.data_dir = Path(data_dir)
         self.domain = domain
         self.split_ratio = split_ratio
@@ -58,7 +61,6 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
         self.context_len = context_len
         self.horizon_len = horizon_len
         self.patch_len = patch_len
-        self.step_size = step_size
         self.data: list[dict[str, Any]] = []
         self._load_data()
 
@@ -146,21 +148,21 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
                 continue
 
             # Create windowed samples from this time series
-            for start_idx in range(0, len(ts_data) - min_length + 1, self.step_size):
+            for start_idx in range(0, len(ts_data) - min_length + 1, self.horizon_len):
                 # Extract context window
                 context_end = start_idx + self.context_len
                 time_series = ts_data[start_idx:context_end].reshape(-1, 1)
 
                 # Extract target
-                target_end = context_end + self.step_size
+                target_end = context_end + self.horizon_len
                 target = ts_data[context_end:target_end].reshape(-1, 1)
 
                 # Get associated text for this time period
                 window_start_date = str(start_dates.iloc[start_idx])
                 window_end_date = str(end_dates.iloc[target_end - 1])
 
-                # Calculate number of text patches based on step_size / patch_len
-                text_patches_num = self.step_size // self.patch_len
+                # Calculate number of text patches based on horizon_len / patch_len
+                text_patches_num = self.horizon_len // self.patch_len
 
                 patched_texts = self._get_patched_texts_for_period(
                     window_start_date, window_end_date, textual_data, text_patches_num
