@@ -41,9 +41,14 @@ multimodal-timesfm/
 │   └── model.yml                    # Model architecture settings
 ├── tests/
 │   ├── __init__.py
-│   ├── test_models.py
-│   ├── test_data.py
-│   └── test_train.py
+│   ├── test_multimodal_timesfm.py
+│   ├── test_text_encoder.py
+│   ├── test_time_mmd_dataset.py
+│   ├── test_preprocessing.py
+│   ├── test_trainer.py
+│   ├── test_finetuner.py
+│   ├── test_evaluator.py
+│   └── test_ablation_study.py
 ├── .gitmodules                      # Git submodule configuration
 ├── .python-version                  # Python 3.11
 ├── pyproject.toml                   # uv configuration
