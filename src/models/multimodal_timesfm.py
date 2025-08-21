@@ -48,6 +48,6 @@ class MultimodalTimesFM(TimesFm):  # type: ignore[misc]
 
         # Initialize fusion mechanism using addition-based fusion
         self.fusion = MultimodalFusion(
-            ts_model_dims=hparams.model_dims,
+            ts_feature_dim=hparams.model_dims,
             text_feature_dim=hparams.text_embedding_dim,
         )
