@@ -12,15 +12,24 @@ class TextEncoder(nn.Module):
     that can be fused with time series features in the multimodal TimesFM model.
     """
 
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2", embedding_dim: int = 384) -> None:
+    def __init__(self, model_name: str = "all-MiniLM-L6-v2", embedding_dim: int = 384, device: str | None = None) -> None:
         """Initialize the text encoder.
 
         Args:
             model_name: Name of the sentence transformer model to use.
             embedding_dim: Dimension of the output embeddings.
+            device: Device to use for computations. If None, uses CUDA if available, then MPS, then CPU.
         """
         super().__init__()
-        self.sentence_transformer = SentenceTransformer(model_name)
+        if device is None:
+            if torch.cuda.is_available():
+                device = "cuda"
+            elif torch.backends.mps.is_available():
+                device = "mps"
+            else:
+                device = "cpu"
+        self.device = torch.device(device)
+        self.sentence_transformer = SentenceTransformer(model_name, device=device)
         self.embedding_dim = embedding_dim
 
         # Get the actual embedding dimension from the model
