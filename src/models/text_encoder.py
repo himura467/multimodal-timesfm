@@ -12,15 +12,24 @@ class TextEncoder(nn.Module):
     that can be fused with time series features in the multimodal TimesFM model.
     """
 
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2", embedding_dim: int = 384) -> None:
+    def __init__(self, model_name: str = "all-MiniLM-L6-v2", embedding_dim: int = 384, device: str | None = None) -> None:
         """Initialize the text encoder.
 
         Args:
             model_name: Name of the sentence transformer model to use.
             embedding_dim: Dimension of the output embeddings.
+            device: Device to use for computations. If None, uses CUDA if available, then MPS, then CPU.
         """
         super().__init__()
-        self.sentence_transformer = SentenceTransformer(model_name)
+        if device is None:
+            if torch.cuda.is_available():
+                device = "cuda"
+            elif torch.backends.mps.is_available():
+                device = "mps"
+            else:
+                device = "cpu"
+        self.device = torch.device(device)
+        self.sentence_transformer = SentenceTransformer(model_name, device=device)
         self.embedding_dim = embedding_dim
 
         # Get the actual embedding dimension from the model
@@ -28,11 +37,12 @@ class TextEncoder(nn.Module):
         if actual_dim is None:
             raise ValueError("Could not determine embedding dimension from sentence transformer")
 
-        # Add a projection layer if needed to match desired embedding_dim
+        # Require exact dimension match - raise error if different
         if actual_dim != embedding_dim:
-            self.projection: nn.Module = nn.Linear(actual_dim, embedding_dim)
-        else:
-            self.projection = nn.Identity()
+            raise ValueError(
+                f"Embedding dimension mismatch: model produces {actual_dim}-dimensional embeddings, "
+                f"but {embedding_dim} was requested. Please use embedding_dim={actual_dim}."
+            )
 
     def forward(self, texts: list[str]) -> torch.Tensor:
         """Encode text inputs into embeddings.
@@ -46,10 +56,7 @@ class TextEncoder(nn.Module):
         # Generate embeddings using sentence transformer
         embeddings = self.sentence_transformer.encode(texts, convert_to_tensor=True)
 
-        # Apply projection if needed
-        projected_embeddings = self.projection(embeddings)
-
-        return torch.as_tensor(projected_embeddings)
+        return embeddings.clone()
 
 
 class MultimodalFusion(nn.Module):
