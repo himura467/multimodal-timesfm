@@ -12,7 +12,9 @@ class TextEncoder(nn.Module):
     that can be fused with time series features in the multimodal TimesFM model.
     """
 
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2", embedding_dim: int = 384, device: str | None = None) -> None:
+    def __init__(
+        self, model_name: str = "all-MiniLM-L6-v2", embedding_dim: int = 384, device: str | None = None
+    ) -> None:
         """Initialize the text encoder.
 
         Args:
