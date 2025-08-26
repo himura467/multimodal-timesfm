@@ -1,0 +1,36 @@
+# Model architecture configuration for multimodal TimesFM
+
+# Base TimesFM configuration
+timesfm:
+  num_layers: 50
+  num_heads: 16
+  hidden_size: 1280
+  intermediate_size: 1280
+  patch_len: 32
+  horizon_len: 128
+  per_core_batch_size: 32
+  quantiles: [0.1, 0.2, 0.3, 0.4, 0.6, 0.7, 0.8, 0.9]
+
+# Text encoder configuration
+text_encoder:
+  model_name: "all-MiniLM-L6-v2"
+  embedding_dim: 384
+  max_sequence_length: 256
+  pooling_strategy: "mean" # Options: mean, cls, max
+  device: null # Auto-detect: cuda, mps, or cpu
+
+# Fusion mechanism configuration
+fusion:
+  fusion_type: "addition" # Options: addition, concatenation, attention
+  projection_dim: null # If null, use timesfm.hidden_size
+  activation: "relu" # Options: relu, gelu, tanh
+
+# Model initialization
+initialization:
+  pretrained_timesfm_path: null # Path to pretrained TimesFM checkpoint
+  freeze_timesfm_on_init: true
+
+# Model output configuration
+output:
+  return_intermediate_outputs: false
+  return_attention_weights: false
