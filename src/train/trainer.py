@@ -44,7 +44,7 @@ class MultimodalTrainer:
         max_grad_norm: float = 1.0,
         log_dir: str = "logs",
         checkpoint_dir: str = "checkpoints",
-        device: str | None = None,
+        device: str | torch.device | None = None,
         wandb_project: str = "multimodal-timesfm",
         wandb_run_name: str | None = None,
     ) -> None:
@@ -61,7 +61,7 @@ class MultimodalTrainer:
             max_grad_norm: Maximum gradient norm for clipping.
             log_dir: Directory for logs.
             checkpoint_dir: Directory for model checkpoints.
-            device: Device to run training on (auto-detected if None).
+            device: Device to run training on (str or torch.device, auto-detected if None).
             wandb_project: W&B project name.
             wandb_run_name: W&B run name (auto-generated if None).
         """
@@ -80,6 +80,8 @@ class MultimodalTrainer:
                 self.device = torch.device("mps")
             else:
                 self.device = torch.device("cpu")
+        elif isinstance(device, torch.device):
+            self.device = device
         else:
             self.device = torch.device(device)
 
