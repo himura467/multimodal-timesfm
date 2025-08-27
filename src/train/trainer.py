@@ -6,10 +6,10 @@ from typing import Any, Protocol
 
 import torch
 import torch.nn as nn
-import wandb
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 
+import wandb
 from src.models.multimodal_patched_decoder import MultimodalPatchedDecoder
 
 
@@ -414,14 +414,13 @@ class MultimodalTrainer:
         # Close W&B run
         wandb.finish()
 
-    def freeze_timesfm_parameters(self) -> None:
-        """Freeze TimesFM parameters for selective training."""
+    def freeze_pretrained_parameters(self) -> None:
+        """Freeze TimesFM and text encoder parameters - only train fusion components."""
         for name, param in self.model.named_parameters():
-            # Only train text encoder and fusion parameters
-            if not (name.startswith("text_encoder") or name.startswith("multimodal_fusion")):
+            if not name.startswith("multimodal_fusion"):
                 param.requires_grad = False
 
-        self.logger.info("Froze TimesFM parameters - only training text components")
+        self.logger.info("Froze TimesFM and text encoder parameters - only training fusion components")
 
     def unfreeze_all_parameters(self) -> None:
         """Unfreeze all parameters for full model training."""

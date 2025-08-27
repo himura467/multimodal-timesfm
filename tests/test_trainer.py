@@ -240,7 +240,7 @@ def test_training_loop(
     )
 
     # Test parameter freezing
-    trainer.freeze_timesfm_parameters()
+    trainer.freeze_pretrained_parameters()
 
     # Count trainable parameters
     trainable_before = sum(p.numel() for p in model.parameters() if p.requires_grad)
