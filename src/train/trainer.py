@@ -42,8 +42,8 @@ class MultimodalTrainer:
         weight_decay: float = 1e-5,
         gradient_accumulation_steps: int = 1,
         max_grad_norm: float = 1.0,
-        log_dir: str = "logs",
-        checkpoint_dir: str = "checkpoints",
+        log_dir: str | Path = "logs",
+        checkpoint_dir: str | Path = "checkpoints",
         device: str | torch.device | None = None,
         wandb_project: str = "multimodal-timesfm",
         wandb_run_name: str | None = None,
@@ -119,8 +119,8 @@ class MultimodalTrainer:
         self.loss_fn = nn.MSELoss(reduction="mean")
 
         # Set up logging
-        self.log_dir = Path(log_dir)
-        self.checkpoint_dir = Path(checkpoint_dir)
+        self.log_dir = Path(log_dir) if isinstance(log_dir, str) else log_dir
+        self.checkpoint_dir = Path(checkpoint_dir) if isinstance(checkpoint_dir, str) else checkpoint_dir
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
