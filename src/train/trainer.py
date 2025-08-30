@@ -36,7 +36,7 @@ class MultimodalTrainer:
         self,
         model: MultimodalPatchedDecoder,
         train_dataset: MultimodalDataset,
-        val_dataset: MultimodalDataset | None = None,
+        val_dataset: MultimodalDataset,
         batch_size: int = 8,
         learning_rate: float = 1e-4,
         weight_decay: float = 1e-5,
@@ -53,7 +53,7 @@ class MultimodalTrainer:
         Args:
             model: MultimodalPatchedDecoder model to train.
             train_dataset: Training dataset.
-            val_dataset: Validation dataset (optional).
+            val_dataset: Validation dataset.
             batch_size: Batch size for training.
             learning_rate: Learning rate for optimizer.
             weight_decay: Weight decay for optimizer.
@@ -97,16 +97,14 @@ class MultimodalTrainer:
             pin_memory=True if self.device.type == "cuda" else False,
         )
 
-        self.val_loader: DataLoader[Any] | None = None
-        if val_dataset is not None:
-            self.val_loader = DataLoader(
-                val_dataset,  # type: ignore[arg-type]
-                batch_size=batch_size,
-                shuffle=False,
-                collate_fn=self._collate_fn,
-                num_workers=0,
-                pin_memory=True if self.device.type == "cuda" else False,
-            )
+        self.val_loader: DataLoader[Any] = DataLoader(
+            val_dataset,  # type: ignore[arg-type]
+            batch_size=batch_size,
+            shuffle=False,
+            collate_fn=self._collate_fn,
+            num_workers=0,
+            pin_memory=True if self.device.type == "cuda" else False,
+        )
 
         # Set up optimizer and scheduler
         self.optimizer = AdamW(
@@ -265,9 +263,6 @@ class MultimodalTrainer:
         Returns:
             Average validation loss.
         """
-        if self.val_loader is None:
-            return float("inf")
-
         self.model.eval()
         total_loss = 0.0
         num_batches = 0
@@ -367,8 +362,7 @@ class MultimodalTrainer:
         self.logger.info(f"Starting training for {num_epochs} epochs")
         self.logger.info(f"Training on device: {self.device}")
         self.logger.info(f"Train dataset size: {len(self.train_dataset)}")
-        if self.val_dataset is not None:
-            self.logger.info(f"Validation dataset size: {len(self.val_dataset)}")
+        self.logger.info(f"Validation dataset size: {len(self.val_dataset)}")
 
         for epoch in range(num_epochs):
             self.current_epoch = epoch
@@ -382,10 +376,9 @@ class MultimodalTrainer:
             # Log epoch metrics
             epoch_metrics = {
                 "epoch/train_loss": train_loss,
+                "epoch/val_loss": val_loss,
                 "epoch": epoch,
             }
-            if val_loss != float("inf"):
-                epoch_metrics["epoch/val_loss"] = val_loss
 
             wandb.log(epoch_metrics)
 
