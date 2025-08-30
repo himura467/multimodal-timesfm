@@ -1,6 +1,5 @@
 """Multimodal trainer for TimesFM with text inputs."""
 
-import logging
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -11,6 +10,7 @@ from torch.utils.data import DataLoader
 
 import wandb
 from src.models.multimodal_patched_decoder import MultimodalPatchedDecoder
+from src.utils.logging import setup_logger
 
 
 class MultimodalDataset(Protocol):
@@ -138,15 +138,11 @@ class MultimodalTrainer:
         )
 
         # Set up logger
-        logging.basicConfig(
-            level=logging.INFO,
-            format="%(asctime)s - %(levelname)s - %(message)s",
-            handlers=[
-                logging.FileHandler(self.log_dir / "training.log"),
-                logging.StreamHandler(),
-            ],
+        self.logger = setup_logger(
+            name=__name__,
+            log_file=self.log_dir / "training.log",
+            format_string="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         )
-        self.logger = logging.getLogger(__name__)
 
         # Training state
         self.current_epoch = 0
