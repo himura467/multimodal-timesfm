@@ -44,7 +44,7 @@ class MultimodalTrainer:
         max_grad_norm: float = 1.0,
         log_dir: str | Path = "logs",
         checkpoint_dir: str | Path = "checkpoints",
-        device: str | torch.device | None = None,
+        device: torch.device | str | None = None,
         wandb_project: str = "multimodal-timesfm",
         wandb_run_name: str | None = None,
     ) -> None:
@@ -73,17 +73,17 @@ class MultimodalTrainer:
         self.max_grad_norm = max_grad_norm
 
         # Set up device
-        if device is None:
+        if isinstance(device, torch.device):
+            self.device = device
+        elif isinstance(device, str):
+            self.device = torch.device(device)
+        else:
             if torch.cuda.is_available():
                 self.device = torch.device("cuda")
             elif torch.backends.mps.is_available():
                 self.device = torch.device("mps")
             else:
                 self.device = torch.device("cpu")
-        elif isinstance(device, torch.device):
-            self.device = device
-        else:
-            self.device = torch.device(device)
 
         self.model.to(self.device)
 
