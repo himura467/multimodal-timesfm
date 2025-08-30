@@ -138,11 +138,7 @@ class MultimodalTrainer:
         )
 
         # Set up logger
-        self.logger = setup_logger(
-            name=__name__,
-            log_file=self.log_dir / "training.log",
-            format_string="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        )
+        self.logger = setup_logger(log_file=self.log_dir / "training.log")
 
         # Training state
         self.current_epoch = 0
