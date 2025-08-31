@@ -161,8 +161,8 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
                 window_start_date = str(start_dates.iloc[start_idx])
                 window_end_date = str(end_dates.iloc[target_end - 1])
 
-                # Calculate number of text patches based on horizon_len / patch_len
-                text_patches_num = self.horizon_len // self.patch_len
+                # Calculate number of text patches based on context_len / patch_len
+                text_patches_num = self.context_len // self.patch_len
 
                 patched_texts = self._get_patched_texts_for_period(
                     window_start_date, window_end_date, textual_data, text_patches_num
