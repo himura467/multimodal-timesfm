@@ -38,13 +38,13 @@ class MultimodalTrainer:
         train_dataset: MultimodalDataset,
         val_dataset: MultimodalDataset,
         batch_size: int = 8,
-        learning_rate: float = 1e-4,
-        weight_decay: float = 1e-5,
         gradient_accumulation_steps: int = 1,
         max_grad_norm: float = 1.0,
+        device: torch.device | str | None = None,
+        learning_rate: float = 1e-4,
+        weight_decay: float = 0.01,
         log_dir: str | Path = "logs",
         checkpoint_dir: str | Path = "checkpoints",
-        device: torch.device | str | None = None,
         wandb_project: str = "multimodal-timesfm",
         wandb_run_name: str | None = None,
     ) -> None:
@@ -55,13 +55,13 @@ class MultimodalTrainer:
             train_dataset: Training dataset.
             val_dataset: Validation dataset.
             batch_size: Batch size for training.
-            learning_rate: Learning rate for optimizer.
-            weight_decay: Weight decay for optimizer.
             gradient_accumulation_steps: Number of steps to accumulate gradients.
             max_grad_norm: Maximum gradient norm for clipping.
+            device: Device to run training on (str or torch.device, auto-detected if None).
+            learning_rate: Learning rate for optimizer.
+            weight_decay: Weight decay for optimizer.
             log_dir: Directory for logs.
             checkpoint_dir: Directory for model checkpoints.
-            device: Device to run training on (str or torch.device, auto-detected if None).
             wandb_project: W&B project name.
             wandb_run_name: W&B run name (auto-generated if None).
         """
@@ -115,10 +115,12 @@ class MultimodalTrainer:
         # Set up loss function (MSE for forecasting)
         self.loss_fn = nn.MSELoss(reduction="mean")
 
-        # Set up logging
+        # Set up logger
         self.log_dir = Path(log_dir) if isinstance(log_dir, str) else log_dir
+        self.logger = setup_logger(log_file=self.log_dir / "training.log")
+
+        # Set up checkpoint
         self.checkpoint_dir = Path(checkpoint_dir) if isinstance(checkpoint_dir, str) else checkpoint_dir
-        self.log_dir.mkdir(parents=True, exist_ok=True)
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
         # Initialize W&B
@@ -126,16 +128,10 @@ class MultimodalTrainer:
             project=wandb_project,
             name=wandb_run_name,
             config={
+                "lr": learning_rate,
                 "batch_size": batch_size,
-                "learning_rate": learning_rate,
-                "weight_decay": weight_decay,
-                "gradient_accumulation_steps": gradient_accumulation_steps,
-                "max_grad_norm": max_grad_norm,
             },
         )
-
-        # Set up logger
-        self.logger = setup_logger(log_file=self.log_dir / "training.log")
 
         # Training state
         self.current_epoch = 0
