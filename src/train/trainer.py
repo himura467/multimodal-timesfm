@@ -91,16 +91,12 @@ class MultimodalTrainer:
         self.train_loader: DataLoader[Any] = DataLoader(
             train_dataset,  # type: ignore[arg-type]
             batch_size=batch_size,
-            shuffle=False,
-            collate_fn=self._collate_fn,
             num_workers=0,
             pin_memory=True if self.device.type == "cuda" else False,
         )
         self.val_loader: DataLoader[Any] = DataLoader(
             val_dataset,  # type: ignore[arg-type]
             batch_size=batch_size,
-            shuffle=False,
-            collate_fn=self._collate_fn,
             num_workers=0,
             pin_memory=True if self.device.type == "cuda" else False,
         )
@@ -137,41 +133,6 @@ class MultimodalTrainer:
         self.current_epoch = 0
         self.global_step = 0
         self.best_val_loss = float("inf")
-
-    def _collate_fn(self, batch: list[dict[str, Any]]) -> dict[str, Any]:
-        """Collate function for multimodal data.
-
-        Args:
-            batch: List of samples from the dataset.
-
-        Returns:
-            Batched data dictionary.
-        """
-        # Stack time series data
-        time_series = torch.stack([torch.from_numpy(sample["time_series"]) for sample in batch])
-        targets = torch.stack([torch.from_numpy(sample["target"]) for sample in batch])
-
-        # Create padding tensors (assume no padding for now)
-        batch_size, seq_len, _ = time_series.shape
-        input_padding = torch.zeros(batch_size, seq_len, dtype=torch.float32)
-
-        # Create frequency tensor (assume daily frequency for now)
-        freq = torch.zeros(batch_size, 1, dtype=torch.long)
-
-        # Collect text descriptions for each batch item
-        text_descriptions = []
-        for sample in batch:
-            # Convert patch texts to the expected format: [batch][patch][texts]
-            patched_texts = sample["patched_texts"]
-            text_descriptions.append(patched_texts)
-
-        return {
-            "time_series": time_series.squeeze(-1),  # Remove last dimension for compatibility
-            "input_padding": input_padding,
-            "freq": freq,
-            "text_descriptions": text_descriptions,
-            "targets": targets.squeeze(-1),  # Remove last dimension for compatibility
-        }
 
     def train_epoch(self) -> float:
         """Train one epoch.
