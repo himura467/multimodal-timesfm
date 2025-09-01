@@ -93,6 +93,7 @@ class MultimodalTrainer:
             batch_size=batch_size,
             shuffle=True,
             num_workers=0,
+            collate_fn=self._collate_fn,
             pin_memory=True if self.device.type == "cuda" else False,
         )
         self.val_loader: DataLoader[Any] = DataLoader(
@@ -100,6 +101,7 @@ class MultimodalTrainer:
             batch_size=batch_size,
             shuffle=False,
             num_workers=0,
+            collate_fn=self._collate_fn,
             pin_memory=True if self.device.type == "cuda" else False,
         )
 
@@ -134,6 +136,32 @@ class MultimodalTrainer:
         self.current_epoch = 0
         self.global_step = 0
         self.best_val_loss = float("inf")
+
+    def _collate_fn(self, batch: list[dict[str, Any]]) -> dict[str, Any]:
+        """Collate function for multimodal data.
+
+        Args:
+            batch: List of samples from the dataset.
+
+        Returns:
+            Batched data dictionary.
+        """
+        # Stack time series data
+        time_series = torch.stack([torch.from_numpy(sample["time_series"]) for sample in batch])
+        targets = torch.stack([torch.from_numpy(sample["target"]) for sample in batch])
+        freq = torch.stack([torch.tensor(sample["freq"]) for sample in batch])
+
+        # Collect text descriptions for each batch item
+        text_descriptions = []
+        for sample in batch:
+            text_descriptions.append(sample["patched_texts"])
+
+        return {
+            "time_series": time_series.squeeze(-1),
+            "target": targets.squeeze(-1),
+            "freq": freq.unsqueeze(-1),
+            "patched_texts": text_descriptions,
+        }
 
     def train_epoch(self) -> float:
         """Train one epoch.
