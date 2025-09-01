@@ -171,7 +171,7 @@ class MultimodalTrainer:
         """
         self.model.train()
         total_loss = 0.0
-        num_batches = 0
+        num_batches = len(self.train_loader)
 
         for batch_idx, batch in enumerate(self.train_loader):
             # Move tensors to device
@@ -231,7 +231,6 @@ class MultimodalTrainer:
                     wandb.log(metrics)
 
             total_loss += loss.item() * self.gradient_accumulation_steps
-            num_batches += 1
 
             # Log progress
             if batch_idx % 50 == 0:
@@ -250,7 +249,7 @@ class MultimodalTrainer:
         """
         self.model.eval()
         total_loss = 0.0
-        num_batches = 0
+        num_batches = len(self.val_loader)
 
         with torch.no_grad():
             for batch in self.val_loader:
@@ -283,7 +282,6 @@ class MultimodalTrainer:
                 loss = self.loss_fn(predictions, targets)
 
                 total_loss += loss.item()
-                num_batches += 1
 
         avg_val_loss = total_loss / num_batches
         return avg_val_loss
