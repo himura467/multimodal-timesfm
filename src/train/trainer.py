@@ -113,7 +113,7 @@ class MultimodalTrainer:
         )
 
         # Set up loss function (MSE for forecasting)
-        self.loss_fn = nn.MSELoss(reduction="mean")
+        self.loss_fn = nn.MSELoss()
 
         # Set up logger
         self.logger = setup_logger(log_file=log_dir / "training.log")
@@ -133,8 +133,8 @@ class MultimodalTrainer:
         )
 
         # Training state
-        self.current_epoch = 0
         self.global_step = 0
+        self.current_epoch = 0
         self.best_val_loss = float("inf")
 
     def _collate_fn(self, batch: list[dict[str, Any]]) -> dict[str, Any]:
