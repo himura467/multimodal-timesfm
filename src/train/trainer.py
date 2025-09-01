@@ -176,32 +176,28 @@ class MultimodalTrainer:
         for batch_idx, batch in enumerate(self.train_loader):
             # Move tensors to device
             time_series = batch["time_series"].to(self.device)
-            input_padding = batch["input_padding"].to(self.device)
+            targets = batch["target"].to(self.device)
             freq = batch["freq"].to(self.device)
-            targets = batch["targets"].to(self.device)
-            text_descriptions = batch["text_descriptions"]  # Keep on CPU as list
+            patched_texts = batch["patched_texts"]
+
+            # Create input_padding tensor (zeros for now)
+            input_padding = torch.zeros_like(time_series)
 
             # Forward pass
-            outputs = self.model(
+            predictions = self.model(
                 input_ts=time_series,
                 input_padding=input_padding,
                 freq=freq,
-                text_descriptions=text_descriptions,
+                text_descriptions=patched_texts,
             )
 
-            # Extract predictions and reshape properly
+            # Extract predictions following TimesFM implementation
             # Model output shape: (batch_size, num_patches, patch_len, num_quantiles)
-            # We want the mean prediction (index 0 in quantiles) and reshape to horizon_len
-            batch_size, num_patches, patch_len, _ = outputs.shape
-            predictions = outputs[:, :, :, 0]  # Get mean prediction: (batch_size, num_patches, patch_len)
-            predictions = predictions.reshape(batch_size, num_patches * patch_len)  # (batch_size, total_len)
-
-            # Slice to match horizon length (in case output is longer than expected)
-            horizon_len = targets.shape[1]
-            predictions = predictions[:, :horizon_len]  # (batch_size, horizon_len)
+            predictions_mean = predictions[..., 0]  # Get mean prediction: (batch_size, num_patches, patch_len)
+            last_patch_pred = predictions_mean[:, -1, :]  # Extract last patch: (batch_size, patch_len)
 
             # Compute loss
-            loss = self.loss_fn(predictions, targets)
+            loss = self.loss_fn(last_patch_pred, targets)
 
             # Scale loss for gradient accumulation
             loss = loss / self.gradient_accumulation_steps
@@ -255,31 +251,28 @@ class MultimodalTrainer:
             for batch in self.val_loader:
                 # Move tensors to device
                 time_series = batch["time_series"].to(self.device)
-                input_padding = batch["input_padding"].to(self.device)
+                targets = batch["target"].to(self.device)
                 freq = batch["freq"].to(self.device)
-                targets = batch["targets"].to(self.device)
-                text_descriptions = batch["text_descriptions"]  # Keep on CPU as list
+                patched_texts = batch["patched_texts"]
+
+                # Create input_padding tensor (zeros for now)
+                input_padding = torch.zeros_like(time_series)
 
                 # Forward pass
-                outputs = self.model(
+                predictions = self.model(
                     input_ts=time_series,
                     input_padding=input_padding,
                     freq=freq,
-                    text_descriptions=text_descriptions,
+                    text_descriptions=patched_texts,
                 )
 
-                # Extract predictions and reshape properly
+                # Extract predictions following TimesFM implementation
                 # Model output shape: (batch_size, num_patches, patch_len, num_quantiles)
-                batch_size, num_patches, patch_len, _ = outputs.shape
-                predictions = outputs[:, :, :, 0]  # Get mean prediction: (batch_size, num_patches, patch_len)
-                predictions = predictions.reshape(batch_size, num_patches * patch_len)  # (batch_size, total_len)
-
-                # Slice to match horizon length (in case output is longer than expected)
-                horizon_len = targets.shape[1]
-                predictions = predictions[:, :horizon_len]  # (batch_size, horizon_len)
+                predictions_mean = predictions[..., 0]  # Get mean prediction: (batch_size, num_patches, patch_len)
+                last_patch_pred = predictions_mean[:, -1, :]  # Extract last patch: (batch_size, patch_len)
 
                 # Compute loss
-                loss = self.loss_fn(predictions, targets)
+                loss = self.loss_fn(last_patch_pred, targets)
 
                 total_loss += loss.item()
 
