@@ -49,10 +49,15 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
             context_len: Length of context window for input sequences.
                          context_len must be an integer multiple of patch_len.
             horizon_len: Length of forecasting horizon (target sequence length).
+                         horizon_len must be an integer multiple of patch_len.
         """
         # Validate that context_len is an integer multiple of patch_len
         if context_len % patch_len != 0:
             raise ValueError(f"context_len ({context_len}) must be an integer multiple of patch_len ({patch_len})")
+
+        # Validate that horizon_len is an integer multiple of patch_len
+        if horizon_len % patch_len != 0:
+            raise ValueError(f"horizon_len ({horizon_len}) must be an integer multiple of patch_len ({patch_len})")
 
         self.data_dir = data_dir
         self.domain = domain
