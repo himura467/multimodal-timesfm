@@ -1,7 +1,7 @@
 """Time-MMD dataset loader for multimodal time series forecasting."""
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
@@ -32,8 +32,8 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
         self,
         data_dir: Path,
         domain: str,
-        split_ratio: float = 0.7,
-        split: str = "train",
+        split_ratio: float = 0.8,
+        split: Literal["train", "test"] = "train",
         context_len: int = 512,
         horizon_len: int = 128,
         patch_len: int = 32,
@@ -43,7 +43,7 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
         Args:
             data_dir: Root directory containing Time-MMD dataset.
             domain: Domain name (e.g., 'Agriculture').
-            split_ratio: Train/test split ratio (default 0.7 for 70% train).
+            split_ratio: Train/test split ratio (default 0.8 for 80% train).
             split: Dataset split ('train' or 'test').
             context_len: Length of context window for input sequences.
             horizon_len: Length of forecasting horizon (target sequence length).
