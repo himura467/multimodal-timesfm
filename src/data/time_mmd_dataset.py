@@ -34,9 +34,9 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
         domain: str,
         split_ratio: float = 0.8,
         split: Literal["train", "test"] = "train",
-        context_len: int = 512,
-        horizon_len: int = 128,
         patch_len: int = 32,
+        context_len: int = 128,
+        horizon_len: int = 32,
     ) -> None:
         """Initializes Time-MMD dataset loader.
 
@@ -45,22 +45,22 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
             domain: Domain name (e.g., 'Agriculture').
             split_ratio: Train/test split ratio (default 0.8 for 80% train).
             split: Dataset split ('train' or 'test').
-            context_len: Length of context window for input sequences.
-            horizon_len: Length of forecasting horizon (target sequence length).
-                         horizon_len must be an integer multiple of patch_len.
             patch_len: Length of input patches for temporal alignment with time series data.
+            context_len: Length of context window for input sequences.
+                         context_len must be an integer multiple of patch_len.
+            horizon_len: Length of forecasting horizon (target sequence length).
         """
-        # Validate that horizon_len is an integer multiple of patch_len
-        if horizon_len % patch_len != 0:
-            raise ValueError(f"horizon_len ({horizon_len}) must be an integer multiple of patch_len ({patch_len})")
+        # Validate that context_len is an integer multiple of patch_len
+        if context_len % patch_len != 0:
+            raise ValueError(f"context_len ({context_len}) must be an integer multiple of patch_len ({patch_len})")
 
         self.data_dir = data_dir
         self.domain = domain
         self.split_ratio = split_ratio
         self.split = split
+        self.patch_len = patch_len
         self.context_len = context_len
         self.horizon_len = horizon_len
-        self.patch_len = patch_len
         self.data: list[dict[str, Any]] = []
         self._load_data()
 
