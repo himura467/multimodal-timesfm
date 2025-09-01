@@ -91,12 +91,14 @@ class MultimodalTrainer:
         self.train_loader: DataLoader[Any] = DataLoader(
             train_dataset,  # type: ignore[arg-type]
             batch_size=batch_size,
+            shuffle=True,
             num_workers=0,
             pin_memory=True if self.device.type == "cuda" else False,
         )
         self.val_loader: DataLoader[Any] = DataLoader(
             val_dataset,  # type: ignore[arg-type]
             batch_size=batch_size,
+            shuffle=False,
             num_workers=0,
             pin_memory=True if self.device.type == "cuda" else False,
         )
