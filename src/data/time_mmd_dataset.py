@@ -30,7 +30,7 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
 
     def __init__(
         self,
-        data_dir: str | Path,
+        data_dir: Path,
         domain: str,
         split_ratio: float = 0.7,
         split: str = "train",
@@ -54,7 +54,7 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
         if horizon_len % patch_len != 0:
             raise ValueError(f"horizon_len ({horizon_len}) must be an integer multiple of patch_len ({patch_len})")
 
-        self.data_dir = Path(data_dir)
+        self.data_dir = data_dir
         self.domain = domain
         self.split_ratio = split_ratio
         self.split = split
