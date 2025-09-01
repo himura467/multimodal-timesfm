@@ -161,6 +161,9 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
                 window_start_date = str(start_dates.iloc[start_idx])
                 window_end_date = str(end_dates.iloc[target_end - 1])
 
+                # Calculate frequency based on interval between end_date values
+                freq = self._calculate_frequency_for_sample(end_dates, start_idx, target_end)
+
                 # Calculate number of text patches based on context_len / patch_len
                 text_patches_num = self.context_len // self.patch_len
 
@@ -172,6 +175,7 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
                     "time_series": time_series.astype(np.float32),
                     "patched_texts": patched_texts,
                     "target": target.astype(np.float32),
+                    "freq": freq,
                     "metadata": {
                         "domain": self.domain,
                         "column": column,
@@ -251,6 +255,42 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
             patches.append(patch_reports)
 
         return patches
+
+    def _calculate_frequency_for_sample(self, end_dates: pd.Series, start_idx: int, target_end: int) -> int:
+        """Calculate frequency value based on interval between end_date values.
+
+        Args:
+            end_dates: Series of end dates for the time series.
+            start_idx: Starting index of the sample.
+            target_end: Ending index of the sample.
+
+        Returns:
+            Frequency value:
+            - 0 for daily or lower granularity
+            - 1 for weekly or monthly granularity
+            - 2 for quarterly or higher granularity
+        """
+        if target_end - start_idx < 2:
+            return 0  # Default to daily if insufficient data
+
+        # Convert to datetime and calculate intervals for the entire sample range
+        sample_dates = pd.to_datetime(end_dates.iloc[start_idx:target_end])
+        intervals = sample_dates.diff().dropna()
+
+        if len(intervals) == 0:
+            return 0  # Default to daily
+
+        # Calculate average interval across all data points in the sample
+        avg_interval = intervals.mean()
+        avg_days = pd.Timedelta(avg_interval).total_seconds() / (24 * 3600)  # Convert to days
+
+        # Classify based on average interval
+        if avg_days < 3:
+            return 0
+        elif avg_days < 35:  # Weekly to monthly (up to ~5 weeks)
+            return 1
+        else:  # Quarterly or higher
+            return 2
 
     def __len__(self) -> int:
         """Returns dataset size."""
