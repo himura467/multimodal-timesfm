@@ -62,34 +62,6 @@ class MultimodalFusion(nn.Module):
         nn.init.xavier_uniform_(self.text_projection.weight)
         nn.init.zeros_(self.text_projection.bias)
 
-    def forward(self, ts_features: torch.Tensor, text_features: torch.Tensor) -> torch.Tensor:
-        """Fuse time series and text features using addition.
-
-        Args:
-            ts_features: Time series features of shape (batch_size, seq_len, ts_feature_dim).
-            text_features: Text features of shape (batch_size, seq_len, text_feature_dim).
-
-        Returns:
-            Fused features of shape (batch_size, seq_len, ts_feature_dim).
-
-        Raises:
-            ValueError: If input tensor dimensions don't match expected shapes.
-            RuntimeError: If input tensors are not on the same device.
-        """
-        # Validate input requirements
-        self._validate_inputs(ts_features, text_features)
-
-        # Project text features to time series dimension: (batch_size, seq_len, text_dim) -> (batch_size, seq_len, ts_dim)
-        projected_text = self.text_projection(text_features)
-
-        # Apply ReLU activation
-        projected_text = self.activation(projected_text)
-
-        # Add time series and text features element-wise
-        fused_features = ts_features + projected_text
-
-        return torch.as_tensor(fused_features)
-
     def _validate_inputs(self, ts_features: torch.Tensor, text_features: torch.Tensor) -> None:
         """Validate input tensor shapes, types, and compatibility.
 
@@ -140,24 +112,20 @@ class MultimodalFusion(nn.Module):
                 f"Device mismatch: ts_features on {ts_features.device}, text_features on {text_features.device}"
             )
 
-    def get_projection_parameters(self) -> dict[str, torch.Tensor]:
-        """Get projection layer parameters for TimesFM integration.
-
-        Returns:
-            Dictionary containing 'weight' and 'bias' parameters of the projection layer.
-        """
-        return {"weight": self.text_projection.weight.clone(), "bias": self.text_projection.bias.clone()}
-
-    def set_projection_parameters(self, parameters: dict[str, torch.Tensor]) -> None:
-        """Set projection layer parameters for TimesFM integration.
+    def _validate_parameters(self, parameters: dict[str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
+        """Validate projection parameters for setting.
 
         Args:
             parameters: Dictionary containing 'weight' and 'bias' tensors.
 
+        Returns:
+            Tuple of (weight, bias) tensors after validation.
+
         Raises:
-            ValueError: If parameters don't match expected shapes.
             KeyError: If required parameter keys are missing.
+            ValueError: If parameters don't match expected shapes.
         """
+        # Check for required keys
         if "weight" not in parameters:
             raise KeyError("Missing 'weight' parameter")
         if "bias" not in parameters:
@@ -174,6 +142,57 @@ class MultimodalFusion(nn.Module):
             raise ValueError(f"Weight shape mismatch: expected {expected_weight_shape}, got {weight.shape}")
         if bias.shape != expected_bias_shape:
             raise ValueError(f"Bias shape mismatch: expected {expected_bias_shape}, got {bias.shape}")
+
+        return weight, bias
+
+    def forward(self, ts_features: torch.Tensor, text_features: torch.Tensor) -> torch.Tensor:
+        """Fuse time series and text features using addition.
+
+        Args:
+            ts_features: Time series features of shape (batch_size, seq_len, ts_feature_dim).
+            text_features: Text features of shape (batch_size, seq_len, text_feature_dim).
+
+        Returns:
+            Fused features of shape (batch_size, seq_len, ts_feature_dim).
+
+        Raises:
+            ValueError: If input tensor dimensions don't match expected shapes.
+            RuntimeError: If input tensors are not on the same device.
+        """
+        # Validate input requirements
+        self._validate_inputs(ts_features, text_features)
+
+        # Project text features to time series dimension: (batch_size, seq_len, text_dim) -> (batch_size, seq_len, ts_dim)
+        projected_text = self.text_projection(text_features)
+
+        # Apply activation
+        projected_text = self.activation(projected_text)
+
+        # Add time series and text features element-wise
+        fused_features = ts_features + projected_text
+
+        return torch.as_tensor(fused_features)
+
+    def get_projection_parameters(self) -> dict[str, torch.Tensor]:
+        """Get projection layer parameters for TimesFM integration.
+
+        Returns:
+            Dictionary containing 'weight' and 'bias' parameters of the projection layer.
+        """
+        return {"weight": self.text_projection.weight.clone(), "bias": self.text_projection.bias.clone()}
+
+    def set_projection_parameters(self, parameters: dict[str, torch.Tensor]) -> None:
+        """Set projection layer parameters for TimesFM integration.
+
+        Args:
+            parameters: Dictionary containing 'weight' and 'bias' tensors.
+
+        Raises:
+            KeyError: If required parameter keys are missing.
+            ValueError: If parameters don't match expected shapes.
+        """
+        # Validate parameters
+        weight, bias = self._validate_parameters(parameters)
 
         # Set parameters
         with torch.no_grad():
