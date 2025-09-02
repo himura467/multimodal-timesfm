@@ -76,29 +76,8 @@ class MultimodalFusion(nn.Module):
             ValueError: If input tensor dimensions don't match expected shapes.
             RuntimeError: If input tensors are not on the same device.
         """
-        # Validate input shapes
+        # Validate input requirements
         self._validate_inputs(ts_features, text_features)
-
-        batch_size, seq_len, ts_dim = ts_features.shape
-        text_batch_size, text_seq_len, text_dim = text_features.shape
-
-        # Ensure batch sizes and sequence lengths match
-        if batch_size != text_batch_size:
-            raise ValueError(f"Batch size mismatch: ts_features has {batch_size}, text_features has {text_batch_size}")
-        if seq_len != text_seq_len:
-            raise ValueError(f"Sequence length mismatch: ts_features has {seq_len}, text_features has {text_seq_len}")
-
-        # Ensure feature dimensions match expected
-        if ts_dim != self.ts_feature_dim:
-            raise ValueError(f"Time series feature dimension mismatch: expected {self.ts_feature_dim}, got {ts_dim}")
-        if text_dim != self.text_feature_dim:
-            raise ValueError(f"Text feature dimension mismatch: expected {self.text_feature_dim}, got {text_dim}")
-
-        # Ensure tensors are on the same device
-        if ts_features.device != text_features.device:
-            raise RuntimeError(
-                f"Device mismatch: ts_features on {ts_features.device}, text_features on {text_features.device}"
-            )
 
         # Project text features to time series dimension: (batch_size, seq_len, text_dim) -> (batch_size, seq_len, ts_dim)
         projected_text = self.text_projection(text_features)
@@ -112,20 +91,23 @@ class MultimodalFusion(nn.Module):
         return torch.as_tensor(fused_features)
 
     def _validate_inputs(self, ts_features: torch.Tensor, text_features: torch.Tensor) -> None:
-        """Validate input tensor shapes and types.
+        """Validate input tensor shapes, types, and compatibility.
 
         Args:
             ts_features: Time series features tensor.
             text_features: Text features tensor.
 
         Raises:
-            ValueError: If input tensors have incorrect shapes or types.
+            ValueError: If input tensors have incorrect shapes, types, or incompatible dimensions.
+            RuntimeError: If input tensors are not on the same device.
         """
+        # Validate tensor types
         if not isinstance(ts_features, torch.Tensor):
             raise ValueError(f"ts_features must be a torch.Tensor, got {type(ts_features)}")
         if not isinstance(text_features, torch.Tensor):
             raise ValueError(f"text_features must be a torch.Tensor, got {type(text_features)}")
 
+        # Validate tensor dimensionality
         if ts_features.dim() != 3:
             raise ValueError(
                 f"ts_features must be 3D (batch_size, seq_len, feature_dim), "
@@ -135,6 +117,27 @@ class MultimodalFusion(nn.Module):
             raise ValueError(
                 f"text_features must be 3D (batch_size, seq_len, feature_dim), "
                 f"got {text_features.dim()}D with shape {text_features.shape}"
+            )
+
+        batch_size, seq_len, ts_dim = ts_features.shape
+        text_batch_size, text_seq_len, text_dim = text_features.shape
+
+        # Validate batch sizes and sequence lengths match
+        if batch_size != text_batch_size:
+            raise ValueError(f"Batch size mismatch: ts_features has {batch_size}, text_features has {text_batch_size}")
+        if seq_len != text_seq_len:
+            raise ValueError(f"Sequence length mismatch: ts_features has {seq_len}, text_features has {text_seq_len}")
+
+        # Validate feature dimensions match expected
+        if ts_dim != self.ts_feature_dim:
+            raise ValueError(f"Time series feature dimension mismatch: expected {self.ts_feature_dim}, got {ts_dim}")
+        if text_dim != self.text_feature_dim:
+            raise ValueError(f"Text feature dimension mismatch: expected {self.text_feature_dim}, got {text_dim}")
+
+        # Validate tensors are on the same device
+        if ts_features.device != text_features.device:
+            raise RuntimeError(
+                f"Device mismatch: ts_features on {ts_features.device}, text_features on {text_features.device}"
             )
 
     def get_projection_parameters(self) -> dict[str, torch.Tensor]:
