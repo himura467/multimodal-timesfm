@@ -377,16 +377,19 @@ class MultimodalTrainer:
         wandb.finish()
 
     def freeze_pretrained_parameters(self) -> None:
-        """Freeze TimesFM and text encoder parameters - only train fusion components."""
-        for name, param in self.model.named_parameters():
-            if not name.startswith("multimodal_fusion"):
-                param.requires_grad = False
+        """Freeze pretrained TimesFM and text encoder parameters - only train fusion components."""
+        # Use the model's built-in method to freeze all parameters first
+        self.model.freeze_parameters()
 
-        self.logger.info("Froze TimesFM and text encoder parameters - only training fusion components")
+        # Then unfreeze only the fusion component for training (keep text encoder frozen)
+        self.model.unfreeze_text_components(unfreeze_encoder=False, unfreeze_fusion=True)
+
+        # Log the status
+        status = self.model.is_text_frozen()
+        self.logger.info(f"Froze pretrained parameters - text components status: {status}")
 
     def unfreeze_all_parameters(self) -> None:
         """Unfreeze all parameters for full model training."""
-        for param in self.model.parameters():
-            param.requires_grad = True
+        self.model.unfreeze_parameters()
 
         self.logger.info("Unfroze all parameters - training full model")
