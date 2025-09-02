@@ -38,7 +38,7 @@ class MultimodalTrainer:
         train_dataset: MultimodalDataset,
         val_dataset: MultimodalDataset,
         batch_size: int = 8,
-        gradient_accumulation_steps: int = 1,
+        gradient_accumulation_steps: int = 4,
         max_grad_norm: float = 1.0,
         device: torch.device | str | None = None,
         learning_rate: float = 1e-4,
@@ -229,7 +229,7 @@ class MultimodalTrainer:
             total_loss += loss.item() * self.gradient_accumulation_steps
 
             # Log progress
-            if batch_idx % 50 == 0:
+            if batch_idx % 100 == 0:
                 self.logger.info(
                     f"Epoch {self.current_epoch}, Batch {batch_idx}/{len(self.train_loader)}, "
                     f"Loss: {loss.item() * self.gradient_accumulation_steps:.6f}"
@@ -324,7 +324,7 @@ class MultimodalTrainer:
 
     def train(
         self,
-        num_epochs: int,
+        num_epochs: int = 20,
         scheduler: torch.optim.lr_scheduler.LRScheduler | None = None,
         save_every: int = 5,
     ) -> None:
