@@ -290,43 +290,66 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
 
         return (full_outputs_tensor[:, :, 0], full_outputs_tensor)
 
-    def freeze_text_components(self) -> None:
-        """Freeze text encoder and fusion components for selective training."""
-        for param in self.text_encoder.parameters():
+    def freeze_parameters(self) -> None:
+        """Freeze all parameters in the MultimodalPatchedDecoder model.
+
+        This includes all TimesFM decoder parameters, text encoder parameters,
+        and fusion layer parameters.
+        """
+        # Freeze all model parameters
+        for param in self.parameters():
             param.requires_grad = False
 
-        self.multimodal_fusion.freeze_projection()
+    def unfreeze_parameters(self) -> None:
+        """Unfreeze all parameters in the MultimodalPatchedDecoder model.
 
-    def unfreeze_text_components(self) -> None:
-        """Unfreeze text encoder and fusion components for training."""
-        for param in self.text_encoder.parameters():
+        This includes all TimesFM decoder parameters, text encoder parameters,
+        and fusion layer parameters.
+        """
+        # Unfreeze all model parameters
+        for param in self.parameters():
             param.requires_grad = True
 
-        self.multimodal_fusion.unfreeze_projection()
+    def is_frozen(self) -> bool:
+        """Check if all parameters in the MultimodalPatchedDecoder model are frozen.
 
-    def is_text_frozen(self) -> bool:
+        Returns:
+            True if all parameters are frozen, False otherwise.
+        """
+        return all(not param.requires_grad for param in self.parameters())
+
+    def freeze_text_components(self, freeze_encoder: bool = True, freeze_fusion: bool = True) -> None:
+        """Freeze text encoder and/or fusion components for selective training.
+
+        Args:
+            freeze_encoder: Whether to freeze the text encoder parameters.
+            freeze_fusion: Whether to freeze the fusion projection parameters.
+        """
+        if freeze_encoder:
+            self.text_encoder.freeze_parameters()
+
+        if freeze_fusion:
+            self.multimodal_fusion.freeze_projection()
+
+    def unfreeze_text_components(self, unfreeze_encoder: bool = True, unfreeze_fusion: bool = True) -> None:
+        """Unfreeze text encoder and/or fusion components for training.
+
+        Args:
+            unfreeze_encoder: Whether to unfreeze the text encoder parameters.
+            unfreeze_fusion: Whether to unfreeze the fusion projection parameters.
+        """
+        if unfreeze_encoder:
+            self.text_encoder.unfreeze_parameters()
+
+        if unfreeze_fusion:
+            self.multimodal_fusion.unfreeze_projection()
+
+    def is_text_frozen(self) -> dict[str, bool]:
         """Check if text components are frozen.
 
         Returns:
-            True if all text components are frozen, False otherwise.
+            Dictionary with freeze status of each component:
+            - 'encoder': True if text encoder is frozen, False otherwise
+            - 'fusion': True if fusion projection is frozen, False otherwise
         """
-        text_encoder_frozen = all(not param.requires_grad for param in self.text_encoder.parameters())
-        fusion_frozen = self.multimodal_fusion.is_projection_frozen()
-
-        return text_encoder_frozen and fusion_frozen
-
-    def get_text_fusion_parameters(self) -> dict[str, torch.Tensor]:
-        """Get text fusion parameters for checkpoint saving.
-
-        Returns:
-            Dictionary of fusion parameters.
-        """
-        return self.multimodal_fusion.get_projection_parameters()
-
-    def set_text_fusion_parameters(self, parameters: dict[str, torch.Tensor]) -> None:
-        """Set text fusion parameters for checkpoint loading.
-
-        Args:
-            parameters: Dictionary containing fusion parameters.
-        """
-        self.multimodal_fusion.set_projection_parameters(parameters)
+        return {"encoder": self.text_encoder.is_frozen(), "fusion": self.multimodal_fusion.is_projection_frozen()}
