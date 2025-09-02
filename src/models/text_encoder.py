@@ -67,6 +67,24 @@ class TextEncoder(nn.Module):
 
         return embeddings.clone()
 
+    def freeze_parameters(self) -> None:
+        """Freeze all parameters of the sentence transformer for selective training."""
+        for param in self.sentence_transformer.parameters():
+            param.requires_grad = False
+
+    def unfreeze_parameters(self) -> None:
+        """Unfreeze all parameters of the sentence transformer for training."""
+        for param in self.sentence_transformer.parameters():
+            param.requires_grad = True
+
+    def is_frozen(self) -> bool:
+        """Check if sentence transformer parameters are frozen.
+
+        Returns:
+            True if all parameters are frozen, False otherwise.
+        """
+        return all(not param.requires_grad for param in self.sentence_transformer.parameters())
+
 
 class MultimodalFusion(nn.Module):
     """Addition-based fusion mechanism for combining time series and text features.
