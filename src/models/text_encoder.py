@@ -1,5 +1,6 @@
 """Text encoding components for multimodal TimesFM."""
 
+import numpy as np
 import torch
 import torch.nn as nn
 from sentence_transformers import SentenceTransformer
@@ -47,14 +48,19 @@ class TextEncoder(nn.Module):
                 f"but {embedding_dim} was requested. Please use embedding_dim={actual_dim}."
             )
 
-    def forward(self, texts: list[str]) -> torch.Tensor:
+    def forward(self, texts: str | list[str] | np.ndarray) -> torch.Tensor:
         """Encode text inputs into embeddings.
 
         Args:
-            texts: List of text strings to encode.
+            texts: Text input(s) to encode. Can be:
+                - Single string
+                - List of strings
+                - NumPy array of strings
 
         Returns:
-            Tensor of shape (batch_size, embedding_dim) containing text embeddings.
+            Tensor containing text embeddings:
+            - For single string: shape (embedding_dim,)
+            - For multiple strings: shape (num_inputs, embedding_dim)
         """
         # Generate embeddings using sentence transformer
         embeddings = self.sentence_transformer.encode(texts, convert_to_tensor=True)
