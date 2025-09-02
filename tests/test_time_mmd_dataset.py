@@ -311,6 +311,196 @@ class TestTimeMmdDataset:
             assert sample["future"].shape == first_sample["future"].shape
             assert len(sample["patched_texts"]) == len(first_sample["patched_texts"])
 
+    def test_calculate_frequency_daily_data(self, sample_data_dir: Path) -> None:
+        """Tests frequency calculation for daily data."""
+        dataset = TimeMmdDataset(
+            data_dir=sample_data_dir,
+            domain="TestDomain",
+            patch_len=8,
+            context_len=32,
+            horizon_len=16,
+        )
+
+        # Create daily dates
+        daily_dates = pd.date_range("2020-01-01", periods=50, freq="D").astype(str)
+        dates_series = pd.Series(daily_dates)
+
+        freq = dataset._calculate_frequency_for_sample(dates_series, 0, 30)
+        assert freq == 0  # Daily frequency
+
+    def test_calculate_frequency_weekly_data(self, sample_data_dir: Path) -> None:
+        """Tests frequency calculation for weekly data."""
+        dataset = TimeMmdDataset(
+            data_dir=sample_data_dir,
+            domain="TestDomain",
+            patch_len=8,
+            context_len=32,
+            horizon_len=16,
+        )
+
+        # Create weekly dates
+        weekly_dates = pd.date_range("2020-01-01", periods=20, freq="W").astype(str)
+        dates_series = pd.Series(weekly_dates)
+
+        freq = dataset._calculate_frequency_for_sample(dates_series, 0, 15)
+        assert freq == 1  # Weekly frequency
+
+    def test_calculate_frequency_monthly_data(self, sample_data_dir: Path) -> None:
+        """Tests frequency calculation for monthly data."""
+        dataset = TimeMmdDataset(
+            data_dir=sample_data_dir,
+            domain="TestDomain",
+            patch_len=8,
+            context_len=32,
+            horizon_len=16,
+        )
+
+        # Create monthly dates
+        monthly_dates = pd.date_range("2020-01-01", periods=15, freq="MS").astype(str)
+        dates_series = pd.Series(monthly_dates)
+
+        freq = dataset._calculate_frequency_for_sample(dates_series, 0, 12)
+        assert freq == 1  # Monthly frequency
+
+    def test_calculate_frequency_quarterly_data(self, sample_data_dir: Path) -> None:
+        """Tests frequency calculation for quarterly data."""
+        dataset = TimeMmdDataset(
+            data_dir=sample_data_dir,
+            domain="TestDomain",
+            patch_len=8,
+            context_len=32,
+            horizon_len=16,
+        )
+
+        # Create quarterly dates
+        quarterly_dates = pd.date_range("2020-01-01", periods=12, freq="QS").astype(str)
+        dates_series = pd.Series(quarterly_dates)
+
+        freq = dataset._calculate_frequency_for_sample(dates_series, 0, 10)
+        assert freq == 2  # Quarterly frequency
+
+    def test_calculate_frequency_yearly_data(self, sample_data_dir: Path) -> None:
+        """Tests frequency calculation for yearly data."""
+        dataset = TimeMmdDataset(
+            data_dir=sample_data_dir,
+            domain="TestDomain",
+            patch_len=8,
+            context_len=32,
+            horizon_len=16,
+        )
+
+        # Create yearly dates
+        yearly_dates = pd.date_range("2020-01-01", periods=8, freq="YS").astype(str)
+        dates_series = pd.Series(yearly_dates)
+
+        freq = dataset._calculate_frequency_for_sample(dates_series, 0, 6)
+        assert freq == 2  # Yearly frequency
+
+    def test_calculate_frequency_insufficient_data(self, sample_data_dir: Path) -> None:
+        """Tests frequency calculation with insufficient data points."""
+        dataset = TimeMmdDataset(
+            data_dir=sample_data_dir,
+            domain="TestDomain",
+            patch_len=8,
+            context_len=32,
+            horizon_len=16,
+        )
+
+        dates_series = pd.Series(["2020-01-01"])
+
+        # Same start and end index
+        freq = dataset._calculate_frequency_for_sample(dates_series, 0, 0)
+        assert freq == 0
+
+        # End index - start index < 1
+        freq = dataset._calculate_frequency_for_sample(dates_series, 0, 1)
+        assert freq == 0
+
+    def test_calculate_frequency_single_date_range(self, sample_data_dir: Path) -> None:
+        """Tests frequency calculation with only one date difference."""
+        dataset = TimeMmdDataset(
+            data_dir=sample_data_dir,
+            domain="TestDomain",
+            patch_len=8,
+            context_len=32,
+            horizon_len=16,
+        )
+
+        dates_series = pd.Series(["2020-01-01", "2020-01-02"])
+
+        freq = dataset._calculate_frequency_for_sample(dates_series, 0, 2)
+        assert freq == 0  # Single day interval
+
+    def test_calculate_frequency_mixed_intervals(self, sample_data_dir: Path) -> None:
+        """Tests frequency calculation with mixed intervals averaging to weekly."""
+        dataset = TimeMmdDataset(
+            data_dir=sample_data_dir,
+            domain="TestDomain",
+            patch_len=8,
+            context_len=32,
+            horizon_len=16,
+        )
+
+        # Mix of 1-day and 25-day intervals (average ~7 days)
+        mixed_dates = [
+            "2020-01-01",
+            "2020-01-02",  # 1 day
+            "2020-01-03",  # 1 day
+            "2020-01-04",  # 1 day
+            "2020-01-29",  # 25 days
+        ]
+        dates_series = pd.Series(mixed_dates)
+
+        freq = dataset._calculate_frequency_for_sample(dates_series, 0, 5)
+        assert freq == 1  # Should classify as weekly (average ~7 days)
+
+    def test_calculate_frequency_subsample_range(self, sample_data_dir: Path) -> None:
+        """Tests frequency calculation on a subsample of the date series."""
+        dataset = TimeMmdDataset(
+            data_dir=sample_data_dir,
+            domain="TestDomain",
+            patch_len=8,
+            context_len=32,
+            horizon_len=16,
+        )
+
+        # Create mixed frequency data
+        mixed_dates = (
+            pd.date_range("2020-01-01", periods=10, freq="D").astype(str).tolist()  # Daily
+            + pd.date_range("2020-01-11", periods=10, freq="W").astype(str).tolist()  # Weekly
+        )
+        dates_series = pd.Series(mixed_dates)
+
+        # Test daily portion
+        freq_daily = dataset._calculate_frequency_for_sample(dates_series, 0, 8)
+        assert freq_daily == 0
+
+        # Test weekly portion
+        freq_weekly = dataset._calculate_frequency_for_sample(dates_series, 10, 18)
+        assert freq_weekly == 1
+
+    def test_calculate_frequency_boundary_cases(self, sample_data_dir: Path) -> None:
+        """Tests frequency calculation at boundary values."""
+        dataset = TimeMmdDataset(
+            data_dir=sample_data_dir,
+            domain="TestDomain",
+            patch_len=8,
+            context_len=32,
+            horizon_len=16,
+        )
+
+        # Test 3-day boundary (should be weekly/monthly category)
+        three_day_dates = pd.date_range("2020-01-01", periods=10, freq="3D").astype(str)
+        dates_series = pd.Series(three_day_dates)
+        freq = dataset._calculate_frequency_for_sample(dates_series, 0, 8)
+        assert freq == 1
+
+        # Test 35-day boundary (should be quarterly/yearly category)
+        thirty_five_day_dates = pd.date_range("2020-01-01", periods=10, freq="35D").astype(str)
+        dates_series = pd.Series(thirty_five_day_dates)
+        freq = dataset._calculate_frequency_for_sample(dates_series, 0, 8)
+        assert freq == 2
+
 
 class TestTimeMmdDatasetEdgeCases:
     """Test edge cases and error conditions."""
