@@ -47,9 +47,9 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
             split: Dataset split ('train' or 'test').
             patch_len: Length of input patches for temporal alignment with time series data.
             context_len: Length of context window for input sequences.
-                         context_len must be an integer multiple of patch_len.
+                        context_len must be an integer multiple of patch_len.
             horizon_len: Length of forecasting horizon.
-                         horizon_len must be an integer multiple of patch_len.
+                        horizon_len must be an integer multiple of patch_len.
         """
         # Validate that context_len is an integer multiple of patch_len
         if context_len % patch_len != 0:
