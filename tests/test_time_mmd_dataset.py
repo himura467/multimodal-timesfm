@@ -30,44 +30,148 @@ class TestTimeMmdDataset:
         assert dataset.context_len == 32
         assert dataset.horizon_len == 16
 
-    def test_data_loading_and_structure(self, sample_data_dir: Path) -> None:
-        """Tests that data is loaded correctly and has expected structure."""
+    def test_init_missing_numerical_file(self, sample_data_dir: Path) -> None:
+        """Tests initialization fails when numerical file is missing."""
+        with pytest.raises(FileNotFoundError, match="Numerical data file not found"):
+            TimeMmdDataset(
+                data_dir=sample_data_dir,
+                domain="NonexistentDomain",
+                patch_len=8,
+                context_len=32,
+                horizon_len=16,
+            )
+
+    def test_missing_text_data_handling(self) -> None:
+        """Tests handling when textual data files are missing."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir)
+            numerical_dir = data_dir / "numerical" / "NoTextDomain"
+            numerical_dir.mkdir(parents=True)
+
+            # Create numerical data without corresponding textual data
+            dates = pd.date_range("2020-01-01", periods=100, freq="D")
+            numerical_data = pd.DataFrame(
+                {
+                    "start_date": dates.astype(str),
+                    "end_date": dates.astype(str),
+                    "value": np.random.randn(100),
+                }
+            )
+            numerical_data.to_csv(numerical_dir / "NoTextDomain.csv", index=False)
+
+            # Should initialize without errors
+            dataset = TimeMmdDataset(
+                data_dir=data_dir,
+                domain="NoTextDomain",
+                patch_len=8,
+                context_len=32,
+                horizon_len=16,
+            )
+
+            assert len(dataset) > 0
+
+            # Samples should have empty text patches
+            sample = dataset[0]
+            assert all(len(patch) == 0 for patch in sample["patched_texts"])
+
+    def test_missing_date_columns(self) -> None:
+        """Tests handling of missing date columns."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir)
+            numerical_dir = data_dir / "numerical" / "BadDomain"
+            numerical_dir.mkdir(parents=True)
+
+            # Create data without proper date columns
+            bad_data = pd.DataFrame(
+                {
+                    "value": [1, 2, 3, 4, 5],
+                    "other_col": ["a", "b", "c", "d", "e"],
+                }
+            )
+            bad_data.to_csv(numerical_dir / "BadDomain.csv", index=False)
+
+            with pytest.raises(ValueError, match="No start_date column found"):
+                TimeMmdDataset(
+                    data_dir=data_dir,
+                    domain="BadDomain",
+                    patch_len=1,
+                    context_len=4,
+                    horizon_len=2,
+                )
+
+    def test_missing_end_date_column(self) -> None:
+        """Tests handling of missing end_date column."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir)
+            numerical_dir = data_dir / "numerical" / "BadDomain"
+            numerical_dir.mkdir(parents=True)
+
+            # Create data with start_date but no end_date
+            bad_data = pd.DataFrame(
+                {
+                    "start_date": ["2020-01-01", "2020-01-02"],
+                    "value": [1.0, 2.0],
+                }
+            )
+            bad_data.to_csv(numerical_dir / "BadDomain.csv", index=False)
+
+            with pytest.raises(ValueError, match="No end_date column found"):
+                TimeMmdDataset(
+                    data_dir=data_dir,
+                    domain="BadDomain",
+                    patch_len=1,
+                    context_len=4,
+                    horizon_len=2,
+                )
+
+    def test_no_numeric_columns(self) -> None:
+        """Tests handling when no numeric columns are found."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir)
+            numerical_dir = data_dir / "numerical" / "TextOnlyDomain"
+            numerical_dir.mkdir(parents=True)
+
+            # Create data with only text columns
+            text_only_data = pd.DataFrame(
+                {
+                    "start_date": ["2020-01-01", "2020-01-02"],
+                    "end_date": ["2020-01-01", "2020-01-02"],
+                    "category": ["A", "B"],
+                    "description": ["Text 1", "Text 2"],
+                }
+            )
+            text_only_data.to_csv(numerical_dir / "TextOnlyDomain.csv", index=False)
+
+            dataset = TimeMmdDataset(
+                data_dir=data_dir,
+                domain="TextOnlyDomain",
+                patch_len=1,
+                context_len=4,
+                horizon_len=2,
+            )
+
+            # Should result in empty dataset
+            assert len(dataset) == 0
+
+    def test_numeric_column_filtering(self, sample_data_dir: Path) -> None:
+        """Tests that only numeric columns are processed as time series."""
         dataset = TimeMmdDataset(
             data_dir=sample_data_dir,
             domain="TestDomain",
-            patch_len=8,
-            context_len=32,
-            horizon_len=16,
+            patch_len=4,
+            context_len=16,
+            horizon_len=8,
         )
 
-        assert len(dataset) > 0
+        # Should only have samples from value1 and value2 columns, not category
+        columns_found = set()
+        for i in range(len(dataset)):
+            sample = dataset[i]
+            columns_found.add(sample["metadata"]["column"])
 
-        # Test first sample
-        sample = dataset[0]
-        assert isinstance(sample, dict)
-        assert set(sample.keys()) == {"context", "future", "freq", "patched_texts", "metadata"}
-
-        # Test context
-        assert sample["context"].shape == (32, 1)
-        assert sample["context"].dtype == np.float32
-
-        # Test future
-        assert sample["future"].shape == (16, 1)
-        assert sample["future"].dtype == np.float32
-
-        # Test freq
-        assert sample["freq"] in [0, 1, 2]  # Valid frequency values
-
-        # Test patched texts
-        assert isinstance(sample["patched_texts"], list)
-        assert len(sample["patched_texts"]) == 4  # context_len // patch_len = 32 // 8 = 4
-        assert all(isinstance(patch, list) for patch in sample["patched_texts"])
-
-        # Test metadata
-        assert isinstance(sample["metadata"], dict)
-        assert "domain" in sample["metadata"]
-        assert "column" in sample["metadata"]
-        assert "start_index" in sample["metadata"]
+        assert "value1" in columns_found
+        assert "value2" in columns_found
+        assert "category" not in columns_found
 
     def test_train_test_split(self, sample_data_dir: Path) -> None:
         """Tests train/test split functionality."""
@@ -135,25 +239,27 @@ class TestTimeMmdDataset:
         # Allow tolerance due to windowing effects and discrete sample counts
         assert 0.6 <= train_ratio < 0.7
 
-    def test_numeric_column_filtering(self, sample_data_dir: Path) -> None:
-        """Tests that only numeric columns are processed as time series."""
-        dataset = TimeMmdDataset(
-            data_dir=sample_data_dir,
-            domain="TestDomain",
-            patch_len=4,
-            context_len=16,
-            horizon_len=8,
-        )
+    def test_init_invalid_context_patch_ratio(self, sample_data_dir: Path) -> None:
+        """Tests initialization fails when context_len is not multiple of patch_len."""
+        with pytest.raises(ValueError, match="context_len \\(31\\) must be an integer multiple of patch_len \\(8\\)"):
+            TimeMmdDataset(
+                data_dir=sample_data_dir,
+                domain="TestDomain",
+                patch_len=8,
+                context_len=31,  # Not multiple of patch_len=8
+                horizon_len=16,
+            )
 
-        # Should only have samples from value1 and value2 columns, not category
-        columns_found = set()
-        for i in range(len(dataset)):
-            sample = dataset[i]
-            columns_found.add(sample["metadata"]["column"])
-
-        assert "value1" in columns_found
-        assert "value2" in columns_found
-        assert "category" not in columns_found
+    def test_init_invalid_horizon_patch_ratio(self, sample_data_dir: Path) -> None:
+        """Tests initialization fails when horizon_len is not multiple of patch_len."""
+        with pytest.raises(ValueError, match="horizon_len \\(15\\) must be an integer multiple of patch_len \\(8\\)"):
+            TimeMmdDataset(
+                data_dir=sample_data_dir,
+                domain="TestDomain",
+                patch_len=8,
+                context_len=32,
+                horizon_len=15,  # Not multiple of patch_len=8
+            )
 
     def test_insufficient_data_handling(self) -> None:
         """Tests handling when data is too short for context + horizon."""
@@ -182,134 +288,6 @@ class TestTimeMmdDataset:
 
             # Should handle gracefully with empty dataset
             assert len(dataset) == 0
-
-    def test_missing_text_data_handling(self) -> None:
-        """Tests handling when textual data files are missing."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            data_dir = Path(temp_dir)
-            numerical_dir = data_dir / "numerical" / "NoTextDomain"
-            numerical_dir.mkdir(parents=True)
-
-            # Create numerical data without corresponding textual data
-            dates = pd.date_range("2020-01-01", periods=100, freq="D")
-            numerical_data = pd.DataFrame(
-                {
-                    "start_date": dates.astype(str),
-                    "end_date": dates.astype(str),
-                    "value": np.random.randn(100),
-                }
-            )
-            numerical_data.to_csv(numerical_dir / "NoTextDomain.csv", index=False)
-
-            # Should initialize without errors
-            dataset = TimeMmdDataset(
-                data_dir=data_dir,
-                domain="NoTextDomain",
-                patch_len=8,
-                context_len=32,
-                horizon_len=16,
-            )
-
-            assert len(dataset) > 0
-
-            # Samples should have empty text patches
-            sample = dataset[0]
-            assert all(len(patch) == 0 for patch in sample["patched_texts"])
-
-    def test_windowing_logic(self, sample_data_dir: Path) -> None:
-        """Tests windowing logic for creating samples."""
-        dataset = TimeMmdDataset(
-            data_dir=sample_data_dir,
-            domain="TestDomain",
-            patch_len=4,
-            context_len=16,
-            horizon_len=8,
-        )
-
-        # Check that samples have correct sequence relationships
-        sample = dataset[0]
-        context = sample["context"]
-        future = sample["future"]
-
-        # context and future should be consecutive
-        assert context.shape == (16, 1)
-        assert future.shape == (8, 1)
-
-    def test_text_patching_logic(self, sample_data_dir: Path) -> None:
-        """Tests text patching logic."""
-        dataset = TimeMmdDataset(
-            data_dir=sample_data_dir,
-            domain="TestDomain",
-            patch_len=4,
-            context_len=16,
-            horizon_len=8,
-        )
-
-        sample = dataset[0]
-        patched_texts = sample["patched_texts"]
-
-        # Should have correct number of patches
-        expected_patches = dataset.context_len // dataset.patch_len
-        assert len(patched_texts) == expected_patches
-
-        # Each patch should be a list of strings
-        for patch in patched_texts:
-            assert isinstance(patch, list)
-            for text in patch:
-                assert isinstance(text, str)
-
-    def test_getitem_bounds_checking(self, sample_data_dir: Path) -> None:
-        """Tests __getitem__ with invalid indices."""
-        dataset = TimeMmdDataset(
-            data_dir=sample_data_dir,
-            domain="TestDomain",
-            patch_len=4,
-            context_len=16,
-            horizon_len=8,
-        )
-
-        # Valid index should work
-        assert isinstance(dataset[0], dict)
-
-        # Invalid indices should raise IndexError
-        with pytest.raises(IndexError):
-            dataset[len(dataset)]
-
-        with pytest.raises(IndexError):
-            dataset[-len(dataset) - 1]
-
-    def test_len_method(self, sample_data_dir: Path) -> None:
-        """Tests __len__ method."""
-        dataset = TimeMmdDataset(
-            data_dir=sample_data_dir,
-            domain="TestDomain",
-            patch_len=4,
-            context_len=16,
-            horizon_len=8,
-        )
-
-        assert len(dataset) == 16
-
-    def test_data_consistency_across_samples(self, sample_data_dir: Path) -> None:
-        """Tests that all samples have consistent structure."""
-        dataset = TimeMmdDataset(
-            data_dir=sample_data_dir,
-            domain="TestDomain",
-            patch_len=4,
-            context_len=16,
-            horizon_len=8,
-        )
-
-        first_sample = dataset[0]
-
-        # Check all samples have same structure
-        for i in range(min(5, len(dataset))):
-            sample = dataset[i]
-
-            assert set(sample.keys()) == set(first_sample.keys())
-            assert sample["context"].shape == first_sample["context"].shape
-            assert sample["future"].shape == first_sample["future"].shape
-            assert len(sample["patched_texts"]) == len(first_sample["patched_texts"])
 
     def test_calculate_frequency_daily_data(self, sample_data_dir: Path) -> None:
         """Tests frequency calculation for daily data."""
@@ -501,138 +479,28 @@ class TestTimeMmdDataset:
         freq = dataset._calculate_frequency_for_sample(dates_series, 0, 8)
         assert freq == 2
 
-
-class TestTimeMmdDatasetEdgeCases:
-    """Test edge cases and error conditions."""
-
-    def test_missing_date_columns(self) -> None:
-        """Tests handling of missing date columns."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            data_dir = Path(temp_dir)
-            numerical_dir = data_dir / "numerical" / "BadDomain"
-            numerical_dir.mkdir(parents=True)
-
-            # Create data without proper date columns
-            bad_data = pd.DataFrame(
-                {
-                    "value": [1, 2, 3, 4, 5],
-                    "other_col": ["a", "b", "c", "d", "e"],
-                }
-            )
-            bad_data.to_csv(numerical_dir / "BadDomain.csv", index=False)
-
-            with pytest.raises(ValueError, match="No start_date column found"):
-                TimeMmdDataset(
-                    data_dir=data_dir,
-                    domain="BadDomain",
-                    patch_len=1,
-                    context_len=4,
-                    horizon_len=2,
-                )
-
-    def test_missing_end_date_column(self) -> None:
-        """Tests handling of missing end_date column."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            data_dir = Path(temp_dir)
-            numerical_dir = data_dir / "numerical" / "BadDomain"
-            numerical_dir.mkdir(parents=True)
-
-            # Create data with start_date but no end_date
-            bad_data = pd.DataFrame(
-                {
-                    "start_date": ["2020-01-01", "2020-01-02"],
-                    "value": [1.0, 2.0],
-                }
-            )
-            bad_data.to_csv(numerical_dir / "BadDomain.csv", index=False)
-
-            with pytest.raises(ValueError, match="No end_date column found"):
-                TimeMmdDataset(
-                    data_dir=data_dir,
-                    domain="BadDomain",
-                    patch_len=1,
-                    context_len=4,
-                    horizon_len=2,
-                )
-
-    def test_no_numeric_columns(self) -> None:
-        """Tests handling when no numeric columns are found."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            data_dir = Path(temp_dir)
-            numerical_dir = data_dir / "numerical" / "TextOnlyDomain"
-            numerical_dir.mkdir(parents=True)
-
-            # Create data with only text columns
-            text_only_data = pd.DataFrame(
-                {
-                    "start_date": ["2020-01-01", "2020-01-02"],
-                    "end_date": ["2020-01-01", "2020-01-02"],
-                    "category": ["A", "B"],
-                    "description": ["Text 1", "Text 2"],
-                }
-            )
-            text_only_data.to_csv(numerical_dir / "TextOnlyDomain.csv", index=False)
-
-            dataset = TimeMmdDataset(
-                data_dir=data_dir,
-                domain="TextOnlyDomain",
-                patch_len=1,
-                context_len=4,
-                horizon_len=2,
-            )
-
-            # Should result in empty dataset
-            assert len(dataset) == 0
-
-    def test_init_invalid_context_patch_ratio(self, sample_data_dir: Path) -> None:
-        """Tests initialization fails when context_len is not multiple of patch_len."""
-        with pytest.raises(ValueError, match="context_len \\(31\\) must be an integer multiple of patch_len \\(8\\)"):
-            TimeMmdDataset(
-                data_dir=sample_data_dir,
-                domain="TestDomain",
-                patch_len=8,
-                context_len=31,  # Not multiple of patch_len=8
-                horizon_len=16,
-            )
-
-    def test_init_invalid_horizon_patch_ratio(self, sample_data_dir: Path) -> None:
-        """Tests initialization fails when horizon_len is not multiple of patch_len."""
-        with pytest.raises(ValueError, match="horizon_len \\(15\\) must be an integer multiple of patch_len \\(8\\)"):
-            TimeMmdDataset(
-                data_dir=sample_data_dir,
-                domain="TestDomain",
-                patch_len=8,
-                context_len=32,
-                horizon_len=15,  # Not multiple of patch_len=8
-            )
-
-    def test_init_missing_numerical_file(self, sample_data_dir: Path) -> None:
-        """Tests initialization fails when numerical file is missing."""
-        with pytest.raises(FileNotFoundError, match="Numerical data file not found"):
-            TimeMmdDataset(
-                data_dir=sample_data_dir,
-                domain="NonexistentDomain",
-                patch_len=8,
-                context_len=32,
-                horizon_len=16,
-            )
-
-    def test_small_context_and_horizon(self, sample_data_dir: Path) -> None:
-        """Tests with very small context and horizon lengths."""
+    def test_text_patching_logic(self, sample_data_dir: Path) -> None:
+        """Tests text patching logic."""
         dataset = TimeMmdDataset(
             data_dir=sample_data_dir,
             domain="TestDomain",
-            patch_len=1,
-            context_len=4,
-            horizon_len=2,
+            patch_len=4,
+            context_len=16,
+            horizon_len=8,
         )
 
-        if len(dataset) > 0:
-            sample = dataset[0]
-            assert sample["context"].shape == (4, 1)
-            assert sample["future"].shape == (2, 1)
-            assert sample["freq"] in [0, 1, 2]  # Valid frequency values
-            assert len(sample["patched_texts"]) == 4  # context_len // patch_len
+        sample = dataset[0]
+        patched_texts = sample["patched_texts"]
+
+        # Should have correct number of patches
+        expected_patches = dataset.context_len // dataset.patch_len
+        assert len(patched_texts) == expected_patches
+
+        # Each patch should be a list of strings
+        for patch in patched_texts:
+            assert isinstance(patch, list)
+            for text in patch:
+                assert isinstance(text, str)
 
     def test_text_data_with_missing_values(self) -> None:
         """Tests handling of text data with missing values."""
@@ -693,9 +561,97 @@ class TestTimeMmdDatasetEdgeCases:
                 for text in patch:
                     assert "NA" not in text
 
+    def test_len_method(self, sample_data_dir: Path) -> None:
+        """Tests __len__ method."""
+        dataset = TimeMmdDataset(
+            data_dir=sample_data_dir,
+            domain="TestDomain",
+            patch_len=4,
+            context_len=16,
+            horizon_len=8,
+        )
 
-class TestTimeMmdDatasetIntegration:
-    """Integration tests using actual dataset structure."""
+        assert len(dataset) == 16
+
+    def test_getitem_bounds_checking(self, sample_data_dir: Path) -> None:
+        """Tests __getitem__ with invalid indices."""
+        dataset = TimeMmdDataset(
+            data_dir=sample_data_dir,
+            domain="TestDomain",
+            patch_len=4,
+            context_len=16,
+            horizon_len=8,
+        )
+
+        # Valid index should work
+        assert isinstance(dataset[0], dict)
+
+        # Invalid indices should raise IndexError
+        with pytest.raises(IndexError):
+            dataset[len(dataset)]
+
+        with pytest.raises(IndexError):
+            dataset[-len(dataset) - 1]
+
+    def test_data_loading_and_structure(self, sample_data_dir: Path) -> None:
+        """Tests that data is loaded correctly and has expected structure."""
+        dataset = TimeMmdDataset(
+            data_dir=sample_data_dir,
+            domain="TestDomain",
+            patch_len=8,
+            context_len=32,
+            horizon_len=16,
+        )
+
+        assert len(dataset) > 0
+
+        # Test first sample
+        sample = dataset[0]
+        assert isinstance(sample, dict)
+        assert set(sample.keys()) == {"context", "future", "freq", "patched_texts", "metadata"}
+
+        # Test context
+        assert sample["context"].shape == (32, 1)
+        assert sample["context"].dtype == np.float32
+
+        # Test future
+        assert sample["future"].shape == (16, 1)
+        assert sample["future"].dtype == np.float32
+
+        # Test freq
+        assert sample["freq"] in [0, 1, 2]  # Valid frequency values
+
+        # Test patched texts
+        assert isinstance(sample["patched_texts"], list)
+        assert len(sample["patched_texts"]) == 4  # context_len // patch_len = 32 // 8 = 4
+        assert all(isinstance(patch, list) for patch in sample["patched_texts"])
+
+        # Test metadata
+        assert isinstance(sample["metadata"], dict)
+        assert "domain" in sample["metadata"]
+        assert "column" in sample["metadata"]
+        assert "start_index" in sample["metadata"]
+
+    def test_data_consistency_across_samples(self, sample_data_dir: Path) -> None:
+        """Tests that all samples have consistent structure."""
+        dataset = TimeMmdDataset(
+            data_dir=sample_data_dir,
+            domain="TestDomain",
+            patch_len=4,
+            context_len=16,
+            horizon_len=8,
+        )
+
+        first_sample = dataset[0]
+
+        # Check all samples have same structure
+        for i in range(min(5, len(dataset))):
+            sample = dataset[i]
+
+            assert set(sample.keys()) == set(first_sample.keys())
+            assert sample["context"].shape == first_sample["context"].shape
+            assert sample["future"].shape == first_sample["future"].shape
+            assert len(sample["patched_texts"]) == len(first_sample["patched_texts"])
 
     def test_real_time_mmd_domain(self) -> None:
         """Tests with actual Time-MMD dataset if available."""
