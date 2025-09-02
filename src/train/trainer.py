@@ -297,14 +297,13 @@ class MultimodalTrainer:
         # Save regular checkpoint
         checkpoint_path = self.checkpoint_dir / f"checkpoint_epoch_{self.current_epoch}.pt"
         torch.save(checkpoint, checkpoint_path)
+        self.logger.info(f"Saved checkpoint at epoch {self.current_epoch}")
 
         # Save best checkpoint
         if is_best:
             best_path = self.checkpoint_dir / "best_model.pt"
             torch.save(checkpoint, best_path)
             self.logger.info(f"Saved best model checkpoint at epoch {self.current_epoch}")
-
-        self.logger.info(f"Saved checkpoint at epoch {self.current_epoch}")
 
     def load_checkpoint(self, checkpoint_path: str) -> None:
         """Load model checkpoint.
