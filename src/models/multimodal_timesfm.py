@@ -5,7 +5,8 @@ from dataclasses import dataclass
 from timesfm import TimesFmCheckpoint, TimesFmHparams
 from timesfm.timesfm_torch import TimesFmTorch as TimesFm
 
-from src.models.text_encoder import MultimodalFusion, TextEncoder
+from src.models.multimodal_fusion import MultimodalFusion
+from src.models.text_encoder import TextEncoder
 
 
 @dataclass(kw_only=True)

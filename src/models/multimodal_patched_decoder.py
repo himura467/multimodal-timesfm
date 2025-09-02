@@ -8,7 +8,8 @@ from timesfm.pytorch_patched_decoder import (
     TimesFMConfig,
 )
 
-from src.models.text_encoder import MultimodalFusion, TextEncoder
+from src.models.multimodal_fusion import MultimodalFusion
+from src.models.text_encoder import TextEncoder
 
 
 @dataclass
