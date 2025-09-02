@@ -79,7 +79,7 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
         self,
         input_ts: torch.Tensor,
         input_padding: torch.Tensor,
-        text_descriptions: list[list[list[str]]] | None = None,
+        text_descriptions: list[list[list[str]]],
     ) -> tuple[
         torch.Tensor,
         torch.Tensor,
@@ -94,7 +94,7 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
         Args:
             input_ts: Input time series tensor of shape (batch_size, sequence_length).
             input_padding: Padding tensor of shape (batch_size, sequence_length).
-            text_descriptions: Optional list of text descriptions organized as
+            text_descriptions: List of text descriptions organized as
                               [batch][patch] where each patch can have multiple text strings.
                               Shape: (batch_size, num_patches, variable_texts_per_patch).
 
@@ -110,10 +110,6 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
             input_ts=input_ts,
             input_padding=input_padding,
         )
-
-        # If no text provided, return original preprocessing
-        if text_descriptions is None:
-            return model_input, patched_padding, stats, patched_inputs
 
         # Encode text descriptions for each patch
         text_embeddings = self._encode_patch_text_features(text_descriptions, model_input.shape, model_input.device)
@@ -184,7 +180,7 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
         input_ts: torch.Tensor,
         input_padding: torch.LongTensor,
         freq: torch.Tensor,
-        text_descriptions: list[list[list[str]]] | None = None,
+        text_descriptions: list[list[list[str]]],
     ) -> torch.Tensor:
         """Forward pass for multimodal decoder.
 
@@ -192,7 +188,7 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
             input_ts: Input time series tensor.
             input_padding: Input padding tensor.
             freq: Frequency encoding tensor.
-            text_descriptions: Optional patch-level text descriptions organized as [batch][patch][texts].
+            text_descriptions: Patch-level text descriptions organized as [batch][patch][texts].
 
         Returns:
             Output tensor with forecasting predictions.
@@ -224,7 +220,7 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
         paddings: torch.Tensor,
         freq: torch.Tensor,
         horizon_len: int,
-        text_descriptions: list[list[list[str]]] | None = None,
+        text_descriptions: list[list[list[str]]],
         output_patch_len: int | None = None,
         max_len: int | None = None,
         return_forecast_on_context: bool = False,
@@ -239,7 +235,7 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
             paddings: Padding tensor of shape B x (C + H) where H is prediction length.
             freq: Frequency tensor of shape B x 1.
             horizon_len: Prediction length.
-            text_descriptions: Optional patch-level text descriptions organized as [batch][patch][texts].
+            text_descriptions: Patch-level text descriptions organized as [batch][patch][texts].
             output_patch_len: Output length per decoding step.
             max_len: Maximum training context length.
             return_forecast_on_context: Whether to return forecast on context.
