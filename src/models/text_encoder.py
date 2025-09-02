@@ -23,6 +23,9 @@ class TextEncoder(nn.Module):
             device: Device to use for computations. If None, uses CUDA if available, then MPS, then CPU.
         """
         super().__init__()
+        self.sentence_transformer = SentenceTransformer(model_name, device=device)
+        self.embedding_dim = embedding_dim
+
         if device is None:
             if torch.cuda.is_available():
                 device = "cuda"
@@ -31,8 +34,6 @@ class TextEncoder(nn.Module):
             else:
                 device = "cpu"
         self.device = torch.device(device)
-        self.sentence_transformer = SentenceTransformer(model_name, device=device)
-        self.embedding_dim = embedding_dim
 
         # Get the actual embedding dimension from the model
         actual_dim = self.sentence_transformer.get_sentence_embedding_dimension()
