@@ -216,28 +216,3 @@ class MultimodalFusion(nn.Module):
             True if all projection parameters are frozen, False otherwise.
         """
         return all(not param.requires_grad for param in self.text_projection.parameters())
-
-    def compute_fusion_loss(
-        self,
-        ts_features: torch.Tensor,
-        text_features: torch.Tensor,
-        target: torch.Tensor,
-        loss_fn: nn.Module | None = None,
-    ) -> torch.Tensor:
-        """Compute fusion loss for TimesFM integration.
-
-        Args:
-            ts_features: Time series features.
-            text_features: Text features.
-            target: Target tensor for loss computation.
-            loss_fn: Loss function to use. If None, uses MSE loss.
-
-        Returns:
-            Computed loss tensor.
-        """
-        if loss_fn is None:
-            loss_fn = nn.MSELoss()
-
-        fused_features = self(ts_features, text_features)
-        loss_result = loss_fn(fused_features, target)
-        return torch.as_tensor(loss_result)
