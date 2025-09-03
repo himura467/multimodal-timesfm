@@ -68,10 +68,18 @@ def model_config() -> MultimodalTimesFMConfig:
     return MultimodalTimesFMConfig(
         num_layers=config_dict["timesfm"]["num_layers"],
         num_heads=config_dict["timesfm"]["num_heads"],
+        num_kv_heads=config_dict["timesfm"]["num_kv_heads"],
         hidden_size=config_dict["timesfm"]["hidden_size"],
+        intermediate_size=config_dict["timesfm"]["intermediate_size"],
+        head_dim=config_dict["timesfm"]["head_dim"],
+        rms_norm_eps=config_dict["timesfm"]["rms_norm_eps"],
         patch_len=config_dict["timesfm"]["patch_len"],
         horizon_len=config_dict["timesfm"]["horizon_len"],
         quantiles=config_dict["timesfm"]["quantiles"],
+        pad_val=config_dict["timesfm"]["pad_val"],
+        tolerance=config_dict["timesfm"]["tolerance"],
+        dtype=config_dict["timesfm"]["dtype"],
+        use_positional_embedding=config_dict["timesfm"]["use_positional_embedding"],
         text_encoder_model=config_dict["text_encoder"]["model_name"],
         text_embedding_dim=config_dict["text_encoder"]["embedding_dim"],
     )
