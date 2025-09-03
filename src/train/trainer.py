@@ -6,6 +6,7 @@ from typing import Any, Protocol
 import torch
 import torch.nn as nn
 from torch.optim import AdamW
+from torch.types import FileLike
 from torch.utils.data import DataLoader
 
 import wandb
@@ -305,7 +306,7 @@ class MultimodalTrainer:
             torch.save(checkpoint, best_path)
             self.logger.info(f"Saved best model checkpoint at epoch {self.current_epoch}")
 
-    def load_checkpoint(self, checkpoint_path: str) -> None:
+    def load_checkpoint(self, checkpoint_path: FileLike) -> None:
         """Load model checkpoint.
 
         Args:
