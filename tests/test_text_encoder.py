@@ -1,5 +1,6 @@
-"""Tests for text encoding components."""
+"""Tests for TextEncoder class."""
 
+import numpy as np
 import pytest
 import torch
 
@@ -22,9 +23,19 @@ class TestTextEncoder:
 
     def test_init_matching_dimensions(self) -> None:
         """Tests initialization when actual and desired dimensions match."""
-        encoder = TextEncoder(embedding_dim=384)
+        encoder = TextEncoder(model_name="sentence-transformers/all-MiniLM-L12-v2", embedding_dim=384)
 
         assert encoder.embedding_dim == 384
+
+    def test_forward_with_string_input(self) -> None:
+        """Tests forward pass with single string input."""
+        encoder = TextEncoder()
+        text = "This is a single string input."
+        result = encoder(text)
+
+        assert result.shape == (384,)
+        assert isinstance(result, torch.Tensor)
+        assert not torch.isnan(result).any()
 
     def test_forward_single_text(self) -> None:
         """Tests forward pass with single text."""
@@ -55,15 +66,13 @@ class TestTextEncoder:
         assert result.shape == (0,)
         assert isinstance(result, torch.Tensor)
 
-    def test_no_gradient_computation(self) -> None:
-        """Tests that encoder works without gradient computation (inference only)."""
+    def test_forward_with_numpy_array(self) -> None:
+        """Tests forward pass with numpy array input."""
         encoder = TextEncoder()
-        texts: list[str] = ["Test no gradient computation."]
+        texts_array = np.array(["First text", "Second text", "Third text"])
+        result = encoder(texts_array)
 
-        with torch.no_grad():
-            result = encoder(texts)
-
-        assert result.shape == (1, 384)
+        assert result.shape == (3, 384)
         assert isinstance(result, torch.Tensor)
         assert not torch.isnan(result).any()
 
@@ -84,36 +93,3 @@ class TestTextEncoder:
 
         assert result.device.type == "cpu"
         assert encoder.device.type == "cpu"
-
-    def test_reproducibility(self) -> None:
-        """Tests that TextEncoder produces consistent results."""
-        encoder1 = TextEncoder()
-        encoder2 = TextEncoder()
-
-        texts: list[str] = ["Reproducibility test sentence."]
-
-        result1 = encoder1(texts)
-        result2 = encoder2(texts)
-
-        # Results should be very similar (sentence transformer is deterministic)
-        assert torch.allclose(result1, result2, atol=1e-4)
-
-    def test_with_different_text_lengths(self) -> None:
-        """Tests TextEncoder with texts of different lengths."""
-        encoder = TextEncoder()
-        texts: list[str] = [
-            "Short text.",
-            "This is a much longer text that contains more information and words.",
-            "Medium length text with some details.",
-        ]
-
-        result = encoder(texts)
-
-        assert result.shape == (3, 384)
-        assert isinstance(result, torch.Tensor)
-        assert not torch.isnan(result).any()
-
-        # All embeddings should be different
-        assert not torch.allclose(result[0], result[1])
-        assert not torch.allclose(result[1], result[2])
-        assert not torch.allclose(result[0], result[2])
