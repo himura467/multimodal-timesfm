@@ -92,8 +92,8 @@ def mock_datasets() -> tuple[MockTimeMmdDataset, MockTimeMmdDataset]:
     torch.manual_seed(42)
     np.random.seed(42)
 
-    train_dataset = MockTimeMmdDataset(size=10, context_len=512, horizon_len=128)  # Smaller for testing
-    val_dataset = MockTimeMmdDataset(size=5, context_len=512, horizon_len=128)
+    train_dataset = MockTimeMmdDataset(size=10, context_len=128, horizon_len=32)  # Smaller for testing
+    val_dataset = MockTimeMmdDataset(size=5, context_len=128, horizon_len=32)
     return train_dataset, val_dataset
 
 
