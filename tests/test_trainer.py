@@ -9,29 +9,29 @@ import numpy as np
 import pytest
 import torch
 import yaml
+from torch.utils.data import Dataset
 
 from src.models.multimodal_patched_decoder import MultimodalPatchedDecoder, MultimodalTimesFMConfig
 from src.train.trainer import MultimodalTrainer
 
 
-class MockTimeMmdDataset:
+class MockTimeMmdDataset(Dataset[dict[str, Any]]):
     """Mock dataset for testing training loop."""
 
     def __init__(self, size: int = 100, context_len: int = 512, horizon_len: int = 128):
         self.size = size
+        self.patch_len = 32
         self.context_len = context_len
         self.horizon_len = horizon_len
-        self.patch_len = 32
 
         # Generate synthetic data
         self.data = []
         for i in range(size):
             # Generate synthetic time series
-            time_series = np.random.randn(context_len, 1).astype(np.float32)
-            target = np.random.randn(horizon_len, 1).astype(np.float32)
+            context = np.random.randn(context_len, 1).astype(np.float32)
+            future = np.random.randn(horizon_len, 1).astype(np.float32)
 
-            # Generate mock text patches for input context (not horizon)
-            # TimesFM expects text for input patches, not target patches
+            # Generate mock text patches
             num_patches = context_len // self.patch_len
             patched_texts = []
             for j in range(num_patches):
@@ -39,8 +39,9 @@ class MockTimeMmdDataset:
                 patched_texts.append(patch_texts)
 
             sample = {
-                "time_series": time_series,
-                "target": target,
+                "context": context,
+                "future": future,
+                "freq": 0,
                 "patched_texts": patched_texts,
                 "metadata": {
                     "domain": "Agriculture",
@@ -50,11 +51,11 @@ class MockTimeMmdDataset:
             }
             self.data.append(sample)
 
-    def __len__(self) -> int:
-        return len(self.data)
-
     def __getitem__(self, idx: int) -> dict[str, Any]:
         return self.data[idx]
+
+    def __len__(self) -> int:
+        return len(self.data)
 
 
 @pytest.fixture
