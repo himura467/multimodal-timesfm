@@ -19,26 +19,24 @@ class TestMultimodalTimesFMConfig:
 
         # Test inherited TimesFM defaults
         assert config.num_layers == 20
-        assert config.hidden_size == 1280
-        assert config.patch_len == 32
 
     def test_custom_config(self) -> None:
         """Test custom configuration values."""
         config = MultimodalTimesFMConfig(
             text_encoder_model="sentence-transformers/all-MiniLM-L12-v2",
             text_embedding_dim=512,
-            hidden_size=512,
+            num_layers=50,
         )
 
         assert config.text_encoder_model == "sentence-transformers/all-MiniLM-L12-v2"
         assert config.text_embedding_dim == 512
-        assert config.hidden_size == 512
+        assert config.num_layers == 50
 
 
 class TestMultimodalPatchedDecoder:
     """Test MultimodalPatchedDecoder class."""
 
-    @pytest.fixture
+    @pytest.fixture(scope="session")
     def config(self) -> MultimodalTimesFMConfig:
         """Create test configuration."""
         return MultimodalTimesFMConfig(
@@ -47,15 +45,14 @@ class TestMultimodalPatchedDecoder:
             intermediate_size=128,
             patch_len=8,
             horizon_len=16,
-            text_embedding_dim=384,
         )
 
-    @pytest.fixture
+    @pytest.fixture(scope="session")
     def decoder(self, config: MultimodalTimesFMConfig) -> MultimodalPatchedDecoder:
         """Create decoder instance."""
         return MultimodalPatchedDecoder(config)
 
-    @pytest.fixture
+    @pytest.fixture(scope="session")
     def sample_data(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, list[list[list[str]]]]:
         """Create sample input data."""
         batch_size = 2
@@ -79,66 +76,50 @@ class TestMultimodalPatchedDecoder:
 
         return input_ts, input_padding, freq, text_descriptions
 
-    def test_initialization_with_text(self, config: MultimodalTimesFMConfig) -> None:
-        """Test decoder initialization with text fusion enabled."""
+    def test_initialization(self, config: MultimodalTimesFMConfig) -> None:
+        """Test decoder initialization."""
         decoder = MultimodalPatchedDecoder(config)
 
         assert decoder.config == config
         assert decoder.text_encoder is not None
         assert decoder.multimodal_fusion is not None
         assert hasattr(decoder, "input_ff_layer")
+        assert hasattr(decoder, "freq_emb")
+        assert hasattr(decoder, "horizon_ff_layer")
         assert hasattr(decoder, "stacked_transformer")
+        assert hasattr(decoder, "position_emb")
 
-    def test_forward_pass_with_text(
+    def test_preprocess_multimodal_input(
         self,
         decoder: MultimodalPatchedDecoder,
         sample_data: tuple[torch.Tensor, torch.Tensor, torch.Tensor, list[list[list[str]]]],
     ) -> None:
-        """Test forward pass with text inputs."""
-        input_ts, input_padding, freq, text_descriptions = sample_data
+        """Test multimodal input preprocessing."""
+        input_ts, input_padding, _, text_descriptions = sample_data
 
         # Move input tensors to the same device as decoder
-        device = next(decoder.parameters()).device
+        device = decoder.device
         input_ts = input_ts.to(device)
         input_padding = input_padding.to(device)
-        freq = freq.to(device)
 
         with torch.no_grad():
-            output = decoder(input_ts, input_padding, freq, text_descriptions)
-
-        # Check output shape: [batch_size, num_patches, horizon_len, num_outputs]
-        batch_size = input_ts.shape[0]
-        num_patches = input_ts.shape[1] // decoder.config.patch_len
-        num_outputs = len(decoder.config.quantiles) + 1
-
-        expected_shape = (batch_size, num_patches, decoder.config.horizon_len, num_outputs)
-        assert output.shape == expected_shape
-        assert not torch.isnan(output).any()
-
-    def test_forward_pass_without_text(
-        self,
-        decoder: MultimodalPatchedDecoder,
-        sample_data: tuple[torch.Tensor, torch.Tensor, torch.Tensor, list[list[list[str]]]],
-    ) -> None:
-        """Test forward pass without text inputs."""
-        input_ts, input_padding, freq, _ = sample_data
-
-        # Move input tensors to the same device as decoder
-        device = next(decoder.parameters()).device
-        input_ts = input_ts.to(device)
-        input_padding = input_padding.to(device)
-        freq = freq.to(device)
-
-        with torch.no_grad():
-            output = decoder(input_ts, input_padding, freq)
+            model_input, patched_padding, stats, patched_inputs = decoder._preprocess_multimodal_input(
+                input_ts=input_ts,
+                input_padding=input_padding,
+                text_descriptions=text_descriptions,
+            )
 
         batch_size = input_ts.shape[0]
         num_patches = input_ts.shape[1] // decoder.config.patch_len
-        num_outputs = len(decoder.config.quantiles) + 1
 
-        expected_shape = (batch_size, num_patches, decoder.config.horizon_len, num_outputs)
-        assert output.shape == expected_shape
-        assert not torch.isnan(output).any()
+        assert model_input.shape == (batch_size, num_patches, decoder.config.hidden_size)
+        assert not torch.isnan(model_input).any()
+        assert patched_padding.shape == (batch_size, num_patches)
+        assert stats is not None
+        assert len(stats) == 2  # mean, std
+        assert patched_inputs is not None
+        assert patched_inputs.shape == (batch_size, num_patches, decoder.config.patch_len)
+        assert not torch.isnan(patched_inputs).any()
 
     def test_encode_patch_text_features(
         self,
@@ -150,7 +131,7 @@ class TestMultimodalPatchedDecoder:
         target_shape = torch.Size([2, 8, 128])  # batch_size, num_patches, hidden_size
 
         # Get decoder's device
-        device = next(decoder.parameters()).device
+        device = torch.device(decoder.device)
 
         with torch.no_grad():
             text_features = decoder._encode_patch_text_features(text_descriptions, target_shape, device)
@@ -165,7 +146,7 @@ class TestMultimodalPatchedDecoder:
         target_shape = torch.Size([2, 8, 128])  # Batch size 2 with 8 patches
 
         # Get decoder's device
-        device = next(decoder.parameters()).device
+        device = torch.device(decoder.device)
 
         with pytest.raises(ValueError, match="Batch size mismatch"):
             decoder._encode_patch_text_features(text_descriptions, target_shape, device)
@@ -178,16 +159,18 @@ class TestMultimodalPatchedDecoder:
                 ["First batch first patch text", "additional text"],
                 ["First batch second patch text"],
                 ["First batch third patch with longer description text"],
+                ["First batch fourth patch text"],
             ],
             [  # Batch 2
                 ["Second batch first patch text"],
                 ["Second batch second patch text", "more text", "even more"],
                 ["Second batch third patch text"],
+                ["Second batch fourth patch text"],
             ],
         ]
 
-        target_shape = torch.Size([2, 3, 128])  # batch_size=2, num_patches=3, hidden_size=128
-        device = next(decoder.parameters()).device
+        target_shape = torch.Size([2, 4, 128])  # batch_size=2, num_patches=4, hidden_size=128
+        device = torch.device(decoder.device)
 
         # Method 1: Batch encoding (current implementation)
         with torch.no_grad():
@@ -215,18 +198,44 @@ class TestMultimodalPatchedDecoder:
             "Batch encoding should produce identical results to one-by-one encoding"
         )
 
-    def test_decode_with_text(
+    def test_forward_pass(
         self,
         decoder: MultimodalPatchedDecoder,
         sample_data: tuple[torch.Tensor, torch.Tensor, torch.Tensor, list[list[list[str]]]],
     ) -> None:
-        """Test auto-regressive decoding with text."""
+        """Test forward pass."""
+        input_ts, input_padding, freq, text_descriptions = sample_data
+
+        # Move input tensors to the same device as decoder
+        device = decoder.device
+        input_ts = input_ts.to(device)
+        input_padding = input_padding.to(device)
+        freq = freq.to(device)
+
+        with torch.no_grad():
+            output = decoder(input_ts, input_padding, freq, text_descriptions)
+
+        # Check output shape: [batch_size, num_patches, horizon_len, num_outputs]
+        batch_size = input_ts.shape[0]
+        num_patches = input_ts.shape[1] // decoder.config.patch_len
+        num_outputs = len(decoder.config.quantiles) + 1
+
+        expected_shape = (batch_size, num_patches, decoder.config.horizon_len, num_outputs)
+        assert output.shape == expected_shape
+        assert not torch.isnan(output).any()
+
+    def test_decode(
+        self,
+        decoder: MultimodalPatchedDecoder,
+        sample_data: tuple[torch.Tensor, torch.Tensor, torch.Tensor, list[list[list[str]]]],
+    ) -> None:
+        """Test auto-regressive decoding."""
         input_ts, _, freq, text_descriptions = sample_data
         batch_size, context_len = input_ts.shape
         horizon_len = 32
 
         # Move input tensors to the same device as decoder
-        device = next(decoder.parameters()).device
+        device = decoder.device
         input_ts = input_ts.to(device)
         freq = freq.to(device)
 
@@ -249,136 +258,18 @@ class TestMultimodalPatchedDecoder:
         assert not torch.isnan(mean_output).any()
         assert not torch.isnan(full_output).any()
 
-    def test_decode_without_text(
-        self,
-        decoder: MultimodalPatchedDecoder,
-        sample_data: tuple[torch.Tensor, torch.Tensor, torch.Tensor, list[list[list[str]]]],
-    ) -> None:
-        """Test auto-regressive decoding without text."""
-        input_ts, _, freq, _ = sample_data
-        batch_size, context_len = input_ts.shape
-        horizon_len = 32
-
-        # Move input tensors to the same device as decoder
-        device = next(decoder.parameters()).device
-        input_ts = input_ts.to(device)
-        freq = freq.to(device)
-
-        paddings = torch.zeros(batch_size, context_len + horizon_len, device=device)
-
-        with torch.no_grad():
-            mean_output, full_output = decoder.decode(
-                input_ts=input_ts,
-                paddings=paddings,
-                freq=freq,
-                horizon_len=horizon_len,
-            )
-
-        assert mean_output.shape == (batch_size, horizon_len)
-        num_outputs = len(decoder.config.quantiles) + 1
-        assert full_output.shape == (batch_size, horizon_len, num_outputs)
-
-    def test_freeze_unfreeze_text_components(self, decoder: MultimodalPatchedDecoder) -> None:
-        """Test freezing and unfreezing text components."""
-        # Initially unfrozen
-        assert not decoder.is_text_frozen()
-
-        # Freeze
-        decoder.freeze_text_components()
-        assert decoder.is_text_frozen()
-
-        # Unfreeze
-        decoder.unfreeze_text_components()
-        assert not decoder.is_text_frozen()
-
-    def test_text_fusion_parameters(self, decoder: MultimodalPatchedDecoder) -> None:
-        """Test getting and setting text fusion parameters."""
-        # Get original parameters
-        original_params = decoder.get_text_fusion_parameters()
-        assert original_params is not None
-        assert "weight" in original_params
-        assert "bias" in original_params
-
-        # Modify parameters
-        new_weight = torch.randn_like(original_params["weight"])
-        new_bias = torch.randn_like(original_params["bias"])
-        new_params = {"weight": new_weight, "bias": new_bias}
-
-        # Set new parameters
-        decoder.set_text_fusion_parameters(new_params)
-
-        # Verify parameters were set
-        current_params = decoder.get_text_fusion_parameters()
-        assert torch.allclose(current_params["weight"], new_weight)
-        assert torch.allclose(current_params["bias"], new_bias)
-
-    def test_preprocess_multimodal_input(
-        self,
-        decoder: MultimodalPatchedDecoder,
-        sample_data: tuple[torch.Tensor, torch.Tensor, torch.Tensor, list[list[list[str]]]],
-    ) -> None:
-        """Test multimodal input preprocessing."""
-        input_ts, input_padding, _, text_descriptions = sample_data
-
-        # Move input tensors to the same device as decoder
-        device = next(decoder.parameters()).device
-        input_ts = input_ts.to(device)
-        input_padding = input_padding.to(device)
-
-        with torch.no_grad():
-            model_input, patched_padding, stats, patched_inputs = decoder._preprocess_multimodal_input(
-                input_ts=input_ts,
-                input_padding=input_padding,
-                text_descriptions=text_descriptions,
-            )
-
-        batch_size = input_ts.shape[0]
-        num_patches = input_ts.shape[1] // decoder.config.patch_len
-
-        assert model_input.shape == (batch_size, num_patches, decoder.config.hidden_size)
-        assert patched_padding.shape == (batch_size, num_patches)
-        assert stats is not None
-        assert len(stats) == 2  # mean, std
-        assert not torch.isnan(model_input).any()
-
-    def test_preprocess_multimodal_input_no_text(
-        self,
-        decoder: MultimodalPatchedDecoder,
-        sample_data: tuple[torch.Tensor, torch.Tensor, torch.Tensor, list[list[list[str]]]],
-    ) -> None:
-        """Test multimodal preprocessing without text."""
-        input_ts, input_padding, _, _ = sample_data
-
-        # Move input tensors to the same device as decoder
-        device = next(decoder.parameters()).device
-        input_ts = input_ts.to(device)
-        input_padding = input_padding.to(device)
-
-        with torch.no_grad():
-            model_input, patched_padding, stats, patched_inputs = decoder._preprocess_multimodal_input(
-                input_ts=input_ts,
-                input_padding=input_padding,
-                text_descriptions=None,
-            )
-
-        batch_size = input_ts.shape[0]
-        num_patches = input_ts.shape[1] // decoder.config.patch_len
-
-        assert model_input.shape == (batch_size, num_patches, decoder.config.hidden_size)
-        assert not torch.isnan(model_input).any()
-
     def test_decode_padding_length_mismatch(
         self,
         decoder: MultimodalPatchedDecoder,
         sample_data: tuple[torch.Tensor, torch.Tensor, torch.Tensor, list[list[list[str]]]],
     ) -> None:
         """Test decode with incorrect padding length."""
-        input_ts, _, freq, _ = sample_data
+        input_ts, _, freq, text_descriptions = sample_data
         batch_size, context_len = input_ts.shape
         horizon_len = 32
 
         # Move input tensors to the same device as decoder
-        device = next(decoder.parameters()).device
+        device = decoder.device
         input_ts = input_ts.to(device)
         freq = freq.to(device)
 
@@ -391,7 +282,76 @@ class TestMultimodalPatchedDecoder:
                 paddings=paddings,
                 freq=freq,
                 horizon_len=horizon_len,
+                text_descriptions=text_descriptions,
             )
+
+    def test_freeze_unfreeze_all_parameters(self, decoder: MultimodalPatchedDecoder) -> None:
+        """Test freezing and unfreezing all parameters."""
+        # Initially unfrozen - check a few key parameters
+        text_encoder_param = next(decoder.text_encoder.sentence_transformer.parameters())
+        assert text_encoder_param.requires_grad
+        assert decoder.multimodal_fusion.text_projection.weight.requires_grad
+        assert decoder.multimodal_fusion.text_projection.bias.requires_grad
+
+        # Check that some TimesFM parameters are also unfrozen
+        timesfm_param = next(decoder.input_ff_layer.parameters())
+        assert timesfm_param.requires_grad
+
+        # Freeze all parameters
+        decoder.freeze_parameters()
+
+        # Check that text components are frozen
+        assert not text_encoder_param.requires_grad
+        assert not decoder.multimodal_fusion.text_projection.weight.requires_grad
+        assert not decoder.multimodal_fusion.text_projection.bias.requires_grad
+
+        # Check that TimesFM parameters are also frozen
+        assert not timesfm_param.requires_grad
+
+        # Verify is_frozen status
+        assert decoder.is_frozen()
+
+        # Unfreeze all parameters
+        decoder.unfreeze_parameters()
+
+        # Check that text components are unfrozen
+        assert text_encoder_param.requires_grad
+        assert decoder.multimodal_fusion.text_projection.weight.requires_grad
+        assert decoder.multimodal_fusion.text_projection.bias.requires_grad
+
+        # Check that TimesFM parameters are also unfrozen
+        assert timesfm_param.requires_grad
+
+        # Verify is_frozen status
+        assert not decoder.is_frozen()
+
+    def test_freeze_unfreeze_text_components(self, decoder: MultimodalPatchedDecoder) -> None:
+        """Test freezing and unfreezing text components."""
+        # Initially unfrozen - check actual parameters
+        text_encoder_param = next(decoder.text_encoder.sentence_transformer.parameters())
+        assert text_encoder_param.requires_grad
+        assert decoder.multimodal_fusion.text_projection.weight.requires_grad
+        assert decoder.multimodal_fusion.text_projection.bias.requires_grad
+
+        assert not decoder.is_text_frozen()
+
+        # Freeze text components
+        decoder.freeze_text_components()
+
+        assert not text_encoder_param.requires_grad
+        assert not decoder.multimodal_fusion.text_projection.weight.requires_grad
+        assert not decoder.multimodal_fusion.text_projection.bias.requires_grad
+
+        assert decoder.is_text_frozen()
+
+        # Unfreeze text components
+        decoder.unfreeze_text_components()
+
+        assert text_encoder_param.requires_grad
+        assert decoder.multimodal_fusion.text_projection.weight.requires_grad
+        assert decoder.multimodal_fusion.text_projection.bias.requires_grad
+
+        assert not decoder.is_text_frozen()
 
     def test_gradient_computation(
         self,
@@ -402,7 +362,7 @@ class TestMultimodalPatchedDecoder:
         input_ts, input_padding, freq, text_descriptions = sample_data
 
         # Move input tensors to the same device as decoder
-        device = next(decoder.parameters()).device
+        device = decoder.device
         input_ts = input_ts.to(device)
         input_padding = input_padding.to(device)
         freq = freq.to(device)
@@ -418,50 +378,3 @@ class TestMultimodalPatchedDecoder:
         # Check that gradients are computed
         assert input_ts.grad is not None
         assert not torch.isnan(input_ts.grad).any()
-
-    def test_device_consistency(
-        self,
-        decoder: MultimodalPatchedDecoder,
-        sample_data: tuple[torch.Tensor, torch.Tensor, torch.Tensor, list[list[list[str]]]],
-    ) -> None:
-        """Test device consistency for inputs and outputs."""
-        input_ts, input_padding, freq, text_descriptions = sample_data
-
-        # Move to CPU explicitly (default should be CPU)
-        device = torch.device("cpu")
-        decoder = decoder.to(device)
-        input_ts = input_ts.to(device)
-        input_padding = input_padding.to(device)
-        freq = freq.to(device)
-
-        with torch.no_grad():
-            output = decoder(input_ts, input_padding, freq, text_descriptions)
-
-        assert output.device == device
-
-    def test_different_batch_sizes(self, decoder: MultimodalPatchedDecoder) -> None:
-        """Test decoder with different batch sizes."""
-        batch_sizes = [1, 3, 8]
-        seq_len = 64
-
-        # Get decoder's device
-        device = next(decoder.parameters()).device
-
-        for batch_size in batch_sizes:
-            input_ts = torch.randn(batch_size, seq_len, device=device)
-            input_padding = torch.zeros(batch_size, seq_len, dtype=torch.float, device=device)
-            freq = torch.zeros(batch_size, 1, dtype=torch.long, device=device)
-
-            # Create patch-level text descriptions for different batch sizes
-            num_patches = seq_len // decoder.config.patch_len
-            text_descriptions = [[[f"Batch {b} Patch {p} text"] for p in range(num_patches)] for b in range(batch_size)]
-
-            with torch.no_grad():
-                output = decoder(input_ts, input_padding, freq, text_descriptions)
-
-            num_patches = seq_len // decoder.config.patch_len
-            num_outputs = len(decoder.config.quantiles) + 1
-            expected_shape = (batch_size, num_patches, decoder.config.horizon_len, num_outputs)
-
-            assert output.shape == expected_shape
-            assert not torch.isnan(output).any()

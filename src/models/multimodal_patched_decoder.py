@@ -57,15 +57,15 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
         self.config = config
 
         if torch.cuda.is_available():
-            device = "cuda"
+            self.device = "cuda"
         elif torch.backends.mps.is_available():
-            device = "mps"
+            self.device = "mps"
         else:
-            device = "cpu"
+            self.device = "cpu"
 
         # Initialize text encoder and fusion components
         self.text_encoder = TextEncoder(
-            model_name=config.text_encoder_model, embedding_dim=config.text_embedding_dim, device=device
+            model_name=config.text_encoder_model, embedding_dim=config.text_embedding_dim, device=self.device
         )
         self.multimodal_fusion = MultimodalFusion(
             ts_feature_dim=config.hidden_size,
@@ -73,7 +73,7 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
         )
 
         # Move the entire decoder to the selected device
-        self.to(device)
+        self.to(self.device)
 
     def _preprocess_multimodal_input(
         self,
