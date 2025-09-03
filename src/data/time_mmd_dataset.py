@@ -292,10 +292,6 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
 
         return patches
 
-    def __len__(self) -> int:
-        """Returns dataset size."""
-        return len(self.data)
-
     def __getitem__(self, idx: int) -> dict[str, Any]:
         """Gets dataset item by index.
 
@@ -306,3 +302,7 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
             Dictionary containing context, future, freq, text, and metadata.
         """
         return self.data[idx]
+
+    def __len__(self) -> int:
+        """Returns dataset size."""
+        return len(self.data)

@@ -617,18 +617,6 @@ class TestTimeMmdDataset:
                 for text in patch:
                     assert "NA" not in text
 
-    def test_len_method(self, sample_data_dir: Path) -> None:
-        """Tests __len__ method."""
-        dataset = TimeMmdDataset(
-            data_dir=sample_data_dir,
-            domain="TestDomain",
-            patch_len=4,
-            context_len=16,
-            horizon_len=8,
-        )
-
-        assert len(dataset) == 16
-
     def test_getitem_bounds_checking(self, sample_data_dir: Path) -> None:
         """Tests __getitem__ with invalid indices."""
         dataset = TimeMmdDataset(
@@ -648,6 +636,18 @@ class TestTimeMmdDataset:
 
         with pytest.raises(IndexError):
             dataset[-len(dataset) - 1]
+
+    def test_len_method(self, sample_data_dir: Path) -> None:
+        """Tests __len__ method."""
+        dataset = TimeMmdDataset(
+            data_dir=sample_data_dir,
+            domain="TestDomain",
+            patch_len=4,
+            context_len=16,
+            horizon_len=8,
+        )
+
+        assert len(dataset) == 16
 
     def test_data_loading_and_structure(self, sample_data_dir: Path) -> None:
         """Tests that data is loaded correctly and has expected structure."""
