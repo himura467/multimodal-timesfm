@@ -333,7 +333,10 @@ class TestMultimodalPatchedDecoder:
         assert decoder.multimodal_fusion.text_projection.weight.requires_grad
         assert decoder.multimodal_fusion.text_projection.bias.requires_grad
 
-        assert not decoder.is_text_frozen()
+        # Check that components are not frozen initially
+        frozen_status = decoder.is_text_frozen()
+        assert not frozen_status["encoder"]
+        assert not frozen_status["fusion"]
 
         # Freeze text components
         decoder.freeze_text_components()
@@ -342,7 +345,10 @@ class TestMultimodalPatchedDecoder:
         assert not decoder.multimodal_fusion.text_projection.weight.requires_grad
         assert not decoder.multimodal_fusion.text_projection.bias.requires_grad
 
-        assert decoder.is_text_frozen()
+        # Check that components are frozen
+        frozen_status = decoder.is_text_frozen()
+        assert frozen_status["encoder"]
+        assert frozen_status["fusion"]
 
         # Unfreeze text components
         decoder.unfreeze_text_components()
@@ -351,7 +357,10 @@ class TestMultimodalPatchedDecoder:
         assert decoder.multimodal_fusion.text_projection.weight.requires_grad
         assert decoder.multimodal_fusion.text_projection.bias.requires_grad
 
-        assert not decoder.is_text_frozen()
+        # Check that components are unfrozen
+        frozen_status = decoder.is_text_frozen()
+        assert not frozen_status["encoder"]
+        assert not frozen_status["fusion"]
 
     def test_gradient_computation(
         self,
