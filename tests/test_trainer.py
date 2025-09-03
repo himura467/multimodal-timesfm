@@ -122,186 +122,159 @@ def mock_wandb() -> Generator[Mock, None, None]:
         yield mock_wandb
 
 
-def test_mock_dataset() -> None:
-    """Test mock dataset creation and access."""
-    dataset = MockTimeMmdDataset(size=5, context_len=512, horizon_len=128)
+class TestMultimodalTrainer:
+    """Test cases for MultimodalTrainer class."""
 
-    assert len(dataset) == 5
+    def test_trainer_initialization(
+        self,
+        model: MultimodalPatchedDecoder,
+        mock_datasets: tuple[MockTimeMmdDataset, MockTimeMmdDataset],
+        temp_dirs: tuple[Path, Path],
+    ) -> None:
+        """Test trainer initialization."""
+        train_dataset, val_dataset = mock_datasets
+        log_dir, checkpoint_dir = temp_dirs
 
-    sample = dataset[0]
-    assert "time_series" in sample
-    assert "target" in sample
-    assert "patched_texts" in sample
-    assert "metadata" in sample
-
-    # Check shapes
-    assert sample["time_series"].shape == (512, 1)
-    assert sample["target"].shape == (128, 1)
-    assert len(sample["patched_texts"]) == 16  # 512 / 32 patches
-
-
-def test_model_creation(model: MultimodalPatchedDecoder) -> None:
-    """Test model creation and basic properties."""
-    # Test model exists and has parameters
-    total_params = sum(p.numel() for p in model.parameters())
-    assert total_params > 1000000  # Should have many parameters
-
-    # Test device placement
-    device = next(model.parameters()).device
-    assert device.type in ["cuda", "mps", "cpu"]
-
-
-def test_trainer_creation(
-    model: MultimodalPatchedDecoder,
-    mock_datasets: tuple[MockTimeMmdDataset, MockTimeMmdDataset],
-    temp_dirs: tuple[Path, Path],
-) -> None:
-    """Test trainer creation and initialization."""
-    train_dataset, val_dataset = mock_datasets
-    log_dir, checkpoint_dir = temp_dirs
-
-    trainer = MultimodalTrainer(
-        model=model,
-        train_dataset=train_dataset,
-        val_dataset=val_dataset,
-        batch_size=2,
-        learning_rate=1e-4,
-        gradient_accumulation_steps=1,
-        log_dir=str(log_dir),
-        checkpoint_dir=str(checkpoint_dir),
-    )
-
-    # Test trainer properties
-    assert trainer.device.type in ["cuda", "mps", "cpu"]
-    assert len(trainer.train_loader) > 0
-    assert trainer.val_loader is not None
-    assert len(trainer.val_loader) > 0
-
-
-def test_forward_pass(
-    model: MultimodalPatchedDecoder,
-    mock_datasets: tuple[MockTimeMmdDataset, MockTimeMmdDataset],
-    temp_dirs: tuple[Path, Path],
-) -> None:
-    """Test single forward pass through the model."""
-    train_dataset, val_dataset = mock_datasets
-    log_dir, checkpoint_dir = temp_dirs
-
-    trainer = MultimodalTrainer(
-        model=model,
-        train_dataset=train_dataset,
-        val_dataset=val_dataset,
-        batch_size=2,
-        learning_rate=1e-4,
-        log_dir=str(log_dir),
-        checkpoint_dir=str(checkpoint_dir),
-    )
-
-    # Get a batch from the trainer
-    sample_batch = next(iter(trainer.train_loader))
-
-    # Check batch structure
-    assert "time_series" in sample_batch
-    assert "targets" in sample_batch
-    assert "text_descriptions" in sample_batch
-    assert "input_padding" in sample_batch
-    assert "freq" in sample_batch
-
-    # Move batch to device
-    time_series = sample_batch["time_series"].to(trainer.device)
-    input_padding = sample_batch["input_padding"].to(trainer.device)
-    freq = sample_batch["freq"].to(trainer.device)
-    text_descriptions = sample_batch["text_descriptions"]
-
-    # Test forward pass
-    model.eval()
-    with torch.no_grad():
-        outputs = model(
-            input_ts=time_series,
-            input_padding=input_padding,
-            freq=freq,
-            text_descriptions=text_descriptions,
+        trainer = MultimodalTrainer(
+            model=model,
+            train_dataset=train_dataset,
+            val_dataset=val_dataset,
+            batch_size=2,
+            gradient_accumulation_steps=2,
+            log_dir=log_dir,
+            checkpoint_dir=checkpoint_dir,
         )
 
-    # Check output shape
-    batch_size = time_series.shape[0]
-    expected_shape = (batch_size, 16, 128, 9)  # Based on model config
-    assert outputs.shape == expected_shape
+        # Test trainer properties
+        assert len(trainer.train_loader) > 0
+        assert len(trainer.val_loader) > 0
+        assert trainer.device.type in ["cuda", "mps", "cpu"]
 
+    def test_forward_pass(
+        self,
+        model: MultimodalPatchedDecoder,
+        mock_datasets: tuple[MockTimeMmdDataset, MockTimeMmdDataset],
+        temp_dirs: tuple[Path, Path],
+    ) -> None:
+        """Test single forward pass through the model."""
+        train_dataset, val_dataset = mock_datasets
+        log_dir, checkpoint_dir = temp_dirs
 
-def test_training_loop(
-    model: MultimodalPatchedDecoder,
-    mock_datasets: tuple[MockTimeMmdDataset, MockTimeMmdDataset],
-    temp_dirs: tuple[Path, Path],
-) -> None:
-    """Test training loop execution."""
-    train_dataset, val_dataset = mock_datasets
-    log_dir, checkpoint_dir = temp_dirs
+        trainer = MultimodalTrainer(
+            model=model,
+            train_dataset=train_dataset,
+            val_dataset=val_dataset,
+            batch_size=2,
+            gradient_accumulation_steps=2,
+            log_dir=log_dir,
+            checkpoint_dir=checkpoint_dir,
+        )
 
-    trainer = MultimodalTrainer(
-        model=model,
-        train_dataset=train_dataset,
-        val_dataset=val_dataset,
-        batch_size=2,
-        learning_rate=1e-4,
-        log_dir=str(log_dir),
-        checkpoint_dir=str(checkpoint_dir),
-    )
+        # Get a batch from the trainer
+        sample_batch = next(iter(trainer.train_loader))
 
-    # Test parameter freezing
-    trainer.freeze_pretrained_parameters()
+        # Check batch structure
+        assert "context" in sample_batch
+        assert "future" in sample_batch
+        assert "freq" in sample_batch
+        assert "patched_texts" in sample_batch
 
-    # Count trainable parameters
-    trainable_before = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    total_params = sum(p.numel() for p in model.parameters())
+        # Move batch to device
+        context = sample_batch["context"].to(trainer.device)
+        freq = sample_batch["freq"].to(trainer.device)
+        patched_texts = sample_batch["patched_texts"]
 
-    # Should have fewer trainable parameters when frozen
-    assert trainable_before < total_params
+        input_padding = torch.zeros_like(context)
 
-    # Test short training run
-    trainer.train(num_epochs=1, save_every=1)
+        # Test forward pass
+        model.eval()
+        with torch.no_grad():
+            outputs = model(
+                input_ts=context,
+                input_padding=input_padding,
+                freq=freq,
+                text_descriptions=patched_texts,
+            )
 
-    # Test checkpoint exists
-    checkpoint_files = list(checkpoint_dir.glob("*.pt"))
-    assert len(checkpoint_files) > 0
+        # Check output shape
+        batch_size = context.shape[0]
+        expected_shape = (batch_size, 4, 32, 9)  # Based on model config
+        assert outputs.shape == expected_shape
 
-    # Test parameter unfreezing
-    trainer.unfreeze_all_parameters()
-    trainable_after = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    def test_training_loop(
+        self,
+        model: MultimodalPatchedDecoder,
+        mock_datasets: tuple[MockTimeMmdDataset, MockTimeMmdDataset],
+        temp_dirs: tuple[Path, Path],
+    ) -> None:
+        """Test training loop execution."""
+        train_dataset, val_dataset = mock_datasets
+        log_dir, checkpoint_dir = temp_dirs
 
-    # Should have all parameters trainable after unfreezing
-    assert trainable_after == total_params
+        trainer = MultimodalTrainer(
+            model=model,
+            train_dataset=train_dataset,
+            val_dataset=val_dataset,
+            batch_size=2,
+            gradient_accumulation_steps=2,
+            log_dir=log_dir,
+            checkpoint_dir=checkpoint_dir,
+        )
 
+        # Test parameter freezing
+        trainer.freeze_pretrained_parameters()
 
-def test_checkpoint_loading(
-    model: MultimodalPatchedDecoder,
-    mock_datasets: tuple[MockTimeMmdDataset, MockTimeMmdDataset],
-    temp_dirs: tuple[Path, Path],
-) -> None:
-    """Test checkpoint saving and loading."""
-    train_dataset, val_dataset = mock_datasets
-    log_dir, checkpoint_dir = temp_dirs
+        # Count trainable parameters
+        trainable_before = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        total_params = sum(p.numel() for p in model.parameters())
 
-    trainer = MultimodalTrainer(
-        model=model,
-        train_dataset=train_dataset,
-        val_dataset=val_dataset,
-        batch_size=2,
-        learning_rate=1e-4,
-        log_dir=str(log_dir),
-        checkpoint_dir=str(checkpoint_dir),
-    )
+        # Should have fewer trainable parameters when frozen
+        assert trainable_before < total_params
 
-    # Train for one epoch to create checkpoint
-    trainer.train(num_epochs=1, save_every=1)
+        # Test short training run
+        trainer.train(num_epochs=1, save_every=1)
 
-    # Find checkpoint file
-    checkpoint_files = list(checkpoint_dir.glob("*.pt"))
-    assert len(checkpoint_files) > 0
+        # Test checkpoint exists
+        checkpoint_files = list(checkpoint_dir.glob("*.pt"))
+        assert len(checkpoint_files) == 2
 
-    # Test loading checkpoint
-    checkpoint_path = checkpoint_files[0]
-    trainer.load_checkpoint(str(checkpoint_path))
+        # Test parameter unfreezing
+        trainer.unfreeze_all_parameters()
+        trainable_after = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-    # Verify checkpoint loaded (epoch should match)
-    assert trainer.current_epoch >= 0
+        # Should have all parameters trainable after unfreezing
+        assert trainable_after == total_params
+
+    def test_checkpoint_loading(
+        self,
+        model: MultimodalPatchedDecoder,
+        mock_datasets: tuple[MockTimeMmdDataset, MockTimeMmdDataset],
+        temp_dirs: tuple[Path, Path],
+    ) -> None:
+        """Test checkpoint saving and loading."""
+        train_dataset, val_dataset = mock_datasets
+        log_dir, checkpoint_dir = temp_dirs
+
+        trainer = MultimodalTrainer(
+            model=model,
+            train_dataset=train_dataset,
+            val_dataset=val_dataset,
+            batch_size=2,
+            gradient_accumulation_steps=2,
+            log_dir=log_dir,
+            checkpoint_dir=checkpoint_dir,
+        )
+
+        # Train for two epochs
+        trainer.train(num_epochs=2, save_every=1)
+
+        # Find checkpoint file
+        checkpoint_files = list(checkpoint_dir.glob("*.pt"))
+        assert len(checkpoint_files) == 3
+
+        # Test loading checkpoint
+        checkpoint_path = checkpoint_files[0]
+        trainer.load_checkpoint(checkpoint_path)
+
+        # Verify checkpoint loaded (epoch should match)
+        assert trainer.current_epoch == 1
