@@ -148,20 +148,20 @@ class MultimodalTrainer:
             Batched data dictionary.
         """
         # Stack time series data
-        time_series = torch.stack([torch.from_numpy(sample["time_series"]) for sample in batch])
-        targets = torch.stack([torch.from_numpy(sample["target"]) for sample in batch])
+        context = torch.stack([torch.from_numpy(sample["context"]) for sample in batch])
+        future = torch.stack([torch.from_numpy(sample["future"]) for sample in batch])
         freq = torch.stack([torch.tensor(sample["freq"]) for sample in batch])
 
-        # Collect text descriptions for each batch item
-        text_descriptions = []
+        # Collect patched texts for each batch item
+        patched_texts = []
         for sample in batch:
-            text_descriptions.append(sample["patched_texts"])
+            patched_texts.append(sample["patched_texts"])
 
         return {
-            "time_series": time_series.squeeze(-1),
-            "target": targets.squeeze(-1),
+            "context": context.squeeze(-1),
+            "future": future.squeeze(-1),
             "freq": freq.unsqueeze(-1),
-            "patched_texts": text_descriptions,
+            "patched_texts": patched_texts,
         }
 
     def train_epoch(self) -> float:
@@ -176,17 +176,17 @@ class MultimodalTrainer:
 
         for batch_idx, batch in enumerate(self.train_loader):
             # Move tensors to device
-            time_series = batch["time_series"].to(self.device)
-            targets = batch["target"].to(self.device)
+            context = batch["context"].to(self.device)
+            future = batch["future"].to(self.device)
             freq = batch["freq"].to(self.device)
             patched_texts = batch["patched_texts"]
 
             # Create input_padding tensor (zeros for now)
-            input_padding = torch.zeros_like(time_series)
+            input_padding = torch.zeros_like(context)
 
             # Forward pass
             predictions = self.model(
-                input_ts=time_series,
+                input_ts=context,
                 input_padding=input_padding,
                 freq=freq,
                 text_descriptions=patched_texts,
@@ -198,7 +198,7 @@ class MultimodalTrainer:
             last_patch_pred = predictions_mean[:, -1, :]  # Extract last patch: (batch_size, patch_len)
 
             # Compute loss
-            loss = self.loss_fn(last_patch_pred, targets)
+            loss = self.loss_fn(last_patch_pred, future)
 
             # Scale loss for gradient accumulation
             loss = loss / self.gradient_accumulation_steps
@@ -251,17 +251,17 @@ class MultimodalTrainer:
         with torch.no_grad():
             for batch in self.val_loader:
                 # Move tensors to device
-                time_series = batch["time_series"].to(self.device)
-                targets = batch["target"].to(self.device)
+                context = batch["context"].to(self.device)
+                future = batch["future"].to(self.device)
                 freq = batch["freq"].to(self.device)
                 patched_texts = batch["patched_texts"]
 
                 # Create input_padding tensor (zeros for now)
-                input_padding = torch.zeros_like(time_series)
+                input_padding = torch.zeros_like(context)
 
                 # Forward pass
                 predictions = self.model(
-                    input_ts=time_series,
+                    input_ts=context,
                     input_padding=input_padding,
                     freq=freq,
                     text_descriptions=patched_texts,
@@ -273,7 +273,7 @@ class MultimodalTrainer:
                 last_patch_pred = predictions_mean[:, -1, :]  # Extract last patch: (batch_size, patch_len)
 
                 # Compute loss
-                loss = self.loss_fn(last_patch_pred, targets)
+                loss = self.loss_fn(last_patch_pred, future)
 
                 total_loss += loss.item()
 
