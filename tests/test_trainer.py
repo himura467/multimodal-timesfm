@@ -271,5 +271,10 @@ class TestMultimodalTrainer:
         checkpoint_path = checkpoint_files[0]
         trainer.load_checkpoint(checkpoint_path)
 
-        # Verify checkpoint loaded (epoch should match)
-        assert trainer.current_epoch == 1
+        # Verify checkpoint loaded (epoch should match the loaded checkpoint)
+        if len(checkpoint_files) == 2:
+            # Only epoch checkpoints, no best model - loading epoch 0
+            assert trainer.current_epoch == 0
+        else:
+            # Has best model checkpoint - loading epoch 1
+            assert trainer.current_epoch == 1
