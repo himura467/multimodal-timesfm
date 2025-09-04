@@ -1,7 +1,7 @@
 """Time-MMD dataset loader for multimodal time series forecasting."""
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
@@ -30,37 +30,42 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
 
     def __init__(
         self,
-        data_dir: str | Path,
+        data_dir: Path,
         domain: str,
-        split_ratio: float = 0.7,
-        split: str = "train",
-        context_len: int = 512,
-        horizon_len: int = 128,
+        split_ratio: float = 0.8,
+        split: Literal["train", "test"] = "train",
         patch_len: int = 32,
+        context_len: int = 128,
+        horizon_len: int = 32,
     ) -> None:
         """Initializes Time-MMD dataset loader.
 
         Args:
             data_dir: Root directory containing Time-MMD dataset.
             domain: Domain name (e.g., 'Agriculture').
-            split_ratio: Train/test split ratio (default 0.7 for 70% train).
+            split_ratio: Train/test split ratio (default 0.8 for 80% train).
             split: Dataset split ('train' or 'test').
-            context_len: Length of context window for input sequences.
-            horizon_len: Length of forecasting horizon (target sequence length).
-                         horizon_len must be an integer multiple of patch_len.
             patch_len: Length of input patches for temporal alignment with time series data.
+            context_len: Length of context window for input sequences.
+                        context_len must be an integer multiple of patch_len.
+            horizon_len: Length of forecasting horizon.
+                        horizon_len must be an integer multiple of patch_len.
         """
+        # Validate that context_len is an integer multiple of patch_len
+        if context_len % patch_len != 0:
+            raise ValueError(f"context_len ({context_len}) must be an integer multiple of patch_len ({patch_len})")
+
         # Validate that horizon_len is an integer multiple of patch_len
         if horizon_len % patch_len != 0:
             raise ValueError(f"horizon_len ({horizon_len}) must be an integer multiple of patch_len ({patch_len})")
 
-        self.data_dir = Path(data_dir)
+        self.data_dir = data_dir
         self.domain = domain
         self.split_ratio = split_ratio
         self.split = split
+        self.patch_len = patch_len
         self.context_len = context_len
         self.horizon_len = horizon_len
-        self.patch_len = patch_len
         self.data: list[dict[str, Any]] = []
         self._load_data()
 
@@ -126,11 +131,6 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
             # Extract time series from this column
             time_series_values = numerical_df.loc[:, column].to_numpy()
 
-            # Skip if insufficient data for context + horizon
-            min_length = self.context_len + self.horizon_len
-            if len(time_series_values) < min_length:
-                continue
-
             # Split data based on split_ratio
             split_idx = int(len(time_series_values) * self.split_ratio)
 
@@ -144,34 +144,38 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
                 end_dates = full_end_dates.iloc[split_idx:]
 
             # Skip if insufficient data after split
-            if len(ts_data) < min_length:
+            if len(ts_data) < self.context_len + self.horizon_len:
                 continue
 
             # Create windowed samples from this time series
-            for start_idx in range(0, len(ts_data) - min_length + 1, self.horizon_len):
-                # Extract context window
+            for start_idx in range(0, len(ts_data) - self.context_len - self.horizon_len + 1, self.horizon_len):
+                # Extract context
                 context_end = start_idx + self.context_len
-                time_series = ts_data[start_idx:context_end].reshape(-1, 1)
+                context = ts_data[start_idx:context_end].reshape(-1, 1)
 
-                # Extract target
-                target_end = context_end + self.horizon_len
-                target = ts_data[context_end:target_end].reshape(-1, 1)
+                # Extract future
+                future_end = context_end + self.horizon_len
+                future = ts_data[context_end:future_end].reshape(-1, 1)
 
-                # Get associated text for this time period
+                # Get associated text for this context
                 window_start_date = str(start_dates.iloc[start_idx])
-                window_end_date = str(end_dates.iloc[target_end - 1])
+                window_end_date = str(end_dates.iloc[context_end - 1])
 
-                # Calculate number of text patches based on horizon_len / patch_len
-                text_patches_num = self.horizon_len // self.patch_len
+                # Calculate frequency based on interval between end_date values
+                freq = self._calculate_frequency_for_sample(end_dates, start_idx, context_end)
+
+                # Calculate number of text patches based on context_len / patch_len
+                text_patches_num = self.context_len // self.patch_len
 
                 patched_texts = self._get_patched_texts_for_period(
                     window_start_date, window_end_date, textual_data, text_patches_num
                 )
 
                 sample = {
-                    "time_series": time_series.astype(np.float32),
+                    "context": context.astype(np.float32),
+                    "future": future.astype(np.float32),
+                    "freq": freq,
                     "patched_texts": patched_texts,
-                    "target": target.astype(np.float32),
                     "metadata": {
                         "domain": self.domain,
                         "column": column,
@@ -179,6 +183,42 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
                     },
                 }
                 self.data.append(sample)
+
+    def _calculate_frequency_for_sample(self, dates: pd.Series, start_idx: int, end_idx: int) -> int:
+        """Calculate frequency value based on interval between date values.
+
+        Args:
+            dates: Series of dates for the time series.
+            start_idx: Starting index of the sample.
+            end_idx: Ending index of the sample.
+
+        Returns:
+            Frequency value:
+            - 0 for daily or lower granularity
+            - 1 for weekly or monthly granularity
+            - 2 for quarterly or higher granularity
+        """
+        if end_idx - start_idx < 1:
+            return 0  # Default to daily if insufficient data
+
+        # Convert to datetime and calculate intervals for the entire sample range
+        sample_dates = pd.to_datetime(dates.iloc[start_idx:end_idx])
+        intervals = sample_dates.diff().dropna()
+
+        if len(intervals) == 0:
+            return 0  # Default to daily
+
+        # Calculate average interval across all data points in the sample
+        avg_interval = intervals.mean()
+        avg_days = pd.Timedelta(avg_interval).total_seconds() / (24 * 3600)  # Convert to days
+
+        # Classify based on average interval
+        if avg_days < 3:
+            return 0
+        elif avg_days < 35:  # Weekly to monthly (up to ~5 weeks)
+            return 1
+        else:  # Quarterly or higher
+            return 2
 
     def _get_patched_texts_for_period(
         self, start_date: str, end_date: str, textual_data: dict[str, pd.DataFrame], text_patches_num: int
@@ -225,10 +265,10 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
                     ]
 
                     for _, row in matching_reports.iterrows():
-                        if "fact" in reports_df.columns and pd.notna(row["fact"]):
+                        if "fact" in reports_df.columns and pd.notna(row["fact"]) and str(row["fact"]) != "NA":
                             patch_reports.append(f"Report: {str(row['fact'])}")
-                        if "preds" in reports_df.columns and pd.notna(row["preds"]):
-                            patch_reports.append(f"Prediction: {str(row['preds'])}")
+                        if "preds" in reports_df.columns and pd.notna(row["preds"]) and str(row["preds"]) != "NA":
+                            patch_reports.append(f"Report Prediction: {str(row['preds'])}")
 
             # Get search data that overlaps with this patch period
             if "search" in textual_data:
@@ -252,10 +292,6 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
 
         return patches
 
-    def __len__(self) -> int:
-        """Returns dataset size."""
-        return len(self.data)
-
     def __getitem__(self, idx: int) -> dict[str, Any]:
         """Gets dataset item by index.
 
@@ -263,6 +299,10 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
             idx: Item index.
 
         Returns:
-            Dictionary containing time series, text, target, and metadata.
+            Dictionary containing context, future, freq, text, and metadata.
         """
         return self.data[idx]
+
+    def __len__(self) -> int:
+        """Returns dataset size."""
+        return len(self.data)

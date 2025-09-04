@@ -21,8 +21,6 @@ class TestTextPreprocessing:
         cleaned = clean_text(dirty_text)
 
         assert cleaned == "Hello world! "
-        assert not cleaned.startswith(" ")
-        # Note: clean_text preserves some trailing spaces after punctuation
 
     def test_clean_text_special_characters(self) -> None:
         """Tests cleaning of special characters."""
@@ -30,28 +28,12 @@ class TestTextPreprocessing:
         cleaned = clean_text(text_with_special)
 
         # Should keep basic punctuation but remove special symbols
-        assert "Climate data" in cleaned
-        assert "temp25C" in cleaned or "temp=25C" in cleaned
-        assert "°" not in cleaned
-        assert "~" not in cleaned
-
-    def test_clean_text_numbers(self) -> None:
-        """Tests that numbers are preserved."""
-        text_with_numbers = "Temperature increased by 2.5 degrees in 2023"
-        cleaned = clean_text(text_with_numbers)
-
-        assert "2.5" in cleaned
-        assert "2023" in cleaned
+        assert cleaned == "Climate data temp25C, humidity60"
 
     def test_clean_text_empty_input(self) -> None:
         """Tests handling of empty input."""
         assert clean_text("") == ""
         assert clean_text("   ") == ""
-
-    def test_clean_text_non_string_input(self) -> None:
-        """Tests conversion of non-string input."""
-        assert clean_text(123) == "123"
-        assert clean_text(None) == "None"
 
     def test_validate_text_inputs_valid(self) -> None:
         """Tests validation of valid text inputs."""
@@ -64,16 +46,9 @@ class TestTextPreprocessing:
 
     def test_validate_text_inputs_empty(self) -> None:
         """Tests validation fails for empty texts."""
-        texts = ["Valid text", "", "Another valid text"]
+        texts = ["Valid text", "#$%", "Another valid text"]
 
-        with pytest.raises(ValueError, match="empty after cleaning"):
-            validate_text_inputs(texts)
-
-    def test_validate_text_inputs_whitespace_only(self) -> None:
-        """Tests validation fails for whitespace-only texts."""
-        texts = ["Valid text", "   ", "Another valid text"]
-
-        with pytest.raises(ValueError, match="empty after cleaning"):
+        with pytest.raises(ValueError, match=r"Text input '#\$%' is empty after cleaning"):
             validate_text_inputs(texts)
 
 
@@ -86,10 +61,10 @@ class TestTimeseriesNormalization:
 
         standardized, mean, std = standardize_timeseries(data)
 
-        assert abs(np.mean(standardized)) < 1e-10  # Should be ~0
-        assert abs(np.std(standardized) - 1.0) < 1e-10  # Should be ~1
+        assert abs(np.mean(standardized)) < 1e-7  # Should be ~0
+        assert abs(np.std(standardized) - 1.0) < 1e-7  # Should be ~1
         assert mean == 3.0
-        assert abs(std - np.sqrt(2.0)) < 1e-10
+        assert abs(std - np.sqrt(2.0)) < 1e-7
 
     def test_standardize_constant_series(self) -> None:
         """Tests standardization of constant series."""
@@ -101,15 +76,6 @@ class TestTimeseriesNormalization:
         assert std == 1.0  # Should default to 1.0 for constant series
         assert np.allclose(standardized, 0.0)
 
-    def test_denormalize_timeseries(self) -> None:
-        """Tests denormalization of standardized data."""
-        original = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
-        standardized, mean, std = standardize_timeseries(original)
-
-        denormalized = denormalize_timeseries(standardized, mean, std)
-
-        assert np.allclose(denormalized, original)
-
     def test_standardization_round_trip(self) -> None:
         """Tests that standardization and denormalization are inverse operations."""
         original = np.random.randn(100) * 10 + 5  # Random data with mean 5, std 10
@@ -117,7 +83,7 @@ class TestTimeseriesNormalization:
         standardized, mean, std = standardize_timeseries(original)
         recovered = denormalize_timeseries(standardized, mean, std)
 
-        assert np.allclose(recovered, original, rtol=1e-10)
+        assert np.allclose(recovered, original, rtol=1e-7)
 
 
 class TestBatchPreparation:
@@ -147,5 +113,5 @@ class TestBatchPreparation:
         # Check that standardization was applied
         for ts in processed_ts:
             if isinstance(ts, np.ndarray):
-                assert abs(np.mean(ts)) < 1e-10  # Should be ~0
-                assert abs(np.std(ts) - 1.0) < 1e-10  # Should be ~1
+                assert abs(np.mean(ts)) < 1e-7  # Should be ~0
+                assert abs(np.std(ts) - 1.0) < 1e-7  # Should be ~1

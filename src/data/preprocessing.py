@@ -6,7 +6,7 @@ from typing import Any
 import numpy as np
 
 
-def clean_text(text: Any) -> str:
+def clean_text(text: str) -> str:
     """Clean and normalize text input.
 
     Args:
@@ -15,16 +15,13 @@ def clean_text(text: Any) -> str:
     Returns:
         Cleaned text string.
     """
-    if not isinstance(text, str):
-        text = str(text)
-
     # Remove extra whitespace
-    text = re.sub(r"\s+", " ", text.strip())
+    cleaned = re.sub(r"\s+", " ", text.strip())
 
     # Remove special characters but keep basic punctuation
-    text = re.sub(r"[^\w\s\.\,\!\?\-]", "", text)
+    cleaned = re.sub(r"[^\w\s\.\,\!\?\-]", "", cleaned)
 
-    return str(text)
+    return cleaned
 
 
 def validate_text_inputs(text_inputs: list[str]) -> list[str]:
@@ -41,16 +38,16 @@ def validate_text_inputs(text_inputs: list[str]) -> list[str]:
     """
     cleaned_texts = []
 
-    for i, text in enumerate(text_inputs):
+    for text in text_inputs:
         cleaned = clean_text(text)
         if not cleaned:
-            raise ValueError(f"Text input at index {i} is empty after cleaning: '{text}'")
+            raise ValueError(f"Text input '{text}' is empty after cleaning")
         cleaned_texts.append(cleaned)
 
     return cleaned_texts
 
 
-def standardize_timeseries(data: np.ndarray, epsilon: float = 1e-8) -> tuple[np.ndarray, float, float]:
+def standardize_timeseries(data: np.ndarray, epsilon: float = 1e-7) -> tuple[np.ndarray, float, float]:
     """Standardize time series data (zero mean, unit variance).
 
     Args:

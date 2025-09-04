@@ -8,7 +8,8 @@ from timesfm.pytorch_patched_decoder import (
     TimesFMConfig,
 )
 
-from src.models.text_encoder import MultimodalFusion, TextEncoder
+from src.models.multimodal_fusion import MultimodalFusion
+from src.models.text_encoder import TextEncoder
 
 
 @dataclass
@@ -55,31 +56,30 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
 
         self.config = config
 
-        # Initialize text encoder and fusion components
         if torch.cuda.is_available():
-            device = "cuda"
+            self.device = "cuda"
         elif torch.backends.mps.is_available():
-            device = "mps"
+            self.device = "mps"
         else:
-            device = "cpu"
+            self.device = "cpu"
 
+        # Initialize text encoder and fusion components
         self.text_encoder = TextEncoder(
-            model_name=config.text_encoder_model, embedding_dim=config.text_embedding_dim, device=device
+            model_name=config.text_encoder_model, embedding_dim=config.text_embedding_dim, device=self.device
         )
-
         self.multimodal_fusion = MultimodalFusion(
             ts_feature_dim=config.hidden_size,
             text_feature_dim=config.text_embedding_dim,
         )
 
         # Move the entire decoder to the selected device
-        self.to(device)
+        self.to(self.device)
 
     def _preprocess_multimodal_input(
         self,
         input_ts: torch.Tensor,
         input_padding: torch.Tensor,
-        text_descriptions: list[list[list[str]]] | None = None,
+        text_descriptions: list[list[list[str]]],
     ) -> tuple[
         torch.Tensor,
         torch.Tensor,
@@ -94,7 +94,7 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
         Args:
             input_ts: Input time series tensor of shape (batch_size, sequence_length).
             input_padding: Padding tensor of shape (batch_size, sequence_length).
-            text_descriptions: Optional list of text descriptions organized as
+            text_descriptions: List of text descriptions organized as
                               [batch][patch] where each patch can have multiple text strings.
                               Shape: (batch_size, num_patches, variable_texts_per_patch).
 
@@ -110,10 +110,6 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
             input_ts=input_ts,
             input_padding=input_padding,
         )
-
-        # If no text provided, return original preprocessing
-        if text_descriptions is None:
-            return model_input, patched_padding, stats, patched_inputs
 
         # Encode text descriptions for each patch
         text_embeddings = self._encode_patch_text_features(text_descriptions, model_input.shape, model_input.device)
@@ -184,7 +180,7 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
         input_ts: torch.Tensor,
         input_padding: torch.LongTensor,
         freq: torch.Tensor,
-        text_descriptions: list[list[list[str]]] | None = None,
+        text_descriptions: list[list[list[str]]],
     ) -> torch.Tensor:
         """Forward pass for multimodal decoder.
 
@@ -192,7 +188,7 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
             input_ts: Input time series tensor.
             input_padding: Input padding tensor.
             freq: Frequency encoding tensor.
-            text_descriptions: Optional patch-level text descriptions organized as [batch][patch][texts].
+            text_descriptions: Patch-level text descriptions organized as [batch][patch][texts].
 
         Returns:
             Output tensor with forecasting predictions.
@@ -224,7 +220,7 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
         paddings: torch.Tensor,
         freq: torch.Tensor,
         horizon_len: int,
-        text_descriptions: list[list[list[str]]] | None = None,
+        text_descriptions: list[list[list[str]]],
         output_patch_len: int | None = None,
         max_len: int | None = None,
         return_forecast_on_context: bool = False,
@@ -239,7 +235,7 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
             paddings: Padding tensor of shape B x (C + H) where H is prediction length.
             freq: Frequency tensor of shape B x 1.
             horizon_len: Prediction length.
-            text_descriptions: Optional patch-level text descriptions organized as [batch][patch][texts].
+            text_descriptions: Patch-level text descriptions organized as [batch][patch][texts].
             output_patch_len: Output length per decoding step.
             max_len: Maximum training context length.
             return_forecast_on_context: Whether to return forecast on context.
@@ -294,43 +290,66 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
 
         return (full_outputs_tensor[:, :, 0], full_outputs_tensor)
 
-    def freeze_text_components(self) -> None:
-        """Freeze text encoder and fusion components for selective training."""
-        for param in self.text_encoder.parameters():
+    def freeze_parameters(self) -> None:
+        """Freeze all parameters in the MultimodalPatchedDecoder model.
+
+        This includes all TimesFM decoder parameters, text encoder parameters,
+        and fusion layer parameters.
+        """
+        # Freeze all model parameters
+        for param in self.parameters():
             param.requires_grad = False
 
-        self.multimodal_fusion.freeze_projection()
+    def unfreeze_parameters(self) -> None:
+        """Unfreeze all parameters in the MultimodalPatchedDecoder model.
 
-    def unfreeze_text_components(self) -> None:
-        """Unfreeze text encoder and fusion components for training."""
-        for param in self.text_encoder.parameters():
+        This includes all TimesFM decoder parameters, text encoder parameters,
+        and fusion layer parameters.
+        """
+        # Unfreeze all model parameters
+        for param in self.parameters():
             param.requires_grad = True
 
-        self.multimodal_fusion.unfreeze_projection()
+    def is_frozen(self) -> bool:
+        """Check if all parameters in the MultimodalPatchedDecoder model are frozen.
 
-    def is_text_frozen(self) -> bool:
+        Returns:
+            True if all parameters are frozen, False otherwise.
+        """
+        return all(not param.requires_grad for param in self.parameters())
+
+    def freeze_text_components(self, freeze_encoder: bool = True, freeze_fusion: bool = True) -> None:
+        """Freeze text encoder and/or fusion components for selective training.
+
+        Args:
+            freeze_encoder: Whether to freeze the text encoder parameters.
+            freeze_fusion: Whether to freeze the fusion projection parameters.
+        """
+        if freeze_encoder:
+            self.text_encoder.freeze_parameters()
+
+        if freeze_fusion:
+            self.multimodal_fusion.freeze_projection()
+
+    def unfreeze_text_components(self, unfreeze_encoder: bool = True, unfreeze_fusion: bool = True) -> None:
+        """Unfreeze text encoder and/or fusion components for training.
+
+        Args:
+            unfreeze_encoder: Whether to unfreeze the text encoder parameters.
+            unfreeze_fusion: Whether to unfreeze the fusion projection parameters.
+        """
+        if unfreeze_encoder:
+            self.text_encoder.unfreeze_parameters()
+
+        if unfreeze_fusion:
+            self.multimodal_fusion.unfreeze_projection()
+
+    def is_text_frozen(self) -> dict[str, bool]:
         """Check if text components are frozen.
 
         Returns:
-            True if all text components are frozen, False otherwise.
+            Dictionary with freeze status of each component:
+            - 'encoder': True if text encoder is frozen, False otherwise
+            - 'fusion': True if fusion projection is frozen, False otherwise
         """
-        text_encoder_frozen = all(not param.requires_grad for param in self.text_encoder.parameters())
-        fusion_frozen = self.multimodal_fusion.is_projection_frozen()
-
-        return text_encoder_frozen and fusion_frozen
-
-    def get_text_fusion_parameters(self) -> dict[str, torch.Tensor]:
-        """Get text fusion parameters for checkpoint saving.
-
-        Returns:
-            Dictionary of fusion parameters.
-        """
-        return self.multimodal_fusion.get_projection_parameters()
-
-    def set_text_fusion_parameters(self, parameters: dict[str, torch.Tensor]) -> None:
-        """Set text fusion parameters for checkpoint loading.
-
-        Args:
-            parameters: Dictionary containing fusion parameters.
-        """
-        self.multimodal_fusion.set_projection_parameters(parameters)
+        return {"encoder": self.text_encoder.is_frozen(), "fusion": self.multimodal_fusion.is_projection_frozen()}

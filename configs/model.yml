@@ -1,0 +1,23 @@
+# Model architecture configuration for multimodal TimesFM
+
+# Base TimesFM configuration
+timesfm:
+  num_layers: 50
+  num_heads: 16
+  num_kv_heads: 16
+  hidden_size: 1280
+  intermediate_size: 1280
+  head_dim: 80
+  rms_norm_eps: 1e-6
+  patch_len: 32
+  horizon_len: 32
+  quantiles: [0.1, 0.2, 0.3, 0.4, 0.6, 0.7, 0.8, 0.9]
+  pad_val: 1123581321.0
+  tolerance: 1e-6
+  dtype: "bfloat32"
+  use_positional_embedding: true
+
+# Text encoder configuration
+text_encoder:
+  model_name: "all-MiniLM-L6-v2"
+  embedding_dim: 384

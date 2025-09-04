@@ -16,6 +16,7 @@ dev = [
     "pandas-stubs>=2.3.0.250703",
     "pytest>=8.4.1",
     "ruff>=0.12.7",
+    "types-pyyaml>=6.0.12.20250822",
 ]
 
 [tool.uv.sources]
@@ -45,9 +46,8 @@ line-length = 120
 [tool.ruff.lint]
 select = [
     "E",  # pycodestyle Error
-    "F",  # Pyflakes
-    "I",  # isort
     "W",  # pycodestyle Warning
+    "F",  # Pyflakes
 ]
 ignore = [
     "E501",  # line-too-long

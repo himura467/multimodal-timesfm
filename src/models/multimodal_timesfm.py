@@ -1,14 +1,15 @@
 """MultimodalTimesFM wrapper class that extends TimesFM to support multimodal inputs."""
 
-import dataclasses
+from dataclasses import dataclass
 
 from timesfm import TimesFmCheckpoint, TimesFmHparams
 from timesfm.timesfm_torch import TimesFmTorch as TimesFm
 
-from src.models.text_encoder import MultimodalFusion, TextEncoder
+from src.models.multimodal_fusion import MultimodalFusion
+from src.models.text_encoder import TextEncoder
 
 
-@dataclasses.dataclass(kw_only=True)
+@dataclass(kw_only=True)
 class MultimodalTimesFmHparams(TimesFmHparams):  # type: ignore[misc]
     """Hyperparameters for MultimodalTimesFM that extend TimesFmHparams.
 
@@ -46,7 +47,7 @@ class MultimodalTimesFM(TimesFm):  # type: ignore[misc]
         # Initialize text encoder
         self.text_encoder = TextEncoder(model_name=hparams.text_encoder_model, embedding_dim=hparams.text_embedding_dim)
 
-        # Initialize fusion mechanism using addition-based fusion
+        # Initialize fusion mechanism
         self.fusion = MultimodalFusion(
             ts_feature_dim=hparams.model_dims,
             text_feature_dim=hparams.text_embedding_dim,
