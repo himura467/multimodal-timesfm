@@ -46,9 +46,8 @@ line-length = 120
 [tool.ruff.lint]
 select = [
     "E",  # pycodestyle Error
-    "F",  # Pyflakes
-    "I",  # isort
     "W",  # pycodestyle Warning
+    "F",  # Pyflakes
 ]
 ignore = [
     "E501",  # line-too-long
