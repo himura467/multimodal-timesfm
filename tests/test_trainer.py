@@ -58,72 +58,67 @@ class MockTimeMmdDataset(Dataset[dict[str, Any]]):
         return len(self.data)
 
 
-@pytest.fixture
-def model_config() -> MultimodalTimesFMConfig:
-    """Load model configuration from YAML file."""
-    config_path = Path(__file__).parent.parent / "configs" / "model.yml"
-    with open(config_path, "r") as f:
-        config_dict = yaml.safe_load(f)
-
-    return MultimodalTimesFMConfig(
-        num_layers=config_dict["timesfm"]["num_layers"],
-        num_heads=config_dict["timesfm"]["num_heads"],
-        num_kv_heads=config_dict["timesfm"]["num_kv_heads"],
-        hidden_size=config_dict["timesfm"]["hidden_size"],
-        intermediate_size=config_dict["timesfm"]["intermediate_size"],
-        head_dim=config_dict["timesfm"]["head_dim"],
-        rms_norm_eps=float(config_dict["timesfm"]["rms_norm_eps"]),
-        patch_len=config_dict["timesfm"]["patch_len"],
-        horizon_len=config_dict["timesfm"]["horizon_len"],
-        quantiles=config_dict["timesfm"]["quantiles"],
-        pad_val=float(config_dict["timesfm"]["pad_val"]),
-        tolerance=float(config_dict["timesfm"]["tolerance"]),
-        dtype=config_dict["timesfm"]["dtype"],
-        use_positional_embedding=config_dict["timesfm"]["use_positional_embedding"],
-        text_encoder_model=config_dict["text_encoder"]["model_name"],
-        text_embedding_dim=config_dict["text_encoder"]["embedding_dim"],
-    )
-
-
-@pytest.fixture
-def mock_datasets() -> tuple[MockTimeMmdDataset, MockTimeMmdDataset]:
-    """Create mock training and validation datasets."""
-    # Set seeds for reproducible test data
-    torch.manual_seed(42)
-    np.random.seed(42)
-
-    train_dataset = MockTimeMmdDataset(size=10, context_len=128, horizon_len=32)  # Smaller for testing
-    val_dataset = MockTimeMmdDataset(size=5, context_len=128, horizon_len=32)
-    return train_dataset, val_dataset
-
-
-@pytest.fixture
-def model(model_config: MultimodalTimesFMConfig) -> MultimodalPatchedDecoder:
-    """Create multimodal model."""
-    return MultimodalPatchedDecoder(model_config)
-
-
-@pytest.fixture
-def temp_dirs() -> Generator[tuple[Path, Path], None, None]:
-    """Create temporary directories for logging and checkpoints."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        log_dir = Path(temp_dir) / "logs"
-        checkpoint_dir = Path(temp_dir) / "checkpoints"
-        yield log_dir, checkpoint_dir
-
-
-@pytest.fixture(autouse=True)
-def mock_wandb() -> Generator[Mock, None, None]:
-    """Mock wandb to avoid initialization and deprecation warnings during tests."""
-    with patch("src.train.trainer.wandb") as mock_wandb:
-        mock_wandb.init = Mock()
-        mock_wandb.log = Mock()
-        mock_wandb.finish = Mock()
-        yield mock_wandb
-
-
 class TestMultimodalTrainer:
     """Test cases for MultimodalTrainer class."""
+
+    @pytest.fixture(scope="session")
+    def model_config(self) -> MultimodalTimesFMConfig:
+        """Load model configuration from YAML file."""
+        config_path = Path(__file__).parent.parent / "configs" / "model.yml"
+        with open(config_path, "r") as f:
+            config_dict = yaml.safe_load(f)
+
+        return MultimodalTimesFMConfig(
+            num_layers=config_dict["timesfm"]["num_layers"],
+            num_heads=config_dict["timesfm"]["num_heads"],
+            num_kv_heads=config_dict["timesfm"]["num_kv_heads"],
+            hidden_size=config_dict["timesfm"]["hidden_size"],
+            intermediate_size=config_dict["timesfm"]["intermediate_size"],
+            head_dim=config_dict["timesfm"]["head_dim"],
+            rms_norm_eps=float(config_dict["timesfm"]["rms_norm_eps"]),
+            patch_len=config_dict["timesfm"]["patch_len"],
+            horizon_len=config_dict["timesfm"]["horizon_len"],
+            quantiles=config_dict["timesfm"]["quantiles"],
+            pad_val=float(config_dict["timesfm"]["pad_val"]),
+            tolerance=float(config_dict["timesfm"]["tolerance"]),
+            dtype=config_dict["timesfm"]["dtype"],
+            use_positional_embedding=config_dict["timesfm"]["use_positional_embedding"],
+            text_encoder_model=config_dict["text_encoder"]["model_name"],
+            text_embedding_dim=config_dict["text_encoder"]["embedding_dim"],
+        )
+
+    @pytest.fixture(scope="session")
+    def mock_datasets(self) -> tuple[MockTimeMmdDataset, MockTimeMmdDataset]:
+        """Create mock training and validation datasets."""
+        # Set seeds for reproducible test data
+        torch.manual_seed(42)
+        np.random.seed(42)
+
+        train_dataset = MockTimeMmdDataset(size=10, context_len=128, horizon_len=32)  # Smaller for testing
+        val_dataset = MockTimeMmdDataset(size=5, context_len=128, horizon_len=32)
+        return train_dataset, val_dataset
+
+    @pytest.fixture(scope="session")
+    def model(self, model_config: MultimodalTimesFMConfig) -> MultimodalPatchedDecoder:
+        """Create multimodal model."""
+        return MultimodalPatchedDecoder(model_config)
+
+    @pytest.fixture(scope="session")
+    def temp_dirs(self) -> Generator[tuple[Path, Path], None, None]:
+        """Create temporary directories for logging and checkpoints."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log_dir = Path(temp_dir) / "logs"
+            checkpoint_dir = Path(temp_dir) / "checkpoints"
+            yield log_dir, checkpoint_dir
+
+    @pytest.fixture(scope="session", autouse=True)
+    def mock_wandb(self) -> Generator[Mock, None, None]:
+        """Mock wandb to avoid initialization and deprecation warnings during tests."""
+        with patch("src.train.trainer.wandb") as mock_wandb:
+            mock_wandb.init = Mock()
+            mock_wandb.log = Mock()
+            mock_wandb.finish = Mock()
+            yield mock_wandb
 
     def test_trainer_initialization(
         self,
