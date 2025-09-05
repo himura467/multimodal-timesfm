@@ -154,8 +154,8 @@ def train_model(
         device=device,
         learning_rate=float(train_config["learning_rate"]),
         weight_decay=float(train_config["weight_decay"]),
-        log_dir=log_config["save_dir"],
-        checkpoint_dir=checkpoint_config["save_dir"],
+        log_dir=Path(log_config["save_dir"]),
+        checkpoint_dir=Path(checkpoint_config["save_dir"]),
         wandb_run_name=train_config["wandb_run_name"],
     )
 
