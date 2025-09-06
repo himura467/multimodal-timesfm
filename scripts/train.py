@@ -9,6 +9,7 @@ from typing import Any
 import numpy as np
 import torch
 import yaml
+from huggingface_hub import snapshot_download
 from torch.utils.data import ConcatDataset
 
 from src.data.time_mmd_dataset import TimeMmdDataset
@@ -94,7 +95,10 @@ def create_datasets(
 
 
 def create_model(model_config: dict[str, Any]) -> MultimodalPatchedDecoder:
-    """Create multimodal model from configuration."""
+    """Create multimodal model from configuration and load pretrained TimesFM weights."""
+    logger = get_logger()
+
+    # Create multimodal config
     config = MultimodalTimesFMConfig(
         num_layers=model_config["timesfm"]["num_layers"],
         num_heads=model_config["timesfm"]["num_heads"],
@@ -114,7 +118,41 @@ def create_model(model_config: dict[str, Any]) -> MultimodalPatchedDecoder:
         text_embedding_dim=model_config["text_encoder"]["embedding_dim"],
     )
 
-    return MultimodalPatchedDecoder(config)
+    # Create multimodal model
+    model = MultimodalPatchedDecoder(config)
+
+    # Load pretrained TimesFM weights
+    repo_id = "google/timesfm-2.0-500m-pytorch"
+    logger.info(f"Loading pretrained TimesFM weights from {repo_id}")
+
+    try:
+        model_dir = Path(snapshot_download(repo_id))
+        checkpoint_path = model_dir / "torch_model.ckpt"
+        pretrained_weights = torch.load(checkpoint_path, weights_only=True)
+
+        # Load weights into the TimesFM components (excluding text components)
+        model_state_dict = model.state_dict()
+        pretrained_keys = set(pretrained_weights.keys())
+        model_keys = set(model_state_dict.keys())
+
+        # Find keys that match between pretrained and multimodal model
+        matching_keys = pretrained_keys.intersection(model_keys)
+        non_matching_keys = model_keys - pretrained_keys
+
+        logger.info(f"Loading {len(matching_keys)} pretrained parameters")
+        logger.info(f"Initializing {len(non_matching_keys)} new parameters (text components)")
+
+        # Load matching weights
+        for key in matching_keys:
+            model_state_dict[key].copy_(pretrained_weights[key])
+
+        logger.info("Successfully loaded pretrained TimesFM weights")
+
+    except Exception as e:
+        logger.warning(f"Failed to load pretrained weights: {e}")
+        logger.warning("Continuing with randomly initialized weights")
+
+    return model
 
 
 def train_model(
