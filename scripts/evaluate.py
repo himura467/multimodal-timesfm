@@ -183,7 +183,7 @@ def create_dataset(
 
 def evaluate_original_model(
     model: PatchedTimeSeriesDecoder,
-    dataloader: DataLoader,
+    dataloader: DataLoader[dict[str, Any]],
     device: torch.device,
 ) -> dict[str, float]:
     """Evaluate original TimesFM model (without text)."""
@@ -230,7 +230,7 @@ def evaluate_original_model(
 
 def evaluate_multimodal_model(
     model: MultimodalPatchedDecoder,
-    dataloader: DataLoader,
+    dataloader: DataLoader[dict[str, Any]],
     device: torch.device,
 ) -> dict[str, float]:
     """Evaluate multimodal TimesFM model (with text)."""
