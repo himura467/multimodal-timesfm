@@ -72,12 +72,12 @@ class TestMultimodalTrainer:
             num_layers=config_dict["timesfm"]["num_layers"],
             num_heads=config_dict["timesfm"]["num_heads"],
             num_kv_heads=config_dict["timesfm"]["num_kv_heads"],
-            hidden_size=config_dict["timesfm"]["hidden_size"],
-            intermediate_size=config_dict["timesfm"]["intermediate_size"],
-            head_dim=config_dict["timesfm"]["head_dim"],
+            hidden_size=config_dict["timesfm"]["model_dims"],
+            intermediate_size=config_dict["timesfm"]["model_dims"],
+            head_dim=config_dict["timesfm"]["model_dims"] // config_dict["timesfm"]["num_heads"],
             rms_norm_eps=float(config_dict["timesfm"]["rms_norm_eps"]),
-            patch_len=config_dict["timesfm"]["patch_len"],
-            horizon_len=config_dict["timesfm"]["horizon_len"],
+            patch_len=config_dict["timesfm"]["input_patch_len"],
+            horizon_len=config_dict["timesfm"]["output_patch_len"],
             quantiles=config_dict["timesfm"]["quantiles"],
             pad_val=float(config_dict["timesfm"]["pad_val"]),
             tolerance=float(config_dict["timesfm"]["tolerance"]),
@@ -94,8 +94,8 @@ class TestMultimodalTrainer:
         torch.manual_seed(42)
         np.random.seed(42)
 
-        train_dataset = MockTimeMmdDataset(size=10, context_len=128, horizon_len=32)  # Smaller for testing
-        val_dataset = MockTimeMmdDataset(size=5, context_len=128, horizon_len=32)
+        train_dataset = MockTimeMmdDataset(size=10, context_len=128, horizon_len=128)
+        val_dataset = MockTimeMmdDataset(size=5, context_len=128, horizon_len=128)
         return train_dataset, val_dataset
 
     @pytest.fixture(scope="session")
@@ -193,7 +193,7 @@ class TestMultimodalTrainer:
 
         # Check output shape
         batch_size = context.shape[0]
-        expected_shape = (batch_size, 4, 32, 9)  # Based on model config
+        expected_shape = (batch_size, 4, 128, 10)  # Based on model config
         assert outputs.shape == expected_shape
 
     def test_training_loop(

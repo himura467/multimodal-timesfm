@@ -2,42 +2,19 @@
 """Training script for multimodal TimesFM on Time-MMD dataset."""
 
 import argparse
-import random
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 import torch
-import yaml
+from huggingface_hub import snapshot_download
 from torch.utils.data import ConcatDataset
 
 from src.data.time_mmd_dataset import TimeMmdDataset
 from src.models.multimodal_patched_decoder import MultimodalPatchedDecoder, MultimodalTimesFMConfig
 from src.train.trainer import MultimodalTrainer
 from src.utils.logging import get_logger, setup_logger
-
-
-def load_config(model_config_path: Path, training_config_path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Load model and training configurations."""
-    with open(model_config_path, "r") as f:
-        model_config = yaml.safe_load(f)
-
-    with open(training_config_path, "r") as f:
-        training_config = yaml.safe_load(f)
-
-    return model_config, training_config
-
-
-def set_seed(seed: int) -> None:
-    """Set random seeds for reproducibility."""
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
-    # Ensure deterministic behavior
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+from src.utils.seed import set_seed
+from src.utils.yaml import load_yaml
 
 
 def create_datasets(
@@ -94,17 +71,20 @@ def create_datasets(
 
 
 def create_model(model_config: dict[str, Any]) -> MultimodalPatchedDecoder:
-    """Create multimodal model from configuration."""
+    """Create multimodal model from configuration and load pretrained TimesFM weights."""
+    logger = get_logger()
+
+    # Create multimodal config
     config = MultimodalTimesFMConfig(
         num_layers=model_config["timesfm"]["num_layers"],
         num_heads=model_config["timesfm"]["num_heads"],
         num_kv_heads=model_config["timesfm"]["num_kv_heads"],
-        hidden_size=model_config["timesfm"]["hidden_size"],
-        intermediate_size=model_config["timesfm"]["intermediate_size"],
-        head_dim=model_config["timesfm"]["head_dim"],
+        hidden_size=model_config["timesfm"]["model_dims"],
+        intermediate_size=model_config["timesfm"]["model_dims"],
+        head_dim=model_config["timesfm"]["model_dims"] // model_config["timesfm"]["num_heads"],
         rms_norm_eps=float(model_config["timesfm"]["rms_norm_eps"]),
-        patch_len=model_config["timesfm"]["patch_len"],
-        horizon_len=model_config["timesfm"]["horizon_len"],
+        patch_len=model_config["timesfm"]["input_patch_len"],
+        horizon_len=model_config["timesfm"]["output_patch_len"],
         quantiles=model_config["timesfm"]["quantiles"],
         pad_val=float(model_config["timesfm"]["pad_val"]),
         tolerance=float(model_config["timesfm"]["tolerance"]),
@@ -114,7 +94,41 @@ def create_model(model_config: dict[str, Any]) -> MultimodalPatchedDecoder:
         text_embedding_dim=model_config["text_encoder"]["embedding_dim"],
     )
 
-    return MultimodalPatchedDecoder(config)
+    # Create multimodal model
+    model = MultimodalPatchedDecoder(config)
+
+    # Load pretrained TimesFM weights
+    repo_id = "google/timesfm-2.0-500m-pytorch"
+    logger.info(f"Loading pretrained TimesFM weights from {repo_id}")
+
+    try:
+        model_dir = Path(snapshot_download(repo_id))
+        checkpoint_path = model_dir / "torch_model.ckpt"
+        pretrained_weights = torch.load(checkpoint_path, weights_only=True)
+
+        # Load weights into the TimesFM components (excluding text components)
+        model_state_dict = model.state_dict()
+        pretrained_keys = set(pretrained_weights.keys())
+        model_keys = set(model_state_dict.keys())
+
+        # Find keys that match between pretrained and multimodal model
+        matching_keys = pretrained_keys.intersection(model_keys)
+        non_matching_keys = model_keys - pretrained_keys
+
+        logger.info(f"Loading {len(matching_keys)} pretrained parameters")
+        logger.info(f"Initializing {len(non_matching_keys)} new parameters (text components)")
+
+        # Load matching weights
+        for key in matching_keys:
+            model_state_dict[key].copy_(pretrained_weights[key])
+
+        logger.info("Successfully loaded pretrained TimesFM weights")
+
+    except Exception as e:
+        logger.warning(f"Failed to load pretrained weights: {e}")
+        logger.warning("Continuing with randomly initialized weights")
+
+    return model
 
 
 def train_model(
@@ -205,7 +219,8 @@ def main() -> int:
     args = parser.parse_args()
 
     # Load configurations
-    model_config, training_config = load_config(Path(args.model_config), Path(args.training_config))
+    model_config = load_yaml(Path(args.model_config))
+    training_config = load_yaml(Path(args.training_config))
 
     # Set random seed for reproducibility if provided
     if args.seed is not None:
