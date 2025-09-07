@@ -2,11 +2,9 @@
 """Training script for multimodal TimesFM on Time-MMD dataset."""
 
 import argparse
-import random
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 import torch
 from huggingface_hub import snapshot_download
 from torch.utils.data import ConcatDataset
@@ -15,19 +13,8 @@ from src.data.time_mmd_dataset import TimeMmdDataset
 from src.models.multimodal_patched_decoder import MultimodalPatchedDecoder, MultimodalTimesFMConfig
 from src.train.trainer import MultimodalTrainer
 from src.utils.logging import get_logger, setup_logger
+from src.utils.seed import set_seed
 from src.utils.yaml import load_yaml
-
-
-def set_seed(seed: int) -> None:
-    """Set random seeds for reproducibility."""
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
-    # Ensure deterministic behavior
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
 
 
 def create_datasets(
