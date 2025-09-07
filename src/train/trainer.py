@@ -90,7 +90,7 @@ class MultimodalTrainer:
         self.model.to(self.device)
 
         # Set up data loaders
-        self.train_loader: DataLoader[Any] = DataLoader(
+        self.train_loader: DataLoader[dict[str, Any]] = DataLoader(
             train_dataset,  # type: ignore[arg-type]
             batch_size=batch_size,
             shuffle=True,
@@ -98,7 +98,7 @@ class MultimodalTrainer:
             collate_fn=multimodal_collate_fn,
             pin_memory=True if self.device.type == "cuda" else False,
         )
-        self.val_loader: DataLoader[Any] = DataLoader(
+        self.val_loader: DataLoader[dict[str, Any]] = DataLoader(
             val_dataset,  # type: ignore[arg-type]
             batch_size=batch_size,
             shuffle=False,
