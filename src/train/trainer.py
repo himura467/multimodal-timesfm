@@ -162,7 +162,7 @@ class MultimodalTrainer:
             # Forward pass
             predictions = self.model(
                 input_ts=context,
-                input_padding=input_padding,
+                input_padding=input_padding.float(),
                 freq=freq,
                 text_descriptions=patched_texts,
             )
