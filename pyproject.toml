@@ -17,6 +17,7 @@ dev = [
     "pytest>=8.4.1",
     "ruff>=0.12.7",
     "types-pyyaml>=6.0.12.20250822",
+    "types-tqdm>=4.67.0.20250809",
 ]
 
 [tool.uv.sources]
