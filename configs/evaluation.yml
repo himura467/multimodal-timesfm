@@ -1,0 +1,10 @@
+# Evaluation configuration for multimodal TimesFM model comparison
+
+# Data configuration
+data:
+  data_path: "data/Time-MMD"
+  domain: "Environment"
+
+# Evaluation configuration
+evaluation:
+  batch_size: 8
