@@ -8,7 +8,6 @@ from typing import Any
 
 import numpy as np
 import torch
-import yaml
 from huggingface_hub import snapshot_download
 from torch.utils.data import ConcatDataset
 
@@ -16,17 +15,7 @@ from src.data.time_mmd_dataset import TimeMmdDataset
 from src.models.multimodal_patched_decoder import MultimodalPatchedDecoder, MultimodalTimesFMConfig
 from src.train.trainer import MultimodalTrainer
 from src.utils.logging import get_logger, setup_logger
-
-
-def load_config(model_config_path: Path, training_config_path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Load model and training configurations."""
-    with open(model_config_path, "r") as f:
-        model_config = yaml.safe_load(f)
-
-    with open(training_config_path, "r") as f:
-        training_config = yaml.safe_load(f)
-
-    return model_config, training_config
+from src.utils.yaml import load_yaml
 
 
 def set_seed(seed: int) -> None:
@@ -243,7 +232,8 @@ def main() -> int:
     args = parser.parse_args()
 
     # Load configurations
-    model_config, training_config = load_config(Path(args.model_config), Path(args.training_config))
+    model_config = load_yaml(Path(args.model_config))
+    training_config = load_yaml(Path(args.training_config))
 
     # Set random seed for reproducibility if provided
     if args.seed is not None:
