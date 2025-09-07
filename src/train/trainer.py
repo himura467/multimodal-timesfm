@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 
 import wandb
 from src.models.multimodal_patched_decoder import MultimodalPatchedDecoder
+from src.utils.collate import multimodal_collate_fn
 from src.utils.logging import setup_logger
 
 
@@ -94,7 +95,7 @@ class MultimodalTrainer:
             batch_size=batch_size,
             shuffle=True,
             num_workers=0,
-            collate_fn=self._collate_fn,
+            collate_fn=multimodal_collate_fn,
             pin_memory=True if self.device.type == "cuda" else False,
         )
         self.val_loader: DataLoader[Any] = DataLoader(
@@ -102,7 +103,7 @@ class MultimodalTrainer:
             batch_size=batch_size,
             shuffle=False,
             num_workers=0,
-            collate_fn=self._collate_fn,
+            collate_fn=multimodal_collate_fn,
             pin_memory=True if self.device.type == "cuda" else False,
         )
 
@@ -137,32 +138,6 @@ class MultimodalTrainer:
         self.global_step = 0
         self.current_epoch = 0
         self.best_val_loss = float("inf")
-
-    def _collate_fn(self, batch: list[dict[str, Any]]) -> dict[str, Any]:
-        """Collate function for multimodal data.
-
-        Args:
-            batch: List of samples from the dataset.
-
-        Returns:
-            Batched data dictionary.
-        """
-        # Stack time series data
-        context = torch.stack([torch.from_numpy(sample["context"]) for sample in batch])
-        future = torch.stack([torch.from_numpy(sample["future"]) for sample in batch])
-        freq = torch.stack([torch.tensor(sample["freq"]) for sample in batch])
-
-        # Collect patched texts for each batch item
-        patched_texts = []
-        for sample in batch:
-            patched_texts.append(sample["patched_texts"])
-
-        return {
-            "context": context.squeeze(-1),
-            "future": future.squeeze(-1),
-            "freq": freq.unsqueeze(-1),
-            "patched_texts": patched_texts,
-        }
 
     def train_epoch(self) -> float:
         """Train one epoch.
