@@ -12,204 +12,48 @@ multimodal-timesfm/
 │   ├── __init__.py
 │   ├── models/
 │   │   ├── __init__.py
-│   │   ├── multimodal_timesfm.py    # Main wrapper class
-│   │   └── text_encoder.py          # Text encoding components
+│   │   ├── multimodal_timesfm.py            # Main wrapper class
+│   │   ├── text_encoder.py                  # Text encoding components
+│   │   ├── multimodal_fusion.py             # Fusion mechanism
+│   │   └── multimodal_patched_decoder.py    # Patched decoder for multimodal
 │   ├── data/
 │   │   ├── __init__.py
-│   │   ├── time_mmd_dataset.py      # Time-MMD dataset loader
-│   │   └── preprocessing.py         # Data preprocessing utilities
+│   │   ├── time_mmd_dataset.py              # Time-MMD dataset loader
+│   │   └── preprocessing.py                 # Data preprocessing utilities
 │   ├── train/
 │   │   ├── __init__.py
-│   │   ├── trainer.py               # Training logic
-│   │   └── finetuner.py            # Fine-tuning specific code
-│   └── evaluation/
+│   │   └── trainer.py                       # Training logic
+│   └── utils/
 │       ├── __init__.py
-│       ├── evaluator.py             # Evaluation metrics
-│       └── ablation_study.py        # Ablation study implementation
+│       ├── collate.py                       # Data collation utilities
+│       ├── logging.py                       # Logging utilities
+│       ├── seed.py                          # Random seed utilities
+│       └── yaml.py                          # YAML configuration utilities
 ├── data/
-│   └── Time-MMD/                    # Time-MMD dataset submodule
-│       ├── numerical/               # Time series data by domain
-│       └── textual/                 # Text descriptions by domain
+│   └── Time-MMD/                            # Time-MMD dataset submodule
+│       ├── numerical/                       # Time series data by domain
+│       └── textual/                         # Text descriptions by domain
 ├── scripts/
-│   ├── validate_wrapper.py          # Wrapper class validation script
-│   ├── train.py                     # Main training script
-│   ├── evaluate.py                  # Evaluation script
-│   └── run_ablation.py              # Ablation study runner
+│   ├── train.py                             # Main training script
+│   └── evaluate.py                          # Evaluation script
 ├── configs/
-│   ├── base.yml                     # Base configuration
-│   ├── train.yml                    # Training parameters
-│   └── model.yml                    # Model architecture settings
+│   ├── training.yml                         # Training configuration
+│   ├── evaluation.yml                       # Evaluation configuration
+│   └── model.yml                            # Model architecture settings
 ├── tests/
 │   ├── __init__.py
-│   ├── test_multimodal_timesfm.py
 │   ├── test_text_encoder.py
 │   ├── test_time_mmd_dataset.py
 │   ├── test_preprocessing.py
 │   ├── test_trainer.py
-│   ├── test_finetuner.py
-│   ├── test_evaluator.py
-│   └── test_ablation_study.py
-├── .gitmodules                      # Git submodule configuration
-├── .python-version                  # Python 3.11
-├── pyproject.toml                   # uv configuration
+│   ├── test_multimodal_fusion.py
+│   └── test_multimodal_patched_decoder.py
+├── .gitmodules                              # Git submodule configuration
+├── .python-version                          # Python 3.11
+├── pyproject.toml                           # uv configuration
 ├── README.md
-└── CLAUDE.md                        # This file
+└── CLAUDE.md                                # This file
 ```
-
-## Development Roadmap
-
-### Phase 1: Project Setup and Basic Infrastructure
-
-1. **Initialize project structure**
-   - Set up uv project with Python 3.11.13
-   - Create basic directory structure
-   - Install TimesFM and dependencies
-2. **Create wrapper class skeleton**
-   - Implement `MultimodalTimesFM` wrapper class
-   - Initially delegate all functionality to underlying TimesFM model
-   - Define interfaces for multimodal input handling
-3. **Data pipeline setup**
-   - Add Time-MMD dataset as git submodule
-   - Implement Time-MMD dataset loader
-   - Create data preprocessing utilities
-   - Set up train/test split (70/30)
-4. **Validation of basic functionality**
-   - Test wrapper class with Time-MMD time series data
-   - Verify forward pass and gradient computation
-   - Validate training loop integration
-   - Ensure consistent behavior with original TimesFM
-   - Run baseline performance tests
-
-### Phase 2: Model Architecture Enhancement
-
-1. **Text encoding components**
-   - Implement text encoder (e.g., using sentence transformers)
-   - Design fusion mechanism for time series and text features
-   - Integrate text features into TimesFM architecture
-2. **Wrapper class enhancement**
-   - Extend wrapper to handle text inputs
-   - Implement forward pass with multimodal inputs
-   - Add training-specific methods
-
-### Phase 3: Training and Fine-tuning
-
-1. **Training pipeline**
-   - Implement training loop for multimodal inputs
-   - Set up checkpointing and logging
-   - Configure hyperparameters
-2. **Fine-tuning implementation**
-   - Fine-tune on 70% of Time-MMD dataset
-   - Implement curriculum learning if beneficial
-   - Monitor training metrics and convergence
-
-### Phase 4: Evaluation and Ablation Study
-
-1. **Evaluation framework**
-   - Implement evaluation metrics for time series forecasting
-   - Create comparison utilities
-2. **Ablation study**
-   - Train baseline TimesFM on time series data only
-   - Train multimodal version with text information
-   - Compare performance across various metrics
-   - Generate comprehensive comparison reports
-
-## Key Implementation Details
-
-### Dependencies
-
-- **timesfm**: Google's Time Series Foundation Model
-- **torch**: PyTorch for neural network operations
-
-### Model Architecture Implementation
-
-- **Text Encoder**: Implemented using sentence transformers (all-MiniLM-L6-v2) with configurable embedding dimensions
-- **Feature Fusion**: Addition-based fusion with Linear projection (text_dim -> ts_dim) + ReLU activation
-- **Architecture Integration**: Clean wrapper maintaining TimesFM compatibility with multimodal extensions
-- **Training Strategy**: Selective parameter training with freeze/unfreeze capabilities for TimesFM integration
-
-### Configuration Management
-
-Use YAML files to manage:
-
-- Model hyperparameters
-- Training configuration
-- Data preprocessing parameters
-- Evaluation settings
-
-### Testing Strategy
-
-- Unit tests for model components
-- Integration tests for data pipeline
-- End-to-end tests for training pipeline
-- Performance benchmarks
-
-## Expected Deliverables
-
-1. **Functional multimodal TimesFM wrapper class**
-2. **Complete training and evaluation pipeline**
-3. **Ablation study comparing:**
-   - TimesFM with time series only
-   - Multimodal TimesFM with text and time series
-4. **Performance metrics and analysis**
-5. **Documentation and reproducibility guidelines**
-
-## Success Criteria
-
-- [x] Wrapper class successfully extends TimesFM functionality
-- [x] Wrapper class validation passes with Time-MMD dataset
-- [x] Forward pass produces expected output shapes and ranges
-- [x] Training loop integrates smoothly with wrapper class
-- [x] Model can process both time series and text inputs
-- [x] Text encoder and fusion mechanisms implemented and tested
-- [x] Comprehensive preprocessing utilities for multimodal data
-- [x] Full test suite covering all multimodal components
-- [x] Addition-based fusion with TimesFM integration capabilities
-- [x] Parameter management for selective training
-- [x] Production-ready code with comprehensive documentation
-- [x] Time-MMD dataset integrated as git submodule
-- [ ] Training pipeline completes without errors
-- [ ] Ablation study shows meaningful performance comparison
-- [ ] Results demonstrate the value (or lack thereof) of text information
-
-## Next Steps
-
-**Phase 2: Model Architecture Enhancement** ✅ COMPLETED
-
-1. - [x] Implement text encoder using sentence transformers
-2. - [x] Design fusion mechanism for time series and text features
-3. - [x] Extend MultimodalTimesFM to handle text inputs
-4. - [x] Add multimodal forward pass functionality
-5. - [x] Create text preprocessing utilities
-6. - [x] Add tests for multimodal components
-
-**Phase 3: Training Pipeline**
-
-7. - [ ] Implement training loop for multimodal inputs
-8. - [ ] Set up checkpointing and logging
-9. - [ ] Configure hyperparameters for fine-tuning
-
-**Phase 4: Evaluation**
-
-10. - [ ] Implement evaluation metrics
-11. - [ ] Create ablation study framework
-12. - [ ] Generate performance comparison reports
-
-## Implementation Notes
-
-**Completed Infrastructure:**
-
-- Addition-based MultimodalFusion with TimesFM integration capabilities
-- Comprehensive input validation and error handling implemented
-- Streamlined preprocessing pipeline without unnecessary alignment/feature extraction
-- Time-MMD dataset integrated as git submodule for easy access
-- Type-safe implementation with mypy validation
-- Production-ready code with proper documentation
-
-**Training Considerations:**
-
-- Consider using mixed precision training for efficiency
-- Fusion layer parameters can be selectively trained via freeze/unfreeze methods
-- Keep detailed logs of hyperparameter choices and their impact
 
 ## Bash Commands
 
@@ -217,6 +61,8 @@ Use YAML files to manage:
 - `uv run ruff check`: Linting
 - `uv run ruff format`: Code formatting
 - `uv run pytest tests/ -v`: Run test suite
+- `PYTHONPATH=. uv run python scripts/train.py`: Train multimodal TimesFM model
+- `PYTHONPATH=. uv run python scripts/evaluate.py`: Evaluate trained models
 
 ## Data Access
 
