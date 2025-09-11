@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 
+import torch
 from timesfm import TimesFmCheckpoint, TimesFmHparams
 from timesfm.timesfm_torch import TimesFmTorch as TimesFm
 
@@ -34,18 +35,22 @@ class MultimodalTimesFM(TimesFm):  # type: ignore[misc]
         self,
         hparams: MultimodalTimesFmHparams,
         checkpoint: TimesFmCheckpoint,
+        device: torch.device | str | None = None,
     ) -> None:
         """Initializes MultimodalTimesFM wrapper.
 
         Args:
             hparams: Multimodal hyperparameters of the model.
             checkpoint: Checkpoint to load. checkpoint.version decides which TimesFM version to use.
+            device: Device to use for the model. If None, will auto-resolve the best available device.
         """
         # Initialize the parent TimesFM model
         super().__init__(hparams, checkpoint)
 
         # Initialize text encoder
-        self.text_encoder = TextEncoder(model_name=hparams.text_encoder_model, embedding_dim=hparams.text_embedding_dim)
+        self.text_encoder = TextEncoder(
+            model_name=hparams.text_encoder_model, embedding_dim=hparams.text_embedding_dim, device=device
+        )
 
         # Initialize fusion mechanism
         self.fusion = MultimodalFusion(

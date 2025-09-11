@@ -10,6 +10,7 @@ from timesfm.pytorch_patched_decoder import (
 
 from src.models.multimodal_fusion import MultimodalFusion
 from src.models.text_encoder import TextEncoder
+from src.utils.device import resolve_device
 
 
 @dataclass
@@ -45,23 +46,18 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
         - All transformer layers and output processing remain unchanged
     """
 
-    def __init__(self, config: MultimodalTimesFMConfig):
+    def __init__(self, config: MultimodalTimesFMConfig, device: torch.device | str | None = None):
         """Initialize MultimodalPatchedDecoder.
 
         Args:
             config: Multimodal configuration containing both TimesFM and text encoding parameters.
+            device: Device to use for the model. If None, will auto-resolve the best available device.
         """
         # Initialize parent class with base TimesFM config
         super().__init__(config)
 
         self.config = config
-
-        if torch.cuda.is_available():
-            self.device = "cuda"
-        elif torch.backends.mps.is_available():
-            self.device = "mps"
-        else:
-            self.device = "cpu"
+        self.device = resolve_device(device)
 
         # Initialize text encoder and fusion components
         self.text_encoder = TextEncoder(
