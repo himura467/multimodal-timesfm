@@ -12,6 +12,7 @@ from torch.utils.data import DataLoader
 import wandb
 from src.models.multimodal_patched_decoder import MultimodalPatchedDecoder
 from src.utils.collate import multimodal_collate_fn
+from src.utils.device import get_pin_memory, move_to_device, resolve_device
 from src.utils.logging import setup_logger
 
 
@@ -75,17 +76,7 @@ class MultimodalTrainer:
         self.max_grad_norm = max_grad_norm
 
         # Set up device
-        if isinstance(device, torch.device):
-            self.device = device
-        elif isinstance(device, str):
-            self.device = torch.device(device)
-        else:
-            if torch.cuda.is_available():
-                self.device = torch.device("cuda")
-            elif torch.backends.mps.is_available():
-                self.device = torch.device("mps")
-            else:
-                self.device = torch.device("cpu")
+        self.device = resolve_device(device)
 
         self.model.to(self.device)
 
@@ -96,7 +87,7 @@ class MultimodalTrainer:
             shuffle=True,
             num_workers=0,
             collate_fn=multimodal_collate_fn,
-            pin_memory=True if self.device.type == "cuda" else False,
+            pin_memory=get_pin_memory(self.device),
         )
         self.val_loader: DataLoader[dict[str, Any]] = DataLoader(
             val_dataset,  # type: ignore[arg-type]
@@ -104,7 +95,7 @@ class MultimodalTrainer:
             shuffle=False,
             num_workers=0,
             collate_fn=multimodal_collate_fn,
-            pin_memory=True if self.device.type == "cuda" else False,
+            pin_memory=get_pin_memory(self.device),
         )
 
         # Set up optimizer and scheduler
@@ -151,9 +142,13 @@ class MultimodalTrainer:
 
         for batch_idx, batch in enumerate(self.train_loader):
             # Move tensors to device
-            context = batch["context"].to(self.device)
-            future = batch["future"].to(self.device)
-            freq = batch["freq"].to(self.device)
+            batch_tensors = move_to_device(
+                {"context": batch["context"], "future": batch["future"], "freq": batch["freq"]},
+                self.device,
+            )
+            context = batch_tensors["context"]
+            future = batch_tensors["future"]
+            freq = batch_tensors["freq"]
             patched_texts = batch["patched_texts"]
 
             # Create input_padding tensor (zeros for now)
@@ -226,9 +221,13 @@ class MultimodalTrainer:
         with torch.no_grad():
             for batch in self.val_loader:
                 # Move tensors to device
-                context = batch["context"].to(self.device)
-                future = batch["future"].to(self.device)
-                freq = batch["freq"].to(self.device)
+                batch_tensors = move_to_device(
+                    {"context": batch["context"], "future": batch["future"], "freq": batch["freq"]},
+                    self.device,
+                )
+                context = batch_tensors["context"]
+                future = batch_tensors["future"]
+                freq = batch_tensors["freq"]
                 patched_texts = batch["patched_texts"]
 
                 # Create input_padding tensor (zeros for now)
@@ -287,7 +286,7 @@ class MultimodalTrainer:
         Args:
             checkpoint_path: Path to checkpoint file.
         """
-        checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        checkpoint = torch.load(checkpoint_path)
 
         self.model.load_state_dict(checkpoint["model_state_dict"])
         self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])

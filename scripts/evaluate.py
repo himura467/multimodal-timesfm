@@ -19,6 +19,7 @@ from tqdm import tqdm
 from src.data.time_mmd_dataset import TimeMmdDataset
 from src.models.multimodal_patched_decoder import MultimodalPatchedDecoder, MultimodalTimesFMConfig
 from src.utils.collate import multimodal_collate_fn
+from src.utils.device import get_pin_memory, move_to_device, resolve_device
 from src.utils.logging import get_logger, setup_logger
 from src.utils.seed import set_seed
 from src.utils.yaml import load_yaml
@@ -114,7 +115,9 @@ def create_original_timesfm_model(model_config: dict[str, Any]) -> PatchedTimeSe
     return model
 
 
-def load_multimodal_model(checkpoint_path: Path, model_config: dict[str, Any]) -> MultimodalPatchedDecoder:
+def load_multimodal_model(
+    checkpoint_path: Path, model_config: dict[str, Any], device: torch.device
+) -> MultimodalPatchedDecoder:
     """Load trained multimodal TimesFM model from checkpoint."""
     logger = get_logger()
 
@@ -139,7 +142,7 @@ def load_multimodal_model(checkpoint_path: Path, model_config: dict[str, Any]) -
     )
 
     # Create model
-    model = MultimodalPatchedDecoder(config)
+    model = MultimodalPatchedDecoder(config, device)
 
     # Load checkpoint
     logger.info(f"Loading multimodal model from {checkpoint_path}")
@@ -199,9 +202,12 @@ def evaluate_original_model(
 
     with torch.no_grad():
         for batch in tqdm(dataloader, desc="Original TimesFM"):
-            context = batch["context"].to(device)
-            future = batch["future"].to(device)
-            freq = batch["freq"].to(device)
+            batch_tensors = move_to_device(
+                {"context": batch["context"], "future": batch["future"], "freq": batch["freq"]}, device
+            )
+            context = batch_tensors["context"]
+            future = batch_tensors["future"]
+            freq = batch_tensors["freq"]
 
             # Create input_padding tensor (zeros for now)
             input_padding = torch.zeros_like(context)
@@ -246,9 +252,12 @@ def evaluate_multimodal_model(
 
     with torch.no_grad():
         for batch in tqdm(dataloader, desc="Multimodal TimesFM"):
-            context = batch["context"].to(device)
-            future = batch["future"].to(device)
-            freq = batch["freq"].to(device)
+            batch_tensors = move_to_device(
+                {"context": batch["context"], "future": batch["future"], "freq": batch["freq"]}, device
+            )
+            context = batch_tensors["context"]
+            future = batch_tensors["future"]
+            freq = batch_tensors["freq"]
             patched_texts = batch["patched_texts"]
 
             # Create input_padding tensor (zeros for now)
@@ -295,12 +304,7 @@ def main() -> int:
     logger.info(f"Domain: {eval_config['data']['domain']}")
 
     # Setup device
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-    elif torch.backends.mps.is_available():
-        device = torch.device("mps")
-    else:
-        device = torch.device("cpu")
+    device = resolve_device()
     logger.info(f"Using device: {device}")
 
     # Create dataset using config values
@@ -316,13 +320,13 @@ def main() -> int:
         shuffle=False,
         num_workers=0,
         collate_fn=multimodal_collate_fn,
-        pin_memory=True if device.type == "cuda" else False,
+        pin_memory=get_pin_memory(device),
     )
 
     # Load models
     logger.info("Loading models...")
     original_model = create_original_timesfm_model(model_config)
-    multimodal_model = load_multimodal_model(Path(args.multimodal_checkpoint), model_config)
+    multimodal_model = load_multimodal_model(Path(args.multimodal_checkpoint), model_config, device)
 
     # Evaluate models
     logger.info("Running evaluations...")

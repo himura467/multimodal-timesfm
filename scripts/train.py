@@ -12,6 +12,7 @@ from torch.utils.data import ConcatDataset
 from src.data.time_mmd_dataset import TimeMmdDataset
 from src.models.multimodal_patched_decoder import MultimodalPatchedDecoder, MultimodalTimesFMConfig
 from src.train.trainer import MultimodalTrainer
+from src.utils.device import resolve_device
 from src.utils.logging import get_logger, setup_logger
 from src.utils.seed import set_seed
 from src.utils.yaml import load_yaml
@@ -70,7 +71,7 @@ def create_datasets(
     return combined_train, combined_val
 
 
-def create_model(model_config: dict[str, Any]) -> MultimodalPatchedDecoder:
+def create_model(model_config: dict[str, Any], device: torch.device) -> MultimodalPatchedDecoder:
     """Create multimodal model from configuration and load pretrained TimesFM weights."""
     logger = get_logger()
 
@@ -95,7 +96,7 @@ def create_model(model_config: dict[str, Any]) -> MultimodalPatchedDecoder:
     )
 
     # Create multimodal model
-    model = MultimodalPatchedDecoder(config)
+    model = MultimodalPatchedDecoder(config, device)
 
     # Load pretrained TimesFM weights
     repo_id = "google/timesfm-2.0-500m-pytorch"
@@ -136,26 +137,14 @@ def train_model(
     train_dataset: ConcatDataset[dict[str, Any]],
     val_dataset: ConcatDataset[dict[str, Any]],
     training_config: dict[str, Any],
+    device: torch.device,
 ) -> Path:
     """Train a model and return the path to the best checkpoint."""
 
     # Setup training configuration
-    hardware_config = training_config["hardware"]
     train_config = training_config["train"]
     log_config = training_config["log"]
     checkpoint_config = training_config["checkpoint"]
-
-    # Setup device
-    device = hardware_config["device"]
-    if device is None:
-        if torch.cuda.is_available():
-            device = torch.device("cuda")
-        elif torch.backends.mps.is_available():
-            device = torch.device("mps")
-        else:
-            device = torch.device("cpu")
-    else:
-        device = torch.device(device)
 
     # Create trainer
     trainer = MultimodalTrainer(
@@ -251,7 +240,12 @@ def main() -> int:
     logger.info("Training multimodal TimesFM model")
     logger.info("=" * 50)
 
-    multimodal_model = create_model(model_config)
+    # Setup device for model creation
+    hardware_config = training_config["hardware"]
+    device = resolve_device(hardware_config["device"])
+    logger.info(f"Using device: {device}")
+
+    multimodal_model = create_model(model_config, device)
 
     try:
         checkpoint_path = train_model(
@@ -259,6 +253,7 @@ def main() -> int:
             train_dataset=train_dataset,
             val_dataset=val_dataset,
             training_config=training_config,
+            device=device,
         )
         logger.info(f"Multimodal model training completed. Checkpoint: {checkpoint_path}")
     except Exception as e:

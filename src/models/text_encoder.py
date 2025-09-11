@@ -5,6 +5,8 @@ import torch
 import torch.nn as nn
 from sentence_transformers import SentenceTransformer
 
+from src.utils.device import resolve_device
+
 
 class TextEncoder(nn.Module):
     """Text encoder using sentence transformers for generating text embeddings.
@@ -14,27 +16,19 @@ class TextEncoder(nn.Module):
     """
 
     def __init__(
-        self, model_name: str = "all-MiniLM-L6-v2", embedding_dim: int = 384, device: str | None = None
+        self, model_name: str = "all-MiniLM-L6-v2", embedding_dim: int = 384, device: torch.device | str | None = None
     ) -> None:
         """Initialize the text encoder.
 
         Args:
             model_name: Name of the sentence transformer model to use.
             embedding_dim: Dimension of the output embeddings.
-            device: Device to use for computations. If None, uses CUDA if available, then MPS, then CPU.
+            device: Device to use for computations. Can be str, torch.device, or None for auto-detection.
         """
         super().__init__()
-        self.sentence_transformer = SentenceTransformer(model_name, device=device)
+        self.device = resolve_device(device)
+        self.sentence_transformer = SentenceTransformer(model_name, device=self.device.type)
         self.embedding_dim = embedding_dim
-
-        if device is None:
-            if torch.cuda.is_available():
-                device = "cuda"
-            elif torch.backends.mps.is_available():
-                device = "mps"
-            else:
-                device = "cpu"
-        self.device = torch.device(device)
 
         # Get the actual embedding dimension from the model
         actual_dim = self.sentence_transformer.get_sentence_embedding_dimension()
