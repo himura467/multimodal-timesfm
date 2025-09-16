@@ -9,7 +9,7 @@ from timesfm.pytorch_patched_decoder import (
 )
 
 from src.models.multimodal_fusion import MultimodalFusion
-from src.models.text_encoder import TextEncoder
+from src.models.text_encoder import EnglishTextEncoder
 from src.utils.device import resolve_device
 
 
@@ -60,7 +60,7 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
         self.device = resolve_device(device)
 
         # Initialize text encoder and fusion components
-        self.text_encoder = TextEncoder(
+        self.text_encoder = EnglishTextEncoder(
             model_name=config.text_encoder_model, embedding_dim=config.text_embedding_dim, device=self.device
         )
         self.multimodal_fusion = MultimodalFusion(
