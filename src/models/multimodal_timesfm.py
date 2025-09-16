@@ -7,7 +7,7 @@ from timesfm import TimesFmCheckpoint, TimesFmHparams
 from timesfm.timesfm_torch import TimesFmTorch as TimesFm
 
 from src.models.multimodal_fusion import MultimodalFusion
-from src.models.text_encoder import TextEncoder
+from src.models.text_encoder import EnglishTextEncoder
 
 
 @dataclass(kw_only=True)
@@ -48,7 +48,7 @@ class MultimodalTimesFM(TimesFm):  # type: ignore[misc]
         super().__init__(hparams, checkpoint)
 
         # Initialize text encoder
-        self.text_encoder = TextEncoder(
+        self.text_encoder = EnglishTextEncoder(
             model_name=hparams.text_encoder_model, embedding_dim=hparams.text_embedding_dim, device=device
         )
 
