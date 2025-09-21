@@ -5,10 +5,16 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "pandas>=2.3.2",
+    "protobuf>=6.32.1",
+    "pyyaml>=6.0.2",
+    "safetensors>=0.6.2",
     "sentence-transformers>=5.1.0",
     "sentencepiece>=0.2.1",
     "timesfm[torch] @ git+https://github.com/google-research/timesfm.git",
     "torch>=2.8.0",
+    "tqdm>=4.67.1",
+    "wandb>=0.22.0",
 ]
 
 [dependency-groups]
