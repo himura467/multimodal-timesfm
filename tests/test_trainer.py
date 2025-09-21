@@ -83,8 +83,7 @@ class TestMultimodalTrainer:
             tolerance=float(config_dict["timesfm"]["tolerance"]),
             dtype=config_dict["timesfm"]["dtype"],
             use_positional_embedding=config_dict["timesfm"]["use_positional_embedding"],
-            text_encoder_model=config_dict["text_encoder"]["model_name"],
-            text_embedding_dim=config_dict["text_encoder"]["embedding_dim"],
+            text_encoder_type=config_dict["text_encoder"]["text_encoder_type"],
         )
 
     @pytest.fixture(scope="session")
