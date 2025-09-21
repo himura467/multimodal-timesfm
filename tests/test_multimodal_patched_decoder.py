@@ -1,9 +1,12 @@
 """Tests for MultimodalPatchedDecoder."""
 
+from typing import cast
+
 import pytest
 import torch
 
 from src.models.multimodal_patched_decoder import MultimodalPatchedDecoder, MultimodalTimesFMConfig
+from src.models.text_encoder import EnglishTextEncoder, JapaneseTextEncoder
 
 
 class TestMultimodalTimesFMConfig:
@@ -288,7 +291,8 @@ class TestMultimodalPatchedDecoder:
     def test_freeze_unfreeze_all_parameters(self, decoder: MultimodalPatchedDecoder) -> None:
         """Test freezing and unfreezing all parameters."""
         # Initially unfrozen - check a few key parameters
-        text_encoder_param = next(decoder.text_encoder.sentence_transformer.parameters())
+        text_encoder = cast(EnglishTextEncoder | JapaneseTextEncoder, decoder.text_encoder)
+        text_encoder_param = next(text_encoder.sentence_transformer.parameters())
         assert text_encoder_param.requires_grad
         assert decoder.multimodal_fusion.text_projection.weight.requires_grad
         assert decoder.multimodal_fusion.text_projection.bias.requires_grad
@@ -328,7 +332,8 @@ class TestMultimodalPatchedDecoder:
     def test_freeze_unfreeze_text_components(self, decoder: MultimodalPatchedDecoder) -> None:
         """Test freezing and unfreezing text components."""
         # Initially unfrozen - check actual parameters
-        text_encoder_param = next(decoder.text_encoder.sentence_transformer.parameters())
+        text_encoder = cast(EnglishTextEncoder | JapaneseTextEncoder, decoder.text_encoder)
+        text_encoder_param = next(text_encoder.sentence_transformer.parameters())
         assert text_encoder_param.requires_grad
         assert decoder.multimodal_fusion.text_projection.weight.requires_grad
         assert decoder.multimodal_fusion.text_projection.bias.requires_grad
