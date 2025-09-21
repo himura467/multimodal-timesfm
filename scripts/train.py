@@ -7,6 +7,7 @@ from typing import Any
 
 import torch
 from huggingface_hub import snapshot_download
+from safetensors.torch import load_file
 from torch.utils.data import ConcatDataset
 
 from src.data.time_mmd_dataset import TimeMmdDataset
@@ -98,13 +99,13 @@ def create_model(model_config: dict[str, Any], device: torch.device) -> Multimod
     model = MultimodalPatchedDecoder(config, device)
 
     # Load pretrained TimesFM weights
-    repo_id = "google/timesfm-2.0-500m-pytorch"
+    repo_id = "google/timesfm-2.5-200m-pytorch"
     logger.info(f"Loading pretrained TimesFM weights from {repo_id}")
 
     try:
         model_dir = Path(snapshot_download(repo_id))
-        checkpoint_path = model_dir / "torch_model.ckpt"
-        pretrained_weights = torch.load(checkpoint_path, weights_only=True)
+        checkpoint_path = model_dir / "model.safetensors"  # Updated for safetensors format
+        pretrained_weights = load_file(checkpoint_path)
 
         # Load weights into the TimesFM components (excluding text components)
         model_state_dict = model.state_dict()
