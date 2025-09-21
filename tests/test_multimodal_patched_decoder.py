@@ -17,8 +17,7 @@ class TestMultimodalTimesFMConfig:
         config = MultimodalTimesFMConfig()
 
         # Test multimodal-specific defaults
-        assert config.text_encoder_model == "all-MiniLM-L6-v2"
-        assert config.text_embedding_dim == 384
+        assert config.text_encoder_type == "english"
 
         # Test inherited TimesFM defaults
         assert config.num_layers == 20
@@ -26,13 +25,11 @@ class TestMultimodalTimesFMConfig:
     def test_custom_config(self) -> None:
         """Test custom configuration values."""
         config = MultimodalTimesFMConfig(
-            text_encoder_model="sentence-transformers/all-MiniLM-L12-v2",
-            text_embedding_dim=512,
+            text_encoder_type="japanese",
             num_layers=50,
         )
 
-        assert config.text_encoder_model == "sentence-transformers/all-MiniLM-L12-v2"
-        assert config.text_embedding_dim == 512
+        assert config.text_encoder_type == "japanese"
         assert config.num_layers == 50
 
 
@@ -139,7 +136,7 @@ class TestMultimodalPatchedDecoder:
         with torch.no_grad():
             text_features = decoder._encode_patch_text_features(text_descriptions, target_shape, device)
 
-        expected_shape = (2, 8, decoder.config.text_embedding_dim)
+        expected_shape = (2, 8, decoder.text_encoder.embedding_dim)
         assert text_features.shape == expected_shape
         assert not torch.isnan(text_features).any()
 
