@@ -137,8 +137,7 @@ def load_multimodal_model(
         tolerance=float(model_config["timesfm"]["tolerance"]),
         dtype=model_config["timesfm"]["dtype"],
         use_positional_embedding=model_config["timesfm"]["use_positional_embedding"],
-        text_encoder_model=model_config["text_encoder"]["model_name"],
-        text_embedding_dim=model_config["text_encoder"]["embedding_dim"],
+        text_encoder_type=model_config["text_encoder"]["text_encoder_type"],
     )
 
     # Create model

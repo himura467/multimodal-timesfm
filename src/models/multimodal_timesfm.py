@@ -1,13 +1,14 @@
 """MultimodalTimesFM wrapper class that extends TimesFM to support multimodal inputs."""
 
 from dataclasses import dataclass
+from typing import Literal
 
 import torch
 from timesfm import TimesFmCheckpoint, TimesFmHparams
 from timesfm.timesfm_torch import TimesFmTorch as TimesFm
 
 from src.models.multimodal_fusion import MultimodalFusion
-from src.models.text_encoder import EnglishTextEncoder
+from src.models.text_encoder import EnglishTextEncoder, JapaneseTextEncoder, TextEncoderBase
 
 
 @dataclass(kw_only=True)
@@ -15,12 +16,10 @@ class MultimodalTimesFmHparams(TimesFmHparams):  # type: ignore[misc]
     """Hyperparameters for MultimodalTimesFM that extend TimesFmHparams.
 
     Attributes:
-        text_encoder_model: Name of the sentence transformer model for text encoding.
-        text_embedding_dim: Dimension of text embeddings.
+        text_encoder_type: Type of text encoder to use ('english' or 'japanese').
     """
 
-    text_encoder_model: str = "all-MiniLM-L6-v2"
-    text_embedding_dim: int = 384
+    text_encoder_type: Literal["english", "japanese"] = "english"
 
 
 class MultimodalTimesFM(TimesFm):  # type: ignore[misc]
@@ -47,13 +46,19 @@ class MultimodalTimesFM(TimesFm):  # type: ignore[misc]
         # Initialize the parent TimesFM model
         super().__init__(hparams, checkpoint)
 
-        # Initialize text encoder
-        self.text_encoder = EnglishTextEncoder(
-            model_name=hparams.text_encoder_model, embedding_dim=hparams.text_embedding_dim, device=device
-        )
+        # Initialize text encoder based on type
+        self.text_encoder: TextEncoderBase
+        if hparams.text_encoder_type == "english":
+            self.text_encoder = EnglishTextEncoder(device=device)
+        elif hparams.text_encoder_type == "japanese":
+            self.text_encoder = JapaneseTextEncoder(device=device)
+        else:
+            raise ValueError(
+                f"Unsupported text encoder type: {hparams.text_encoder_type}. Must be 'english' or 'japanese'."
+            )
 
         # Initialize fusion mechanism
         self.fusion = MultimodalFusion(
             ts_feature_dim=hparams.model_dims,
-            text_feature_dim=hparams.text_embedding_dim,
+            text_feature_dim=self.text_encoder.embedding_dim,
         )

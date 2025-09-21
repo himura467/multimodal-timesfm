@@ -1,6 +1,7 @@
 """Multimodal version of TimesFM's patched decoder that supports text inputs."""
 
 from dataclasses import dataclass
+from typing import Literal
 
 import torch
 from timesfm.pytorch_patched_decoder import (
@@ -9,7 +10,7 @@ from timesfm.pytorch_patched_decoder import (
 )
 
 from src.models.multimodal_fusion import MultimodalFusion
-from src.models.text_encoder import EnglishTextEncoder
+from src.models.text_encoder import EnglishTextEncoder, JapaneseTextEncoder, TextEncoderBase
 from src.utils.device import resolve_device
 
 
@@ -18,12 +19,10 @@ class MultimodalTimesFMConfig(TimesFMConfig):  # type: ignore[misc]
     """Config for initializing MultimodalPatchedDecoder that extends TimesFMConfig.
 
     Attributes:
-        text_encoder_model: Name of the sentence transformer model for text encoding.
-        text_embedding_dim: Dimension of text embeddings.
+        text_encoder_type: Type of text encoder to use ('english' or 'japanese').
     """
 
-    text_encoder_model: str = "all-MiniLM-L6-v2"
-    text_embedding_dim: int = 384
+    text_encoder_type: Literal["english", "japanese"] = "english"
 
 
 class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
@@ -59,13 +58,20 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
         self.config = config
         self.device = resolve_device(device)
 
-        # Initialize text encoder and fusion components
-        self.text_encoder = EnglishTextEncoder(
-            model_name=config.text_encoder_model, embedding_dim=config.text_embedding_dim, device=self.device
-        )
+        # Initialize text encoder based on type
+        self.text_encoder: TextEncoderBase
+        if config.text_encoder_type == "english":
+            self.text_encoder = EnglishTextEncoder(device=self.device)
+        elif config.text_encoder_type == "japanese":
+            self.text_encoder = JapaneseTextEncoder(device=self.device)
+        else:
+            raise ValueError(
+                f"Unsupported text encoder type: {config.text_encoder_type}. Must be 'english' or 'japanese'."
+            )
+
         self.multimodal_fusion = MultimodalFusion(
             ts_feature_dim=config.hidden_size,
-            text_feature_dim=config.text_embedding_dim,
+            text_feature_dim=self.text_encoder.embedding_dim,
         )
 
         # Move the entire decoder to the selected device
@@ -164,10 +170,10 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
             all_embeddings = self.text_encoder(all_texts)  # Shape: (batch_size * num_patches, text_embedding_dim)
         else:
             # Handle empty case
-            all_embeddings = torch.zeros((batch_size * num_patches, self.config.text_embedding_dim), device=device)
+            all_embeddings = torch.zeros((batch_size * num_patches, self.text_encoder.embedding_dim), device=device)
 
         # Reshape to (batch_size, num_patches, text_embedding_dim)
-        text_embeddings: torch.Tensor = all_embeddings.reshape(batch_size, num_patches, self.config.text_embedding_dim)
+        text_embeddings: torch.Tensor = all_embeddings.reshape(batch_size, num_patches, self.text_encoder.embedding_dim)
 
         return text_embeddings
 
