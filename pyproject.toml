@@ -7,7 +7,7 @@ requires-python = ">=3.11"
 dependencies = [
     "sentence-transformers>=5.1.0",
     "sentencepiece>=0.2.1",
-    "timesfm[torch]>=1.3.0",
+    "timesfm[torch] @ git+https://github.com/google-research/timesfm.git",
     "torch>=2.8.0",
 ]
 
