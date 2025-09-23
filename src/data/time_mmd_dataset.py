@@ -52,8 +52,8 @@ class TimeMmdDataset(MultimodalDatasetBase):
             horizon_len: Length of forecasting horizon.
                         horizon_len must be an integer multiple of patch_len.
         """
-        super().__init__(data_dir, split_ratio, split, patch_len, context_len, horizon_len)
         self.domain = domain
+        super().__init__(data_dir, split_ratio, split, patch_len, context_len, horizon_len)
 
     def _load_data(self) -> None:
         """Loads Time-MMD dataset from files."""
