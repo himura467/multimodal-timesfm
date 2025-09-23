@@ -1,14 +1,15 @@
 """Time-MMD dataset loader for multimodal time series forecasting."""
 
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
 import numpy as np
 import pandas as pd
-from torch.utils.data import Dataset
+
+from src.data.multimodal_dataset import MultimodalDatasetBase
 
 
-class TimeMmdDataset(Dataset[dict[str, Any]]):
+class TimeMmdDataset(MultimodalDatasetBase):
     """Dataset loader for Time-MMD dataset with time series and text data.
 
     This class loads multimodal time series data from the Time-MMD dataset structure,
@@ -51,23 +52,8 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
             horizon_len: Length of forecasting horizon.
                         horizon_len must be an integer multiple of patch_len.
         """
-        # Validate that context_len is an integer multiple of patch_len
-        if context_len % patch_len != 0:
-            raise ValueError(f"context_len ({context_len}) must be an integer multiple of patch_len ({patch_len})")
-
-        # Validate that horizon_len is an integer multiple of patch_len
-        if horizon_len % patch_len != 0:
-            raise ValueError(f"horizon_len ({horizon_len}) must be an integer multiple of patch_len ({patch_len})")
-
-        self.data_dir = data_dir
+        super().__init__(data_dir, split_ratio, split, patch_len, context_len, horizon_len)
         self.domain = domain
-        self.split_ratio = split_ratio
-        self.split = split
-        self.patch_len = patch_len
-        self.context_len = context_len
-        self.horizon_len = horizon_len
-        self.data: list[dict[str, Any]] = []
-        self._load_data()
 
     def _load_data(self) -> None:
         """Loads Time-MMD dataset from files."""
@@ -291,18 +277,3 @@ class TimeMmdDataset(Dataset[dict[str, Any]]):
             patches.append(patch_reports)
 
         return patches
-
-    def __getitem__(self, idx: int) -> dict[str, Any]:
-        """Gets dataset item by index.
-
-        Args:
-            idx: Item index.
-
-        Returns:
-            Dictionary containing context, future, freq, text, and metadata.
-        """
-        return self.data[idx]
-
-    def __len__(self) -> int:
-        """Returns dataset size."""
-        return len(self.data)
