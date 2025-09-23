@@ -1,28 +1,24 @@
 # Model architecture configuration for multimodal TimesFM
 
-# Base TimesFM configuration
+# Base TimesFM 2.5 configuration
 timesfm:
-  # TimesFmHparams
-  context_len: 128
-  horizon_len: 128
+  # ForecastConfig parameters
+  max_context: 1024
+  max_horizon: 256
+  normalize_inputs: true
+  per_core_batch_size: 32
+
+  # TimesFM 2.5 model parameters (matches TimesFM_2p5_200M_Definition)
+  context_limit: 16384
   input_patch_len: 32
   output_patch_len: 128
-  num_layers: 50
+  output_quantile_len: 1024
+  num_layers: 20 # Updated for TimesFM 2.5
   num_heads: 16
   model_dims: 1280
-  per_core_batch_size: 32
-  backend: "gpu"
   quantiles: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-  use_positional_embedding: true
-  point_forecast_mode: "median"
-
-  # TimesFMConfig
-  num_kv_heads: 16
-  rms_norm_eps: 1e-6
-  pad_val: 1123581321.0
-  tolerance: 1e-6
-  dtype: "bfloat32"
+  decode_index: 5
 
 # Text encoder configuration
 text_encoder:
-  text_encoder_type: "english"  # "english" or "japanese"
+  text_encoder_type: "english" # "english" or "japanese"
