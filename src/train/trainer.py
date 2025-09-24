@@ -8,7 +8,7 @@ import torch.nn as nn
 import wandb
 from torch.optim import AdamW
 from torch.types import FileLike
-from torch.utils.data import DataLoader
+from torch.utils.data import ConcatDataset, DataLoader
 
 from src.data.multimodal_dataset import MultimodalDatasetBase
 from src.models.multimodal_patched_decoder import MultimodalPatchedDecoder
@@ -31,8 +31,8 @@ class MultimodalTrainer:
     def __init__(
         self,
         model: MultimodalPatchedDecoder,
-        train_dataset: MultimodalDatasetBase,
-        val_dataset: MultimodalDatasetBase,
+        train_dataset: MultimodalDatasetBase | ConcatDataset[dict[str, Any]],
+        val_dataset: MultimodalDatasetBase | ConcatDataset[dict[str, Any]],
         batch_size: int = 8,
         gradient_accumulation_steps: int = 4,
         max_grad_norm: float = 1.0,

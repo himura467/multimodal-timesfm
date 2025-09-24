@@ -8,31 +8,41 @@ from unittest.mock import Mock, patch
 import numpy as np
 import pytest
 import torch
-from torch.utils.data import Dataset
 
 from src.configs import ModelConfig
+from src.data.multimodal_dataset import MultimodalDatasetBase
 from src.models.multimodal_patched_decoder import MultimodalPatchedDecoder, MultimodalTimesFMConfig
 from src.train.trainer import MultimodalTrainer
 
 
-class MockTimeMmdDataset(Dataset[dict[str, Any]]):
+class MockMultimodalDataset(MultimodalDatasetBase):
     """Mock dataset for testing training loop."""
 
     def __init__(self, size: int = 100, context_len: int = 512, horizon_len: int = 128):
         self.size = size
-        self.patch_len = 32
-        self.context_len = context_len
-        self.horizon_len = horizon_len
+
+        # Initialize base class - will call _load_data()
+        super().__init__(
+            data_dir=Path(tempfile.mkdtemp()),
+            split_ratio=0.8,
+            split="train",
+            patch_len=32,
+            context_len=context_len,
+            horizon_len=horizon_len,
+        )
+
+    def _load_data(self) -> None:
+        """Load synthetic data."""
 
         # Generate synthetic data
         self.data = []
-        for i in range(size):
+        for i in range(self.size):
             # Generate synthetic time series
-            context = np.random.randn(context_len, 1).astype(np.float32)
-            future = np.random.randn(horizon_len, 1).astype(np.float32)
+            context = np.random.randn(self.context_len, 1).astype(np.float32)
+            future = np.random.randn(self.horizon_len, 1).astype(np.float32)
 
             # Generate mock text patches
-            num_patches = context_len // self.patch_len
+            num_patches = self.context_len // self.patch_len
             patched_texts = []
             for j in range(num_patches):
                 patch_texts = [f"Sample {i} patch {j} text description"]
@@ -85,14 +95,14 @@ class TestMultimodalTrainer:
         )
 
     @pytest.fixture(scope="session")
-    def mock_datasets(self) -> tuple[MockTimeMmdDataset, MockTimeMmdDataset]:
+    def mock_datasets(self) -> tuple[MockMultimodalDataset, MockMultimodalDataset]:
         """Create mock training and validation datasets."""
         # Set seeds for reproducible test data
         torch.manual_seed(42)
         np.random.seed(42)
 
-        train_dataset = MockTimeMmdDataset(size=10, context_len=128, horizon_len=128)
-        val_dataset = MockTimeMmdDataset(size=5, context_len=128, horizon_len=128)
+        train_dataset = MockMultimodalDataset(size=10, context_len=128, horizon_len=128)
+        val_dataset = MockMultimodalDataset(size=5, context_len=128, horizon_len=128)
         return train_dataset, val_dataset
 
     @pytest.fixture(scope="session")
@@ -120,7 +130,7 @@ class TestMultimodalTrainer:
     def test_trainer_initialization(
         self,
         model: MultimodalPatchedDecoder,
-        mock_datasets: tuple[MockTimeMmdDataset, MockTimeMmdDataset],
+        mock_datasets: tuple[MockMultimodalDataset, MockMultimodalDataset],
         temp_dirs: tuple[Path, Path],
     ) -> None:
         """Test trainer initialization."""
@@ -145,7 +155,7 @@ class TestMultimodalTrainer:
     def test_forward_pass(
         self,
         model: MultimodalPatchedDecoder,
-        mock_datasets: tuple[MockTimeMmdDataset, MockTimeMmdDataset],
+        mock_datasets: tuple[MockMultimodalDataset, MockMultimodalDataset],
         temp_dirs: tuple[Path, Path],
     ) -> None:
         """Test single forward pass through the model."""
@@ -196,7 +206,7 @@ class TestMultimodalTrainer:
     def test_training_loop(
         self,
         model: MultimodalPatchedDecoder,
-        mock_datasets: tuple[MockTimeMmdDataset, MockTimeMmdDataset],
+        mock_datasets: tuple[MockMultimodalDataset, MockMultimodalDataset],
         temp_dirs: tuple[Path, Path],
     ) -> None:
         """Test training loop execution."""
@@ -240,7 +250,7 @@ class TestMultimodalTrainer:
     def test_checkpoint_loading(
         self,
         model: MultimodalPatchedDecoder,
-        mock_datasets: tuple[MockTimeMmdDataset, MockTimeMmdDataset],
+        mock_datasets: tuple[MockMultimodalDataset, MockMultimodalDataset],
         temp_dirs: tuple[Path, Path],
     ) -> None:
         """Test checkpoint saving and loading."""
