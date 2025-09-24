@@ -9,13 +9,13 @@ import torch
 from huggingface_hub import snapshot_download
 from torch.utils.data import ConcatDataset
 
+from src.configs import ModelConfig, TrainingConfig
 from src.data.time_mmd_dataset import TimeMmdDataset
 from src.models.multimodal_patched_decoder import MultimodalPatchedDecoder, MultimodalTimesFMConfig
 from src.train.trainer import MultimodalTrainer
 from src.utils.device import resolve_device
 from src.utils.logging import get_logger, setup_logger
 from src.utils.seed import set_seed
-from src.utils.yaml import load_yaml
 
 
 def create_datasets(
@@ -71,27 +71,27 @@ def create_datasets(
     return combined_train, combined_val
 
 
-def create_model(model_config: dict[str, Any], device: torch.device) -> MultimodalPatchedDecoder:
+def create_model(model_config: ModelConfig, device: torch.device) -> MultimodalPatchedDecoder:
     """Create multimodal model from configuration and load pretrained TimesFM weights."""
     logger = get_logger()
 
     # Create multimodal config
     config = MultimodalTimesFMConfig(
-        num_layers=model_config["timesfm"]["num_layers"],
-        num_heads=model_config["timesfm"]["num_heads"],
-        num_kv_heads=model_config["timesfm"]["num_kv_heads"],
-        hidden_size=model_config["timesfm"]["model_dims"],
-        intermediate_size=model_config["timesfm"]["model_dims"],
-        head_dim=model_config["timesfm"]["model_dims"] // model_config["timesfm"]["num_heads"],
-        rms_norm_eps=float(model_config["timesfm"]["rms_norm_eps"]),
-        patch_len=model_config["timesfm"]["input_patch_len"],
-        horizon_len=model_config["timesfm"]["output_patch_len"],
-        quantiles=model_config["timesfm"]["quantiles"],
-        pad_val=float(model_config["timesfm"]["pad_val"]),
-        tolerance=float(model_config["timesfm"]["tolerance"]),
-        dtype=model_config["timesfm"]["dtype"],
-        use_positional_embedding=model_config["timesfm"]["use_positional_embedding"],
-        text_encoder_type=model_config["text_encoder"]["text_encoder_type"],
+        num_layers=model_config.timesfm.num_layers,
+        num_heads=model_config.timesfm.num_heads,
+        num_kv_heads=model_config.timesfm.num_kv_heads,
+        hidden_size=model_config.timesfm.model_dims,
+        intermediate_size=model_config.timesfm.model_dims,
+        head_dim=model_config.timesfm.model_dims // model_config.timesfm.num_heads,
+        rms_norm_eps=model_config.timesfm.rms_norm_eps,
+        patch_len=model_config.timesfm.input_patch_len,
+        horizon_len=model_config.timesfm.output_patch_len,
+        quantiles=model_config.timesfm.quantiles,
+        pad_val=model_config.timesfm.pad_val,
+        tolerance=model_config.timesfm.tolerance,
+        dtype=model_config.timesfm.dtype,
+        use_positional_embedding=model_config.timesfm.use_positional_embedding,
+        text_encoder_type=model_config.text_encoder.text_encoder_type,
     )
 
     # Create multimodal model
@@ -135,30 +135,25 @@ def train_model(
     model: MultimodalPatchedDecoder,
     train_dataset: ConcatDataset[dict[str, Any]],
     val_dataset: ConcatDataset[dict[str, Any]],
-    training_config: dict[str, Any],
+    training_config: TrainingConfig,
     device: torch.device,
 ) -> Path:
     """Train a model and return the path to the best checkpoint."""
-
-    # Setup training configuration
-    train_config = training_config["train"]
-    log_config = training_config["log"]
-    checkpoint_config = training_config["checkpoint"]
 
     # Create trainer
     trainer = MultimodalTrainer(
         model=model,
         train_dataset=train_dataset,
         val_dataset=val_dataset,
-        batch_size=train_config["batch_size"],
-        gradient_accumulation_steps=train_config["gradient_accumulation_steps"],
-        max_grad_norm=float(train_config["max_grad_norm"]),
+        batch_size=training_config.runner.batch_size,
+        gradient_accumulation_steps=training_config.runner.gradient_accumulation_steps,
+        max_grad_norm=training_config.runner.max_grad_norm,
         device=device,
-        learning_rate=float(train_config["learning_rate"]),
-        weight_decay=float(train_config["weight_decay"]),
-        log_dir=Path(log_config["save_dir"]),
-        checkpoint_dir=Path(checkpoint_config["save_dir"]),
-        wandb_run_name=train_config["wandb_run_name"],
+        learning_rate=training_config.runner.learning_rate,
+        weight_decay=training_config.runner.weight_decay,
+        log_dir=Path(training_config.log.save_dir),
+        checkpoint_dir=Path(training_config.checkpoint.save_dir),
+        wandb_run_name=training_config.runner.wandb_run_name,
     )
 
     # Setup logger
@@ -168,12 +163,12 @@ def train_model(
     # Only train fusion
     trainer.freeze_pretrained_parameters()
 
-    epochs = train_config["num_epochs"]
+    epochs = training_config.runner.num_epochs
     logger.info(f"Training fusion components only for {epochs} epochs (TimesFM and text encoder frozen)")
 
     trainer.train(
         num_epochs=epochs,
-        save_every=checkpoint_config["save_frequency"],
+        save_every=training_config.checkpoint.save_frequency,
     )
 
     # Return path to best checkpoint
@@ -207,16 +202,15 @@ def main() -> int:
     args = parser.parse_args()
 
     # Load configurations
-    model_config = load_yaml(Path(args.model_config))
-    training_config = load_yaml(Path(args.training_config))
+    model_config = ModelConfig.from_yaml(Path(args.model_config))
+    training_config = TrainingConfig.from_yaml(Path(args.training_config))
 
     # Set random seed for reproducibility if provided
     if args.seed is not None:
         set_seed(args.seed)
 
     # Setup logging
-    log_config = training_config["log"]
-    setup_logger(log_file=Path(log_config["save_dir"]) / f"{log_config['experiment_name']}.log")
+    setup_logger(log_file=Path(training_config.log.save_dir) / f"{training_config.log.experiment_name}.log")
 
     logger = get_logger()
     logger.info("Starting multimodal TimesFM training")
@@ -224,14 +218,13 @@ def main() -> int:
     logger.info(f"Training config: {args.training_config}")
 
     # Create datasets
-    data_config = training_config["data"]
     train_dataset, val_dataset = create_datasets(
-        data_path=Path(data_config["data_path"]),
-        domains=data_config["domains"],
-        split_ratio=float(data_config["split_ratio"]),
-        patch_len=data_config["patch_len"],
-        context_len=data_config["context_len"],
-        horizon_len=data_config["horizon_len"],
+        data_path=Path(training_config.data.data_path),
+        domains=training_config.data.domains,
+        split_ratio=training_config.data.split_ratio,
+        patch_len=training_config.data.patch_len,
+        context_len=training_config.data.context_len,
+        horizon_len=training_config.data.horizon_len,
     )
 
     # Train multimodal model
@@ -240,8 +233,7 @@ def main() -> int:
     logger.info("=" * 50)
 
     # Setup device for model creation
-    hardware_config = training_config["hardware"]
-    device = resolve_device(hardware_config["device"])
+    device = resolve_device(training_config.hardware.device)
     logger.info(f"Using device: {device}")
 
     multimodal_model = create_model(model_config, device)
