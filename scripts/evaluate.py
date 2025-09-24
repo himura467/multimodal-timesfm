@@ -16,13 +16,13 @@ from timesfm.pytorch_patched_decoder import PatchedTimeSeriesDecoder, TimesFMCon
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from src.configs import EvaluationConfig, ModelConfig
 from src.data.time_mmd_dataset import TimeMmdDataset
 from src.models.multimodal_patched_decoder import MultimodalPatchedDecoder, MultimodalTimesFMConfig
 from src.utils.collate import multimodal_collate_fn
 from src.utils.device import get_pin_memory, move_to_device, resolve_device
 from src.utils.logging import get_logger, setup_logger
 from src.utils.seed import set_seed
-from src.utils.yaml import load_yaml
 
 
 def parse_args() -> argparse.Namespace:
@@ -61,26 +61,26 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def create_original_timesfm_model(model_config: dict[str, Any]) -> PatchedTimeSeriesDecoder:
+def create_original_timesfm_model(model_config: ModelConfig) -> PatchedTimeSeriesDecoder:
     """Create and load original TimesFM model with pretrained weights."""
     logger = get_logger()
 
     # Create TimesFM config
     config = TimesFMConfig(
-        num_layers=model_config["timesfm"]["num_layers"],
-        num_heads=model_config["timesfm"]["num_heads"],
-        num_kv_heads=model_config["timesfm"]["num_kv_heads"],
-        hidden_size=model_config["timesfm"]["model_dims"],
-        intermediate_size=model_config["timesfm"]["model_dims"],
-        head_dim=model_config["timesfm"]["model_dims"] // model_config["timesfm"]["num_heads"],
-        rms_norm_eps=float(model_config["timesfm"]["rms_norm_eps"]),
-        patch_len=model_config["timesfm"]["input_patch_len"],
-        horizon_len=model_config["timesfm"]["output_patch_len"],
-        quantiles=model_config["timesfm"]["quantiles"],
-        pad_val=float(model_config["timesfm"]["pad_val"]),
-        tolerance=float(model_config["timesfm"]["tolerance"]),
-        dtype=model_config["timesfm"]["dtype"],
-        use_positional_embedding=model_config["timesfm"]["use_positional_embedding"],
+        num_layers=model_config.timesfm.num_layers,
+        num_heads=model_config.timesfm.num_heads,
+        num_kv_heads=model_config.timesfm.num_kv_heads,
+        hidden_size=model_config.timesfm.model_dims,
+        intermediate_size=model_config.timesfm.model_dims,
+        head_dim=model_config.timesfm.model_dims // model_config.timesfm.num_heads,
+        rms_norm_eps=model_config.timesfm.rms_norm_eps,
+        patch_len=model_config.timesfm.input_patch_len,
+        horizon_len=model_config.timesfm.output_patch_len,
+        quantiles=model_config.timesfm.quantiles,
+        pad_val=model_config.timesfm.pad_val,
+        tolerance=model_config.timesfm.tolerance,
+        dtype=model_config.timesfm.dtype,
+        use_positional_embedding=model_config.timesfm.use_positional_embedding,
     )
 
     # Create model
@@ -116,28 +116,28 @@ def create_original_timesfm_model(model_config: dict[str, Any]) -> PatchedTimeSe
 
 
 def load_multimodal_model(
-    checkpoint_path: Path, model_config: dict[str, Any], device: torch.device
+    checkpoint_path: Path, model_config: ModelConfig, device: torch.device
 ) -> MultimodalPatchedDecoder:
     """Load trained multimodal TimesFM model from checkpoint."""
     logger = get_logger()
 
     # Create multimodal config
     config = MultimodalTimesFMConfig(
-        num_layers=model_config["timesfm"]["num_layers"],
-        num_heads=model_config["timesfm"]["num_heads"],
-        num_kv_heads=model_config["timesfm"]["num_kv_heads"],
-        hidden_size=model_config["timesfm"]["model_dims"],
-        intermediate_size=model_config["timesfm"]["model_dims"],
-        head_dim=model_config["timesfm"]["model_dims"] // model_config["timesfm"]["num_heads"],
-        rms_norm_eps=float(model_config["timesfm"]["rms_norm_eps"]),
-        patch_len=model_config["timesfm"]["input_patch_len"],
-        horizon_len=model_config["timesfm"]["output_patch_len"],
-        quantiles=model_config["timesfm"]["quantiles"],
-        pad_val=float(model_config["timesfm"]["pad_val"]),
-        tolerance=float(model_config["timesfm"]["tolerance"]),
-        dtype=model_config["timesfm"]["dtype"],
-        use_positional_embedding=model_config["timesfm"]["use_positional_embedding"],
-        text_encoder_type=model_config["text_encoder"]["text_encoder_type"],
+        num_layers=model_config.timesfm.num_layers,
+        num_heads=model_config.timesfm.num_heads,
+        num_kv_heads=model_config.timesfm.num_kv_heads,
+        hidden_size=model_config.timesfm.model_dims,
+        intermediate_size=model_config.timesfm.model_dims,
+        head_dim=model_config.timesfm.model_dims // model_config.timesfm.num_heads,
+        rms_norm_eps=model_config.timesfm.rms_norm_eps,
+        patch_len=model_config.timesfm.input_patch_len,
+        horizon_len=model_config.timesfm.output_patch_len,
+        quantiles=model_config.timesfm.quantiles,
+        pad_val=model_config.timesfm.pad_val,
+        tolerance=model_config.timesfm.tolerance,
+        dtype=model_config.timesfm.dtype,
+        use_positional_embedding=model_config.timesfm.use_positional_embedding,
+        text_encoder_type=model_config.text_encoder.text_encoder_type,
     )
 
     # Create model
@@ -156,7 +156,7 @@ def load_multimodal_model(
 def create_dataset(
     data_path: Path,
     domain: str,
-    model_config: dict[str, Any],
+    model_config: ModelConfig,
 ) -> TimeMmdDataset:
     """Create Time-MMD dataset for evaluation."""
     logger = get_logger()
@@ -164,9 +164,9 @@ def create_dataset(
     logger.info(f"Creating dataset for domain: {domain}")
 
     # Extract values from model config
-    patch_len = model_config["timesfm"]["input_patch_len"]
-    context_len = model_config["timesfm"]["context_len"]
-    horizon_len = model_config["timesfm"]["horizon_len"]
+    patch_len = model_config.timesfm.input_patch_len
+    context_len = model_config.timesfm.context_len
+    horizon_len = model_config.timesfm.horizon_len
 
     logger.info(f"Using config values - patch_len: {patch_len}, context_len: {context_len}, horizon_len: {horizon_len}")
 
@@ -295,12 +295,12 @@ def main() -> int:
     logger = get_logger()
 
     # Load configurations
-    model_config = load_yaml(Path(args.model_config))
-    eval_config = load_yaml(Path(args.evaluation_config))
+    model_config = ModelConfig.from_yaml(Path(args.model_config))
+    eval_config = EvaluationConfig.from_yaml(Path(args.evaluation_config))
 
     logger.info("Starting model comparison...")
     logger.info(f"Multimodal checkpoint: {args.multimodal_checkpoint}")
-    logger.info(f"Domain: {eval_config['data']['domain']}")
+    logger.info(f"Domain: {eval_config.data.domain}")
 
     # Setup device
     device = resolve_device()
@@ -308,14 +308,14 @@ def main() -> int:
 
     # Create dataset using config values
     dataset = create_dataset(
-        data_path=Path(eval_config["data"]["data_path"]),
-        domain=eval_config["data"]["domain"],
+        data_path=Path(eval_config.data.data_path),
+        domain=eval_config.data.domain,
         model_config=model_config,
     )
 
     dataloader = DataLoader(
         dataset,
-        batch_size=eval_config["evaluation"]["batch_size"],
+        batch_size=eval_config.runner.batch_size,
         shuffle=False,
         num_workers=0,
         collate_fn=multimodal_collate_fn,
@@ -333,13 +333,13 @@ def main() -> int:
     multimodal_results = evaluate_multimodal_model(multimodal_model, dataloader, device)
 
     # Compile results
-    results = {
+    results: dict[str, Any] = {
         "config": {
-            "domain": eval_config["data"]["domain"],
-            "patch_len": model_config["timesfm"]["input_patch_len"],
-            "context_len": model_config["timesfm"]["context_len"],
-            "horizon_len": model_config["timesfm"]["horizon_len"],
-            "batch_size": eval_config["evaluation"]["batch_size"],
+            "domain": eval_config.data.domain,
+            "patch_len": model_config.timesfm.input_patch_len,
+            "context_len": model_config.timesfm.context_len,
+            "horizon_len": model_config.timesfm.horizon_len,
+            "batch_size": eval_config.runner.batch_size,
             "num_samples": len(dataset),
         },
         "original": original_results,

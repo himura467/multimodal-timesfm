@@ -8,9 +8,9 @@ from unittest.mock import Mock, patch
 import numpy as np
 import pytest
 import torch
-import yaml
 from torch.utils.data import Dataset
 
+from src.configs import ModelConfig
 from src.models.multimodal_patched_decoder import MultimodalPatchedDecoder, MultimodalTimesFMConfig
 from src.train.trainer import MultimodalTrainer
 
@@ -64,26 +64,24 @@ class TestMultimodalTrainer:
     @pytest.fixture(scope="session")
     def model_config(self) -> MultimodalTimesFMConfig:
         """Load model configuration from YAML file."""
-        config_path = Path(__file__).parent.parent / "configs" / "model.yml"
-        with open(config_path, "r") as f:
-            config_dict = yaml.safe_load(f)
+        model_config = ModelConfig()
 
         return MultimodalTimesFMConfig(
-            num_layers=config_dict["timesfm"]["num_layers"],
-            num_heads=config_dict["timesfm"]["num_heads"],
-            num_kv_heads=config_dict["timesfm"]["num_kv_heads"],
-            hidden_size=config_dict["timesfm"]["model_dims"],
-            intermediate_size=config_dict["timesfm"]["model_dims"],
-            head_dim=config_dict["timesfm"]["model_dims"] // config_dict["timesfm"]["num_heads"],
-            rms_norm_eps=float(config_dict["timesfm"]["rms_norm_eps"]),
-            patch_len=config_dict["timesfm"]["input_patch_len"],
-            horizon_len=config_dict["timesfm"]["output_patch_len"],
-            quantiles=config_dict["timesfm"]["quantiles"],
-            pad_val=float(config_dict["timesfm"]["pad_val"]),
-            tolerance=float(config_dict["timesfm"]["tolerance"]),
-            dtype=config_dict["timesfm"]["dtype"],
-            use_positional_embedding=config_dict["timesfm"]["use_positional_embedding"],
-            text_encoder_type=config_dict["text_encoder"]["text_encoder_type"],
+            num_layers=model_config.timesfm.num_layers,
+            num_heads=model_config.timesfm.num_heads,
+            num_kv_heads=model_config.timesfm.num_kv_heads,
+            hidden_size=model_config.timesfm.model_dims,
+            intermediate_size=model_config.timesfm.model_dims,
+            head_dim=model_config.timesfm.model_dims // model_config.timesfm.num_heads,
+            rms_norm_eps=model_config.timesfm.rms_norm_eps,
+            patch_len=model_config.timesfm.input_patch_len,
+            horizon_len=model_config.timesfm.output_patch_len,
+            quantiles=model_config.timesfm.quantiles,
+            pad_val=model_config.timesfm.pad_val,
+            tolerance=model_config.timesfm.tolerance,
+            dtype=model_config.timesfm.dtype,
+            use_positional_embedding=model_config.timesfm.use_positional_embedding,
+            text_encoder_type=model_config.text_encoder.text_encoder_type,
         )
 
     @pytest.fixture(scope="session")
