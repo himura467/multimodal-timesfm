@@ -1,27 +1,20 @@
 """Multimodal trainer for TimesFM with text inputs."""
 
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any
 
 import torch
 import torch.nn as nn
+import wandb
 from torch.optim import AdamW
 from torch.types import FileLike
-from torch.utils.data import DataLoader
+from torch.utils.data import ConcatDataset, DataLoader
 
-import wandb
+from src.data.multimodal_dataset import MultimodalDatasetBase
 from src.models.multimodal_patched_decoder import MultimodalPatchedDecoder
 from src.utils.collate import multimodal_collate_fn
 from src.utils.device import get_pin_memory, move_to_device, resolve_device
 from src.utils.logging import setup_logger
-
-
-class MultimodalDataset(Protocol):
-    """Protocol for datasets compatible with multimodal training."""
-
-    def __len__(self) -> int: ...
-
-    def __getitem__(self, idx: int) -> dict[str, Any]: ...
 
 
 class MultimodalTrainer:
@@ -38,8 +31,8 @@ class MultimodalTrainer:
     def __init__(
         self,
         model: MultimodalPatchedDecoder,
-        train_dataset: MultimodalDataset,
-        val_dataset: MultimodalDataset,
+        train_dataset: MultimodalDatasetBase | ConcatDataset[dict[str, Any]],
+        val_dataset: MultimodalDatasetBase | ConcatDataset[dict[str, Any]],
         batch_size: int = 8,
         gradient_accumulation_steps: int = 4,
         max_grad_norm: float = 1.0,
@@ -82,7 +75,7 @@ class MultimodalTrainer:
 
         # Set up data loaders
         self.train_loader: DataLoader[dict[str, Any]] = DataLoader(
-            train_dataset,  # type: ignore[arg-type]
+            train_dataset,
             batch_size=batch_size,
             shuffle=True,
             num_workers=0,
@@ -90,7 +83,7 @@ class MultimodalTrainer:
             pin_memory=get_pin_memory(self.device),
         )
         self.val_loader: DataLoader[dict[str, Any]] = DataLoader(
-            val_dataset,  # type: ignore[arg-type]
+            val_dataset,
             batch_size=batch_size,
             shuffle=False,
             num_workers=0,
