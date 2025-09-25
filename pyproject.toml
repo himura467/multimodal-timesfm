@@ -18,6 +18,12 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
+[project.urls]
+Homepage = "https://github.com/himura467/multimodal-timesfm"
+Documentation = "https://github.com/himura467/multimodal-timesfm"
+Repository = "https://github.com/himura467/multimodal-timesfm"
+"Bug Tracker" = "https://github.com/himura467/multimodal-timesfm/issues"
+
 [dependency-groups]
 dev = [
     "mypy>=1.17.1",
