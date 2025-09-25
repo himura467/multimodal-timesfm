@@ -21,7 +21,7 @@ class TimesFMConfig:
     model_dims: int = 1280
     per_core_batch_size: int = 32
     backend: Literal["cpu", "gpu", "tpu"] = "gpu"
-    quantiles: list[float] = field(default_factory=lambda: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
+    quantiles: list[float] | None = field(default_factory=lambda: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
     use_positional_embedding: bool = True
     point_forecast_mode: Literal["mean", "median"] = "median"
 
