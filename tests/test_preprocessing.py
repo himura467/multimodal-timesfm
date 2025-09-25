@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from src.data.preprocessing import (
+from multimodal_timesfm.preprocessing import (
     clean_text,
     denormalize_timeseries,
     prepare_multimodal_batch,

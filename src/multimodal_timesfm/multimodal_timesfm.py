@@ -7,8 +7,8 @@ from typing import Any, Literal, Sequence
 import numpy as np
 import torch
 
-from src.models.multimodal_patched_decoder import MultimodalPatchedDecoder, MultimodalTimesFMConfig
-from src.utils.device import resolve_device
+from multimodal_timesfm.multimodal_patched_decoder import MultimodalPatchedDecoder, MultimodalTimesFMConfig
+from multimodal_timesfm.utils.device import resolve_device
 
 
 @dataclass(kw_only=True)

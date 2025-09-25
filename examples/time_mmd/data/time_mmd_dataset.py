@@ -6,7 +6,7 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 
-from src.data.multimodal_dataset import MultimodalDatasetBase
+from multimodal_timesfm.multimodal_dataset import MultimodalDatasetBase
 
 
 class TimeMmdDataset(MultimodalDatasetBase):

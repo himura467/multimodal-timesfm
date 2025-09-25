@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from src.utils.yaml import load_yaml
+from multimodal_timesfm.utils.yaml import load_yaml
 
 
 @dataclass

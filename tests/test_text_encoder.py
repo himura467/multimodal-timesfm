@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import torch
 
-from src.models.text_encoder import EnglishTextEncoder, JapaneseTextEncoder
+from multimodal_timesfm.text_encoder import EnglishTextEncoder, JapaneseTextEncoder
 
 
 class TestEnglishTextEncoder:

@@ -4,7 +4,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from src.models.multimodal_fusion import MultimodalFusion
+from multimodal_timesfm.multimodal_fusion import MultimodalFusion
 
 
 class TestMultimodalFusion:

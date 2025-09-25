@@ -5,8 +5,8 @@ from typing import cast
 import pytest
 import torch
 
-from src.models.multimodal_patched_decoder import MultimodalPatchedDecoder, MultimodalTimesFMConfig
-from src.models.text_encoder import EnglishTextEncoder, JapaneseTextEncoder
+from multimodal_timesfm.multimodal_patched_decoder import MultimodalPatchedDecoder, MultimodalTimesFMConfig
+from multimodal_timesfm.text_encoder import EnglishTextEncoder, JapaneseTextEncoder
 
 
 class TestMultimodalTimesFMConfig:

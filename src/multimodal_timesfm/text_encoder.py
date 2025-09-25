@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 from sentence_transformers import SentenceTransformer
 
-from src.utils.device import resolve_device
+from multimodal_timesfm.utils.device import resolve_device
 
 
 class TextEncoderBase(nn.Module, ABC):

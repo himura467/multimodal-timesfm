@@ -9,10 +9,10 @@ import numpy as np
 import pytest
 import torch
 
-from src.configs import ModelConfig
-from src.data.multimodal_dataset import MultimodalDatasetBase
-from src.models.multimodal_patched_decoder import MultimodalPatchedDecoder, MultimodalTimesFMConfig
-from src.train.trainer import MultimodalTrainer
+from examples.time_mmd.configs import ModelConfig
+from multimodal_timesfm.multimodal_dataset import MultimodalDatasetBase
+from multimodal_timesfm.multimodal_patched_decoder import MultimodalPatchedDecoder, MultimodalTimesFMConfig
+from multimodal_timesfm.trainer import MultimodalTrainer
 
 
 class MockMultimodalDataset(MultimodalDatasetBase):
@@ -121,7 +121,7 @@ class TestMultimodalTrainer:
     @pytest.fixture(scope="session", autouse=True)
     def mock_wandb(self) -> Generator[Mock, None, None]:
         """Mock wandb to avoid initialization and deprecation warnings during tests."""
-        with patch("src.train.trainer.wandb") as mock_wandb:
+        with patch("multimodal_timesfm.trainer.wandb") as mock_wandb:
             mock_wandb.init = Mock()
             mock_wandb.log = Mock()
             mock_wandb.finish = Mock()

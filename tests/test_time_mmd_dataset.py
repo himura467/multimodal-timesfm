@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.data.time_mmd_dataset import TimeMmdDataset
+from examples.time_mmd.data.time_mmd_dataset import TimeMmdDataset
 
 
 class TestTimeMmdDataset:

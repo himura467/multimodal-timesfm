@@ -16,13 +16,13 @@ from timesfm.pytorch_patched_decoder import PatchedTimeSeriesDecoder, TimesFMCon
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from src.configs import EvaluationConfig, ModelConfig
-from src.data.time_mmd_dataset import TimeMmdDataset
-from src.models.multimodal_patched_decoder import MultimodalPatchedDecoder, MultimodalTimesFMConfig
-from src.utils.collate import multimodal_collate_fn
-from src.utils.device import get_pin_memory, move_to_device, resolve_device
-from src.utils.logging import get_logger, setup_logger
-from src.utils.seed import set_seed
+from examples.time_mmd.configs import EvaluationConfig, ModelConfig
+from examples.time_mmd.data.time_mmd_dataset import TimeMmdDataset
+from multimodal_timesfm.multimodal_patched_decoder import MultimodalPatchedDecoder, MultimodalTimesFMConfig
+from multimodal_timesfm.utils.collate import multimodal_collate_fn
+from multimodal_timesfm.utils.device import get_pin_memory, move_to_device, resolve_device
+from multimodal_timesfm.utils.logging import get_logger, setup_logger
+from multimodal_timesfm.utils.seed import set_seed
 
 
 def parse_args() -> argparse.Namespace:

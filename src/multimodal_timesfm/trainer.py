@@ -10,11 +10,11 @@ from torch.optim import AdamW
 from torch.types import FileLike
 from torch.utils.data import ConcatDataset, DataLoader
 
-from src.data.multimodal_dataset import MultimodalDatasetBase
-from src.models.multimodal_patched_decoder import MultimodalPatchedDecoder
-from src.utils.collate import multimodal_collate_fn
-from src.utils.device import get_pin_memory, move_to_device, resolve_device
-from src.utils.logging import setup_logger
+from multimodal_timesfm.multimodal_dataset import MultimodalDatasetBase
+from multimodal_timesfm.multimodal_patched_decoder import MultimodalPatchedDecoder
+from multimodal_timesfm.utils.collate import multimodal_collate_fn
+from multimodal_timesfm.utils.device import get_pin_memory, move_to_device, resolve_device
+from multimodal_timesfm.utils.logging import setup_logger
 
 
 class MultimodalTrainer:
