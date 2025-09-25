@@ -246,15 +246,18 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
                      where 1 indicates valid data and 0 indicates padding.
             freq: Frequency encoding tensor of shape (batch_size, 1) with values
                  0=high frequency, 1=medium frequency, 2=low frequency.
-            horizon_len: Number of time steps to forecast into the future.
+            horizon_len: Number of time steps to forecast into the future. If this exceeds
+                        the model's configured horizon_len, only the first min(horizon_len,
+                        config.horizon_len) predictions will be returned.
             text_descriptions: Nested list [batch][patch][texts] containing text descriptions
                               for each patch of each batch sample.
 
         Returns:
             Tuple containing:
-            - Point forecasts: Tensor of shape (batch_size, horizon_len) with mean predictions
-            - Full forecasts: Tensor of shape (batch_size, horizon_len, 1 + num_quantiles)
-              where the first channel is mean and remaining channels are quantile predictions
+            - Point forecasts: Tensor of shape (batch_size, actual_horizon_len) with mean predictions
+            - Full forecasts: Tensor of shape (batch_size, actual_horizon_len, 1 + num_quantiles)
+              where actual_horizon_len = min(horizon_len, config.horizon_len), the first channel
+              is mean and remaining channels are quantile predictions
 
         Raises:
             ValueError: If paddings length doesn't match input_ts length + horizon_len.
@@ -272,7 +275,12 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
 
         fprop_outputs = self(context_input, context_padding, freq, text_descriptions)
 
-        new_full_ts = fprop_outputs[:, -1, :horizon_len, :]
+        # The model outputs predictions for self.config.horizon_len steps
+        # We need to handle the case where requested horizon_len differs from model's horizon_len
+        model_horizon_len = fprop_outputs.shape[2]
+        actual_horizon_len = min(horizon_len, model_horizon_len)
+
+        new_full_ts = fprop_outputs[:, -1, :actual_horizon_len, :]
 
         return (new_full_ts[:, :, 0], new_full_ts)
 

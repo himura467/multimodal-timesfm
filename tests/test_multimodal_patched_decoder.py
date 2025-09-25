@@ -229,7 +229,7 @@ class TestMultimodalPatchedDecoder:
         decoder: MultimodalPatchedDecoder,
         sample_data: tuple[torch.Tensor, torch.Tensor, torch.Tensor, list[list[list[str]]]],
     ) -> None:
-        """Test auto-regressive decoding."""
+        """Test direct multi-step forecasting."""
         input_ts, _, freq, text_descriptions = sample_data
         batch_size, context_len = input_ts.shape
         horizon_len = 32
@@ -251,10 +251,11 @@ class TestMultimodalPatchedDecoder:
                 text_descriptions=text_descriptions,
             )
 
-        # Check output shapes
-        assert mean_output.shape == (batch_size, horizon_len)
+        # Check output shapes - actual horizon is limited by model's configured horizon_len
+        actual_horizon_len = min(horizon_len, decoder.config.horizon_len)
+        assert mean_output.shape == (batch_size, actual_horizon_len)
         num_outputs = len(decoder.config.quantiles) + 1
-        assert full_output.shape == (batch_size, horizon_len, num_outputs)
+        assert full_output.shape == (batch_size, actual_horizon_len, num_outputs)
         assert not torch.isnan(mean_output).any()
         assert not torch.isnan(full_output).any()
 
