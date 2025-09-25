@@ -124,19 +124,28 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
     def _encode_patch_text_features(
         self, text_descriptions: list[list[list[str]]], target_shape: torch.Size, device: torch.device
     ) -> torch.Tensor:
-        """Encode patch-level text descriptions and match time series features shape.
+        """Encode patch-level text descriptions to match time series patch structure.
+
+        This method processes text descriptions at the patch level, where each patch
+        can have multiple associated text strings. All texts for a patch are joined
+        and encoded as a single embedding to match the granularity of time series patches.
 
         Args:
-            text_descriptions: List of text descriptions organized as [batch][patch][texts].
-                              Each batch item contains patches, each patch contains multiple text strings.
-            target_shape: Target shape (batch_size, num_patches, feature_dim) to match.
-            device: Device to place the text embeddings on.
+            text_descriptions: Nested list structure [batch][patch][texts] where:
+                - batch: Index of the sample in the current batch
+                - patch: Index of the time series patch
+                - texts: List of text strings associated with that patch
+            target_shape: Target tensor shape (batch_size, num_patches, feature_dim)
+                         from preprocessed time series data.
+            device: PyTorch device to place the resulting text embeddings on.
 
         Returns:
-            Text feature tensor of shape (batch_size, num_patches, text_embedding_dim).
+            Text embedding tensor of shape (batch_size, num_patches, text_embedding_dim)
+            where text_embedding_dim matches the text encoder's output dimension.
 
         Raises:
-            ValueError: If batch sizes or patch numbers don't match.
+            ValueError: If batch sizes don't match between text_descriptions and target_shape,
+                       or if number of patches per batch doesn't match expected num_patches.
         """
         batch_size, num_patches, _ = target_shape
 
@@ -223,74 +232,49 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
         freq: torch.Tensor,
         horizon_len: int,
         text_descriptions: list[list[list[str]]],
-        output_patch_len: int | None = None,
-        max_len: int | None = None,
-        return_forecast_on_context: bool = False,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Auto-regressive decoding with multimodal support.
+        """Direct multi-step forecasting with multimodal support following TimesFM interface.
 
-        This method extends the original decode method to support text descriptions
-        during auto-regressive forecasting.
+        This method extends the original TimesFM decode method to incorporate text descriptions
+        during forecasting. It performs one-shot prediction for the entire horizon rather than
+        auto-regressive generation, maintaining the same interface and behavior as the base
+        TimesFM decoder while adding multimodal capabilities.
 
         Args:
-            input_ts: Input time-series tensor of shape B x C.
-            paddings: Padding tensor of shape B x (C + H) where H is prediction length.
-            freq: Frequency tensor of shape B x 1.
-            horizon_len: Prediction length.
-            text_descriptions: Patch-level text descriptions organized as [batch][patch][texts].
-            output_patch_len: Output length per decoding step.
-            max_len: Maximum training context length.
-            return_forecast_on_context: Whether to return forecast on context.
+            input_ts: Input time series tensor of shape (batch_size, context_length).
+            paddings: Binary padding tensor of shape (batch_size, context_length + horizon_len)
+                     where 1 indicates valid data and 0 indicates padding.
+            freq: Frequency encoding tensor of shape (batch_size, 1) with values
+                 0=high frequency, 1=medium frequency, 2=low frequency.
+            horizon_len: Number of time steps to forecast into the future.
+            text_descriptions: Nested list [batch][patch][texts] containing text descriptions
+                              for each patch of each batch sample.
 
         Returns:
-            Tuple of:
-            - Point (mean) output predictions as tensor with shape B x H'.
-            - Full predictions (mean and quantiles) as tensor with shape B x H' x (1 + # quantiles).
-        """
-        final_out = input_ts
-        context_len = final_out.shape[1]
-        full_outputs = []
+            Tuple containing:
+            - Point forecasts: Tensor of shape (batch_size, horizon_len) with mean predictions
+            - Full forecasts: Tensor of shape (batch_size, horizon_len, 1 + num_quantiles)
+              where the first channel is mean and remaining channels are quantile predictions
 
-        if max_len is None:
-            max_len = context_len
-        if paddings.shape[1] != final_out.shape[1] + horizon_len:
+        Raises:
+            ValueError: If paddings length doesn't match input_ts length + horizon_len.
+        """
+        context_len = input_ts.shape[1]
+
+        if paddings.shape[1] != input_ts.shape[1] + horizon_len:
             raise ValueError(
                 "Length of paddings must match length of input + horizon_len:"
-                f" {paddings.shape[1]} != {final_out.shape[1]} + {horizon_len}"
+                f" {paddings.shape[1]} != {input_ts.shape[1]} + {horizon_len}"
             )
-        if output_patch_len is None:
-            output_patch_len = self.config.horizon_len
 
-        num_decode_patches = (horizon_len + output_patch_len - 1) // output_patch_len
+        context_input = input_ts[:, -context_len:]
+        context_padding = paddings[:, 0 : input_ts.shape[1]][:, -context_len:]
 
-        for step_index in range(num_decode_patches):
-            current_padding = paddings[:, 0 : final_out.shape[1]]
-            input_ts_step = final_out[:, -max_len:]
-            input_padding = current_padding[:, -max_len:]
+        fprop_outputs = self(context_input, context_padding, freq, text_descriptions)
 
-            # Use multimodal forward pass
-            fprop_outputs = self(input_ts_step, input_padding, freq, text_descriptions)
+        new_full_ts = fprop_outputs[:, -1, :horizon_len, :]
 
-            if return_forecast_on_context and step_index == 0:
-                # Collect model forecast on context except unavailable first batch forecast
-                new_full_ts = fprop_outputs[:, 0:-1, 0 : self.config.patch_len, :]
-                new_full_ts = new_full_ts.reshape(new_full_ts.size(0), -1, new_full_ts.size(3))
-                full_outputs.append(new_full_ts)
-
-            # Extract predictions for next step
-            new_ts = fprop_outputs[:, -1, :output_patch_len, 0]
-            new_full_ts = fprop_outputs[:, -1, :output_patch_len, :]
-            full_outputs.append(new_full_ts)
-            final_out = torch.cat([final_out, new_ts], dim=-1)
-
-        if return_forecast_on_context:
-            full_outputs_tensor = torch.cat(full_outputs, dim=1)[
-                :, : (context_len - self.config.patch_len + horizon_len), :
-            ]
-        else:
-            full_outputs_tensor = torch.cat(full_outputs, dim=1)[:, 0:horizon_len, :]
-
-        return (full_outputs_tensor[:, :, 0], full_outputs_tensor)
+        return (new_full_ts[:, :, 0], new_full_ts)
 
     def freeze_parameters(self) -> None:
         """Freeze all parameters in the MultimodalPatchedDecoder model.
