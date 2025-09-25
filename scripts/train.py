@@ -18,6 +18,31 @@ from src.utils.logging import get_logger, setup_logger
 from src.utils.seed import set_seed
 
 
+def parse_args() -> argparse.Namespace:
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description="Train multimodal TimesFM on Time-MMD dataset")
+
+    parser.add_argument(
+        "--model-config",
+        type=str,
+        help="Path to model configuration file",
+    )
+
+    parser.add_argument(
+        "--training-config",
+        type=str,
+        help="Path to training configuration file",
+    )
+
+    parser.add_argument(
+        "--seed",
+        type=int,
+        help="Random seed for reproducibility (if not provided, no seed will be set)",
+    )
+
+    return parser.parse_args()
+
+
 def create_datasets(
     data_path: Path,
     domains: list[str],
@@ -177,27 +202,7 @@ def train_model(
 
 def main() -> int:
     """Main training function."""
-    parser = argparse.ArgumentParser(description="Train multimodal TimesFM on Time-MMD dataset")
-
-    parser.add_argument(
-        "--model-config",
-        type=str,
-        help="Path to model configuration file",
-    )
-
-    parser.add_argument(
-        "--training-config",
-        type=str,
-        help="Path to training configuration file",
-    )
-
-    parser.add_argument(
-        "--seed",
-        type=int,
-        help="Random seed for reproducibility (if not provided, no seed will be set)",
-    )
-
-    args = parser.parse_args()
+    args = parse_args()
 
     # Load configurations
     if args.model_config:
