@@ -1,6 +1,6 @@
 [project]
 name = "multimodal-timesfm"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
     "sentence-transformers>=5.1.0",
     "sentencepiece>=0.2.1",
@@ -17,6 +17,12 @@ classifiers = [
     "Operating System :: OS Independent",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
+
+[project.urls]
+Homepage = "https://github.com/himura467/multimodal-timesfm"
+Documentation = "https://github.com/himura467/multimodal-timesfm"
+Repository = "https://github.com/himura467/multimodal-timesfm"
+"Bug Tracker" = "https://github.com/himura467/multimodal-timesfm/issues"
 
 [dependency-groups]
 dev = [
