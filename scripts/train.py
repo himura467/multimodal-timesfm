@@ -182,14 +182,12 @@ def main() -> int:
     parser.add_argument(
         "--model-config",
         type=str,
-        default="configs/model.yml",
         help="Path to model configuration file",
     )
 
     parser.add_argument(
         "--training-config",
         type=str,
-        default="configs/training.yml",
         help="Path to training configuration file",
     )
 
@@ -202,8 +200,14 @@ def main() -> int:
     args = parser.parse_args()
 
     # Load configurations
-    model_config = ModelConfig.from_yaml(Path(args.model_config))
-    training_config = TrainingConfig.from_yaml(Path(args.training_config))
+    if args.model_config:
+        model_config = ModelConfig.from_yaml(Path(args.model_config))
+    else:
+        model_config = ModelConfig()
+    if args.training_config:
+        training_config = TrainingConfig.from_yaml(Path(args.training_config))
+    else:
+        training_config = TrainingConfig()
 
     # Set random seed for reproducibility if provided
     if args.seed is not None:
