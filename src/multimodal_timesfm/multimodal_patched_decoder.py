@@ -9,9 +9,9 @@ from timesfm.pytorch_patched_decoder import (
     TimesFMConfig,
 )
 
-from src.models.multimodal_fusion import MultimodalFusion
-from src.models.text_encoder import EnglishTextEncoder, JapaneseTextEncoder, TextEncoderBase
-from src.utils.device import resolve_device
+from multimodal_timesfm.multimodal_fusion import MultimodalFusion
+from multimodal_timesfm.text_encoder import EnglishTextEncoder, JapaneseTextEncoder, TextEncoderBase
+from multimodal_timesfm.utils.device import resolve_device
 
 
 @dataclass

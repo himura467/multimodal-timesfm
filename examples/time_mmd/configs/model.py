@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
-from src.utils.yaml import load_yaml
+from multimodal_timesfm.utils.yaml import load_yaml
 
 
 @dataclass

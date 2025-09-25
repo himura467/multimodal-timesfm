@@ -2,47 +2,46 @@
 
 ## Overview
 
-This project aims to extend Google's [TimesFM](https://github.com/google-research/timesfm) to support multimodal inputs including text by creating a wrapper class and fine-tuning it on the [Time-MMD](https://github.com/AdityaLab/Time-MMD) dataset.
+This project provides a multimodal extension of Google's [TimesFM](https://github.com/google-research/timesfm) to support time series forecasting with text inputs. It consists of a core Python package and example implementations using the [Time-MMD](https://github.com/AdityaLab/Time-MMD) dataset.
 
 ## Project Structure
 
 ```
 multimodal-timesfm/
 ├── src/
-│   ├── __init__.py
-│   ├── configs/
-│   │   ├── __init__.py
-│   │   ├── training.py                      # Training configuration
-│   │   ├── evaluation.py                    # Evaluation configuration
-│   │   └── model.py                         # Model architecture settings
-│   ├── models/
-│   │   ├── __init__.py
-│   │   ├── multimodal_timesfm.py            # Main wrapper class
-│   │   ├── text_encoder.py                  # Text encoding components
-│   │   ├── multimodal_fusion.py             # Fusion mechanism
-│   │   └── multimodal_patched_decoder.py    # Patched decoder for multimodal
-│   ├── data/
-│   │   ├── __init__.py
-│   │   ├── time_mmd_dataset.py              # Time-MMD dataset loader
-│   │   ├── multimodal_dataset.py            # Multimodal dataset wrapper
-│   │   └── preprocessing.py                 # Data preprocessing utilities
-│   ├── train/
-│   │   ├── __init__.py
-│   │   └── trainer.py                       # Training logic
-│   └── utils/
+│   └── multimodal_timesfm/                  # Core PyPI package
 │       ├── __init__.py
-│       ├── collate.py                       # Data collation utilities
-│       ├── device.py                        # Device utilities
-│       ├── logging.py                       # Logging utilities
-│       ├── seed.py                          # Random seed utilities
-│       └── yaml.py                          # YAML configuration utilities
+│       ├── multimodal_timesfm.py            # Main wrapper class
+│       ├── text_encoder.py                  # Text encoding components
+│       ├── multimodal_fusion.py             # Fusion mechanism
+│       ├── multimodal_patched_decoder.py    # Patched decoder for multimodal
+│       ├── multimodal_dataset.py            # Base multimodal dataset class
+│       ├── preprocessing.py                 # Data preprocessing utilities
+│       ├── trainer.py                       # Training logic
+│       └── utils/                           # Utility modules
+│           ├── __init__.py
+│           ├── collate.py                   # Data collation utilities
+│           ├── device.py                    # Device utilities
+│           ├── logging.py                   # Logging utilities
+│           ├── seed.py                      # Random seed utilities
+│           └── yaml.py                      # YAML configuration utilities
+├── scripts/
+│   ├── train.py                             # Training script for Time-MMD
+│   └── evaluate.py                          # Evaluation script for Time-MMD
+├── examples/
+│   └── time_mmd/                            # Time-MMD dataset example components
+│       ├── configs/                         # Time-MMD specific configurations
+│       │   ├── __init__.py
+│       │   ├── training.py                  # Training configuration
+│       │   ├── evaluation.py                # Evaluation configuration
+│       │   └── model.py                     # Model architecture settings
+│       └── data/
+│           ├── __init__.py
+│           └── time_mmd_dataset.py          # Time-MMD dataset loader
 ├── data/
 │   └── Time-MMD/                            # Time-MMD dataset submodule
 │       ├── numerical/                       # Time series data by domain
 │       └── textual/                         # Text descriptions by domain
-├── scripts/
-│   ├── train.py                             # Main training script
-│   └── evaluate.py                          # Evaluation script
 ├── tests/
 │   ├── __init__.py
 │   ├── test_text_encoder.py
@@ -53,7 +52,7 @@ multimodal-timesfm/
 │   └── test_multimodal_patched_decoder.py
 ├── .gitmodules                              # Git submodule configuration
 ├── .python-version                          # Python 3.11
-├── pyproject.toml                           # uv configuration
+├── pyproject.toml                           # Package configuration for PyPI
 ├── README.md
 └── CLAUDE.md                                # This file
 ```
@@ -64,7 +63,7 @@ multimodal-timesfm/
 - `uv run ruff check`: Linting
 - `uv run ruff format`: Code formatting
 - `uv run pytest tests/ -v`: Run test suite
-- `PYTHONPATH=. uv run python scripts/train.py`: Train multimodal TimesFM model
+- `PYTHONPATH=. uv run python scripts/train.py`: Train multimodal TimesFM on Time-MMD
 - `PYTHONPATH=. uv run python scripts/evaluate.py`: Evaluate trained models
 
 ## Data Access

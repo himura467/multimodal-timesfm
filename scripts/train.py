@@ -9,13 +9,13 @@ import torch
 from huggingface_hub import snapshot_download
 from torch.utils.data import ConcatDataset
 
-from src.configs import ModelConfig, TrainingConfig
-from src.data.time_mmd_dataset import TimeMmdDataset
-from src.models.multimodal_patched_decoder import MultimodalPatchedDecoder, MultimodalTimesFMConfig
-from src.train.trainer import MultimodalTrainer
-from src.utils.device import resolve_device
-from src.utils.logging import get_logger, setup_logger
-from src.utils.seed import set_seed
+from examples.time_mmd.configs import ModelConfig, TrainingConfig
+from examples.time_mmd.data.time_mmd_dataset import TimeMmdDataset
+from multimodal_timesfm.multimodal_patched_decoder import MultimodalPatchedDecoder, MultimodalTimesFMConfig
+from multimodal_timesfm.trainer import MultimodalTrainer
+from multimodal_timesfm.utils.device import resolve_device
+from multimodal_timesfm.utils.logging import get_logger, setup_logger
+from multimodal_timesfm.utils.seed import set_seed
 
 
 def parse_args() -> argparse.Namespace:
