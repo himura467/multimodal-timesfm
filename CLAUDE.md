@@ -10,6 +10,11 @@ This project aims to extend Google's [TimesFM](https://github.com/google-researc
 multimodal-timesfm/
 ├── src/
 │   ├── __init__.py
+│   ├── configs/
+│   │   ├── __init__.py
+│   │   ├── training.py                      # Training configuration
+│   │   ├── evaluation.py                    # Evaluation configuration
+│   │   └── model.py                         # Model architecture settings
 │   ├── models/
 │   │   ├── __init__.py
 │   │   ├── multimodal_timesfm.py            # Main wrapper class
@@ -19,6 +24,7 @@ multimodal-timesfm/
 │   ├── data/
 │   │   ├── __init__.py
 │   │   ├── time_mmd_dataset.py              # Time-MMD dataset loader
+│   │   ├── multimodal_dataset.py            # Multimodal dataset wrapper
 │   │   └── preprocessing.py                 # Data preprocessing utilities
 │   ├── train/
 │   │   ├── __init__.py
@@ -26,6 +32,7 @@ multimodal-timesfm/
 │   └── utils/
 │       ├── __init__.py
 │       ├── collate.py                       # Data collation utilities
+│       ├── device.py                        # Device utilities
 │       ├── logging.py                       # Logging utilities
 │       ├── seed.py                          # Random seed utilities
 │       └── yaml.py                          # YAML configuration utilities
@@ -36,10 +43,6 @@ multimodal-timesfm/
 ├── scripts/
 │   ├── train.py                             # Main training script
 │   └── evaluate.py                          # Evaluation script
-├── configs/
-│   ├── training.yml                         # Training configuration
-│   ├── evaluation.yml                       # Evaluation configuration
-│   └── model.yml                            # Model architecture settings
 ├── tests/
 │   ├── __init__.py
 │   ├── test_text_encoder.py

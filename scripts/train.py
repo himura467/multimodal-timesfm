@@ -18,6 +18,31 @@ from src.utils.logging import get_logger, setup_logger
 from src.utils.seed import set_seed
 
 
+def parse_args() -> argparse.Namespace:
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description="Train multimodal TimesFM on Time-MMD dataset")
+
+    parser.add_argument(
+        "--model-config",
+        type=str,
+        help="Path to model configuration file",
+    )
+
+    parser.add_argument(
+        "--training-config",
+        type=str,
+        help="Path to training configuration file",
+    )
+
+    parser.add_argument(
+        "--seed",
+        type=int,
+        help="Random seed for reproducibility (if not provided, no seed will be set)",
+    )
+
+    return parser.parse_args()
+
+
 def create_datasets(
     data_path: Path,
     domains: list[str],
@@ -177,33 +202,17 @@ def train_model(
 
 def main() -> int:
     """Main training function."""
-    parser = argparse.ArgumentParser(description="Train multimodal TimesFM on Time-MMD dataset")
-
-    parser.add_argument(
-        "--model-config",
-        type=str,
-        default="configs/model.yml",
-        help="Path to model configuration file",
-    )
-
-    parser.add_argument(
-        "--training-config",
-        type=str,
-        default="configs/training.yml",
-        help="Path to training configuration file",
-    )
-
-    parser.add_argument(
-        "--seed",
-        type=int,
-        help="Random seed for reproducibility (if not provided, no seed will be set)",
-    )
-
-    args = parser.parse_args()
+    args = parse_args()
 
     # Load configurations
-    model_config = ModelConfig.from_yaml(Path(args.model_config))
-    training_config = TrainingConfig.from_yaml(Path(args.training_config))
+    if args.model_config:
+        model_config = ModelConfig.from_yaml(Path(args.model_config))
+    else:
+        model_config = ModelConfig()
+    if args.training_config:
+        training_config = TrainingConfig.from_yaml(Path(args.training_config))
+    else:
+        training_config = TrainingConfig()
 
     # Set random seed for reproducibility if provided
     if args.seed is not None:

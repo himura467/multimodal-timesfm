@@ -41,14 +41,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--model-config",
         type=str,
-        default="configs/model.yml",
         help="Path to model configuration file",
     )
 
     parser.add_argument(
         "--evaluation-config",
         type=str,
-        default="configs/evaluation.yml",
         help="Path to evaluation configuration file",
     )
 
@@ -295,8 +293,14 @@ def main() -> int:
     logger = get_logger()
 
     # Load configurations
-    model_config = ModelConfig.from_yaml(Path(args.model_config))
-    eval_config = EvaluationConfig.from_yaml(Path(args.evaluation_config))
+    if args.model_config:
+        model_config = ModelConfig.from_yaml(Path(args.model_config))
+    else:
+        model_config = ModelConfig()
+    if args.evaluation_config:
+        eval_config = EvaluationConfig.from_yaml(Path(args.evaluation_config))
+    else:
+        eval_config = EvaluationConfig()
 
     logger.info("Starting model comparison...")
     logger.info(f"Multimodal checkpoint: {args.multimodal_checkpoint}")
