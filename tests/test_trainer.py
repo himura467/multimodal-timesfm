@@ -270,18 +270,20 @@ class TestMultimodalTrainer:
         # Train for two epochs
         trainer.train(num_epochs=2, save_every=1)
 
-        # Find checkpoint files
-        checkpoint_files = list(checkpoint_dir.glob("*.pt"))
-        assert len(checkpoint_files) in [2, 3]  # Epoch 0 and 1, possibly best model too
+        # Find checkpoint files - specifically look for epoch checkpoints (not best_model.pt)
+        epoch_checkpoints = sorted(checkpoint_dir.glob("checkpoint_epoch_*.pt"))
+        assert len(epoch_checkpoints) == 2  # Epoch 0 and 1
 
-        # Test loading checkpoint
-        checkpoint_path = checkpoint_files[0]
+        # Test loading the first epoch checkpoint
+        checkpoint_path = epoch_checkpoints[0]
         trainer.load_checkpoint(checkpoint_path)
 
-        # Verify checkpoint loaded (epoch should match the loaded checkpoint)
-        if len(checkpoint_files) == 2:
-            # Only epoch checkpoints, no best model - loading epoch 0
-            assert trainer.current_epoch == 0
-        else:
-            # Has best model checkpoint - loading epoch 1
-            assert trainer.current_epoch == 1
+        # Verify checkpoint loaded - should be epoch 0
+        assert trainer.current_epoch == 0
+
+        # Test loading the second epoch checkpoint
+        checkpoint_path = epoch_checkpoints[1]
+        trainer.load_checkpoint(checkpoint_path)
+
+        # Verify checkpoint loaded - should be epoch 1
+        assert trainer.current_epoch == 1
