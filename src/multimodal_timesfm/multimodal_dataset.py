@@ -58,7 +58,7 @@ class MultimodalDatasetBase(Dataset[dict[str, Any]], ABC):
             raise ValueError(f"horizon_len ({horizon_len}) must be an integer multiple of patch_len ({patch_len})")
 
         # Validate split_ratio
-        if not 0.0 < split_ratio < 1.0:
+        if not 0.0 <= split_ratio <= 1.0:
             raise ValueError(f"split_ratio ({split_ratio}) must be between 0 and 1")
 
         self.data_dir = Path(data_dir)
