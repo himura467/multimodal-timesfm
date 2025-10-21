@@ -6,6 +6,7 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 
+from examples.time_mmd.configs.domain_columns import DEFAULT_TIME_MMD_CONFIGS, DomainColumnConfig
 from multimodal_timesfm.multimodal_dataset import MultimodalDatasetBase
 
 
@@ -38,6 +39,7 @@ class TimeMmdDataset(MultimodalDatasetBase):
         patch_len: int = 32,
         context_len: int = 128,
         horizon_len: int = 32,
+        column_config: DomainColumnConfig | None = None,
     ) -> None:
         """Initializes Time-MMD dataset loader.
 
@@ -51,8 +53,11 @@ class TimeMmdDataset(MultimodalDatasetBase):
                         context_len must be an integer multiple of patch_len.
             horizon_len: Length of forecasting horizon.
                         horizon_len must be an integer multiple of patch_len.
+            column_config: Optional column configuration for this domain.
+                          If None, uses the default configuration from DEFAULT_TIME_MMD_CONFIGS.
         """
         self.domain = domain
+        self.column_config = column_config or DEFAULT_TIME_MMD_CONFIGS.get_config_for_domain(domain)
         super().__init__(data_dir, split_ratio, split, patch_len, context_len, horizon_len)
 
     def _load_data(self) -> None:
@@ -66,9 +71,10 @@ class TimeMmdDataset(MultimodalDatasetBase):
         # Load numerical time series data
         numerical_df = pd.read_csv(numerical_file)
 
-        # Sort numerical_df by end_date to ensure chronological order
-        if "end_date" in numerical_df.columns:
-            numerical_df = numerical_df.sort_values("end_date").reset_index(drop=True)
+        # Sort numerical_df by start_date to ensure chronological order
+        start_date_col = self.column_config.start_date_col
+        if start_date_col in numerical_df.columns:
+            numerical_df = numerical_df.sort_values(start_date_col).reset_index(drop=True)
 
         # Load textual data if available
         report_file = textual_dir / f"{self.domain}_report.csv"
@@ -89,33 +95,42 @@ class TimeMmdDataset(MultimodalDatasetBase):
             numerical_df: Dataframe containing numerical time series data.
             textual_data: Dictionary containing textual dataframes (reports, search).
         """
-        # Identify numeric columns (exclude date columns)
-        date_cols = ["Date", "date", "start_date", "end_date"]
-        numeric_cols = [
-            col
-            for col in numerical_df.columns
-            if col not in date_cols and pd.api.types.is_numeric_dtype(numerical_df[col])
-        ]
+        # Use column configuration to determine which columns to use
+        numeric_cols = self.column_config.get_time_series_columns(all_columns=numerical_df.columns.tolist())
+
+        if not numeric_cols:
+            raise ValueError(f"No time series columns found for domain '{self.domain}' with the given configuration")
+
+        # Get date columns from configuration
+        start_date_col = self.column_config.start_date_col
+        end_date_col = self.column_config.end_date_col
 
         # Prepare date series for efficient lookup
-        if "start_date" in numerical_df.columns:
-            full_start_dates = numerical_df["start_date"]
-        elif "Date" in numerical_df.columns:
-            full_start_dates = numerical_df["Date"]
-        elif "date" in numerical_df.columns:
-            full_start_dates = numerical_df["date"]
-        else:
-            raise ValueError("No start_date column found. Expected at least one of: 'start_date', 'Date', 'date'")
+        if start_date_col not in numerical_df.columns:
+            raise ValueError(
+                f"Start date column '{start_date_col}' not found in numerical data. "
+                f"Available columns: {numerical_df.columns.tolist()}"
+            )
 
-        if "end_date" in numerical_df.columns:
-            full_end_dates = numerical_df["end_date"]
-        else:
-            raise ValueError("No end_date column found in numerical data")
+        if end_date_col not in numerical_df.columns:
+            raise ValueError(
+                f"End date column '{end_date_col}' not found in numerical data. "
+                f"Available columns: {numerical_df.columns.tolist()}"
+            )
+
+        full_start_dates = numerical_df[start_date_col]
+        full_end_dates = numerical_df[end_date_col]
 
         # Process each numeric column as a separate time series
         for column in numeric_cols:
             # Extract time series from this column
             time_series_values = numerical_df.loc[:, column].to_numpy()
+
+            # Check for and handle NaN/Inf values
+            if np.any(np.isnan(time_series_values)) or np.any(np.isinf(time_series_values)):
+                # Skip this column if it contains NaN or Inf values
+                # This prevents NaN loss during training
+                continue
 
             # Split data based on split_ratio
             split_idx = int(len(time_series_values) * self.split_ratio)
