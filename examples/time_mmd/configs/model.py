@@ -1,4 +1,4 @@
-"""Model configuration dataclasses for multimodal TimesFM."""
+"""Model configuration dataclasses for multimodal TimesFM on Time-MMD dataset."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from multimodal_timesfm.utils.yaml import load_yaml
 @dataclass
 class TimesFMConfig:
     # TimesFmHparams
-    context_len: int = 128
+    context_len: int = 32
     horizon_len: int = 128
     input_patch_len: int = 32
     output_patch_len: int = 128
