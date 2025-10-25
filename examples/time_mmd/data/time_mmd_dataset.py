@@ -60,6 +60,86 @@ class TimeMmdDataset(MultimodalDatasetBase):
         self.column_config = column_config or DEFAULT_TIME_MMD_CONFIGS.get_config_for_domain(domain)
         super().__init__(data_dir, split_ratio, split, patch_len, context_len, horizon_len)
 
+    def _sanitize_time_series(
+        self, time_series_values: np.ndarray, start_dates: pd.Series, end_dates: pd.Series
+    ) -> tuple[np.ndarray, pd.Series, pd.Series] | None:
+        """Sanitize time series by removing leading/trailing invalid values and interpolating all invalid values.
+
+        This function performs the following operations:
+        1. Strips leading and trailing NaN/inf/None values from the time series
+        2. Interpolates any remaining invalid values (NaN/inf/None) in the middle of the series
+
+        Args:
+            time_series_values: Raw time series values from the dataset.
+            start_dates: Series of start dates corresponding to each time series value.
+            end_dates: Series of end dates corresponding to each time series value.
+
+        Returns:
+            Tuple of (sanitized_values, trimmed_start_dates, trimmed_end_dates) if successful,
+            None if the series cannot be sanitized (e.g., no valid values exist).
+        """
+        # Convert to float for consistent handling
+        sanitized_values = time_series_values.astype(float)
+
+        # Strip leading and trailing invalid values (NaN/inf/None)
+        valid_mask = pd.notna(sanitized_values) & np.isfinite(sanitized_values)
+
+        valid_indices = np.where(valid_mask)[0]
+        if len(valid_indices) == 0:
+            return None
+
+        first_valid_idx = valid_indices[0]
+        last_valid_idx = valid_indices[-1]
+
+        # Trim to valid range (remove leading/trailing invalid values)
+        sanitized_values = sanitized_values[first_valid_idx : last_valid_idx + 1]
+        trimmed_start_dates = start_dates.iloc[first_valid_idx : last_valid_idx + 1].reset_index(drop=True)
+        trimmed_end_dates = end_dates.iloc[first_valid_idx : last_valid_idx + 1].reset_index(drop=True)
+
+        # Interpolate any remaining invalid values in the middle of the series
+        # This handles NaN, inf, and -inf values uniformly
+        if not np.all(np.isfinite(sanitized_values)):
+            # Use pandas Series for easy interpolation
+            ts_series = pd.Series(sanitized_values)
+            # Replace inf/-inf with NaN so pandas can interpolate everything uniformly
+            ts_series = ts_series.replace([np.inf, -np.inf], np.nan)
+            # Interpolate: first try linear, then forward fill, then backward fill
+            ts_series = ts_series.interpolate(method="linear", limit_direction="both")
+            ts_series = ts_series.ffill().bfill()
+            sanitized_values = ts_series.to_numpy()
+
+        return sanitized_values, trimmed_start_dates, trimmed_end_dates
+
+    def _normalize_sample(self, context: np.ndarray, future: np.ndarray) -> tuple[np.ndarray, np.ndarray, float, float]:
+        """Normalize context and future using z-score normalization based on context statistics.
+
+        This ensures that samples from different domains with vastly different scales
+        (e.g., Energy: 0.95-1.75 vs Security: millions-billions) are normalized to
+        comparable ranges for stable training.
+
+        Args:
+            context: Context window values of shape (context_len, 1).
+            future: Future values to predict of shape (horizon_len, 1).
+
+        Returns:
+            Tuple of (normalized_context, normalized_future, context_mean, context_std).
+            The normalization parameters can be used to denormalize predictions.
+        """
+        # Calculate statistics from context window
+        context_mean = np.mean(context)
+        context_std = np.std(context)
+
+        # Avoid division by zero
+        epsilon = 1e-7
+        if context_std < epsilon:
+            context_std = 1.0
+
+        # Normalize both context and future using context statistics
+        context_normalized = (context - context_mean) / context_std
+        future_normalized = (future - context_mean) / context_std
+
+        return context_normalized, future_normalized, float(context_mean), float(context_std)
+
     def _load_data(self) -> None:
         """Loads Time-MMD dataset from files."""
         numerical_file = self.data_dir / "numerical" / self.domain / f"{self.domain}.csv"
@@ -126,23 +206,23 @@ class TimeMmdDataset(MultimodalDatasetBase):
             # Extract time series from this column
             time_series_values = numerical_df.loc[:, column].to_numpy()
 
-            # Check for and handle NaN/Inf values
-            if np.any(np.isnan(time_series_values)) or np.any(np.isinf(time_series_values)):
-                # Skip this column if it contains NaN or Inf values
-                # This prevents NaN loss during training
+            # Sanitize time series: strip leading/trailing invalid values and interpolate middle ones
+            sanitized = self._sanitize_time_series(time_series_values, full_start_dates, full_end_dates)
+            if sanitized is None:
                 continue
+            sanitized_values, trimmed_start_dates, trimmed_end_dates = sanitized
 
             # Split data based on split_ratio
-            split_idx = int(len(time_series_values) * self.split_ratio)
+            split_idx = int(len(sanitized_values) * self.split_ratio)
 
             if self.split == "train":
-                ts_data = time_series_values[:split_idx]
-                start_dates = full_start_dates.iloc[:split_idx]
-                end_dates = full_end_dates.iloc[:split_idx]
+                ts_data = sanitized_values[:split_idx]
+                start_dates = trimmed_start_dates.iloc[:split_idx]
+                end_dates = trimmed_end_dates.iloc[:split_idx]
             else:  # test
-                ts_data = time_series_values[split_idx:]
-                start_dates = full_start_dates.iloc[split_idx:]
-                end_dates = full_end_dates.iloc[split_idx:]
+                ts_data = sanitized_values[split_idx:]
+                start_dates = trimmed_start_dates.iloc[split_idx:]
+                end_dates = trimmed_end_dates.iloc[split_idx:]
 
             # Skip if insufficient data after split
             if len(ts_data) < self.context_len + self.horizon_len:
@@ -157,6 +237,11 @@ class TimeMmdDataset(MultimodalDatasetBase):
                 # Extract future
                 future_end = context_end + self.horizon_len
                 future = ts_data[context_end:future_end].reshape(-1, 1)
+
+                # Normalize context and future using context statistics
+                context_normalized, future_normalized, context_mean, context_std = self._normalize_sample(
+                    context, future
+                )
 
                 # Get associated text for this context
                 window_start_date = str(start_dates.iloc[start_idx])
@@ -173,14 +258,16 @@ class TimeMmdDataset(MultimodalDatasetBase):
                 )
 
                 sample = {
-                    "context": context.astype(np.float32),
-                    "future": future.astype(np.float32),
+                    "context": context_normalized.astype(np.float32),
+                    "future": future_normalized.astype(np.float32),
                     "freq": freq,
                     "patched_texts": patched_texts,
                     "metadata": {
                         "domain": self.domain,
                         "column": column,
                         "start_index": start_idx,
+                        "mean": context_mean,
+                        "std": context_std,
                     },
                 }
                 self.data.append(sample)
