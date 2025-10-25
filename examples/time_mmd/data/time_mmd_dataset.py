@@ -247,8 +247,8 @@ class TimeMmdDataset(MultimodalDatasetBase):
                 window_start_date = str(start_dates.iloc[start_idx])
                 window_end_date = str(end_dates.iloc[context_end - 1])
 
-                # Calculate frequency based on interval between end_date values
-                freq = self._calculate_frequency_for_sample(end_dates, start_idx, context_end)
+                # Calculate frequency based on interval between start_date values
+                freq = self._calculate_frequency_for_sample(start_dates, start_idx, context_end)
 
                 # Calculate number of text patches based on context_len / patch_len
                 text_patches_num = self.context_len // self.patch_len
