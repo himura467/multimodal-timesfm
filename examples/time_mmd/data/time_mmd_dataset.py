@@ -272,6 +272,36 @@ class TimeMmdDataset(MultimodalDatasetBase):
                 }
                 self.data.append(sample)
 
+    def _clean_and_validate_text(self, text: str | None) -> str | None:
+        """Clean and validate text, returning cleaned text if valid or None if invalid.
+
+        Filters out text that is:
+        - None or NaN
+        - Empty or whitespace-only
+        - Starts with "NA" (case-sensitive, indicating no information available)
+
+        Args:
+            text: Text string to validate and clean.
+
+        Returns:
+            Cleaned text string if valid, None if invalid.
+        """
+        if text is None or pd.isna(text):
+            return None
+
+        # Convert to string and strip whitespace
+        text_str = str(text).strip()
+
+        # Empty or whitespace-only
+        if not text_str:
+            return None
+
+        # Starts with "NA" (case-sensitive)
+        if text_str.startswith("NA"):
+            return None
+
+        return text_str
+
     def _calculate_frequency_for_sample(self, dates: pd.Series, start_idx: int, end_idx: int) -> int:
         """Calculate frequency value based on interval between date values.
 
@@ -353,10 +383,14 @@ class TimeMmdDataset(MultimodalDatasetBase):
                     ]
 
                     for _, row in matching_reports.iterrows():
-                        if "fact" in reports_df.columns and pd.notna(row["fact"]) and str(row["fact"]) != "NA":
-                            patch_reports.append(f"Report: {str(row['fact'])}")
-                        if "preds" in reports_df.columns and pd.notna(row["preds"]) and str(row["preds"]) != "NA":
-                            patch_reports.append(f"Report Prediction: {str(row['preds'])}")
+                        if "fact" in reports_df.columns:
+                            cleaned_fact = self._clean_and_validate_text(row["fact"])
+                            if cleaned_fact is not None:
+                                patch_reports.append(f"Report: {cleaned_fact}")
+                        if "preds" in reports_df.columns:
+                            cleaned_preds = self._clean_and_validate_text(row["preds"])
+                            if cleaned_preds is not None:
+                                patch_reports.append(f"Report Prediction: {cleaned_preds}")
 
             # Get search data that overlaps with this patch period
             if "search" in textual_data:
@@ -371,10 +405,14 @@ class TimeMmdDataset(MultimodalDatasetBase):
                     ]
 
                     for _, row in matching_search.iterrows():
-                        if "fact" in search_df.columns and pd.notna(row["fact"]) and str(row["fact"]) != "NA":
-                            patch_reports.append(f"Search: {str(row['fact'])}")
-                        if "preds" in search_df.columns and pd.notna(row["preds"]) and str(row["preds"]) != "NA":
-                            patch_reports.append(f"Search prediction: {str(row['preds'])}")
+                        if "fact" in search_df.columns:
+                            cleaned_fact = self._clean_and_validate_text(row["fact"])
+                            if cleaned_fact is not None:
+                                patch_reports.append(f"Search: {cleaned_fact}")
+                        if "preds" in search_df.columns:
+                            cleaned_preds = self._clean_and_validate_text(row["preds"])
+                            if cleaned_preds is not None:
+                                patch_reports.append(f"Search prediction: {cleaned_preds}")
 
             patches.append(patch_reports)
 
