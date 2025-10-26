@@ -8,11 +8,25 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from examples.time_mmd.configs.domain_columns import DomainColumnConfig
 from examples.time_mmd.data.time_mmd_dataset import TimeMmdDataset
 
 
 class TestTimeMmdDataset:
     """Test cases for TimeMmdDataset class."""
+
+    @pytest.fixture(scope="session")
+    def test_domain_config(self) -> DomainColumnConfig:
+        """Returns a domain configuration for the test domain.
+
+        Returns:
+            DomainColumnConfig configured for the test data structure.
+        """
+        return DomainColumnConfig(
+            start_date_col="start_date",
+            end_date_col="end_date",
+            time_series_cols=["value1", "value2"],
+        )
 
     @pytest.fixture(scope="session")
     def sample_data_dir(self) -> Generator[Path, None, None]:
@@ -69,7 +83,7 @@ class TestTimeMmdDataset:
 
             yield data_dir
 
-    def test_init_valid_parameters(self, sample_data_dir: Path) -> None:
+    def test_init_valid_parameters(self, sample_data_dir: Path, test_domain_config: DomainColumnConfig) -> None:
         """Tests initialization with valid parameters."""
         dataset = TimeMmdDataset(
             data_dir=sample_data_dir,
@@ -77,6 +91,7 @@ class TestTimeMmdDataset:
             patch_len=8,
             context_len=32,
             horizon_len=16,
+            column_config=test_domain_config,
         )
 
         assert dataset.domain == "TestDomain"
@@ -97,7 +112,7 @@ class TestTimeMmdDataset:
                 horizon_len=16,
             )
 
-    def test_missing_text_data_handling(self) -> None:
+    def test_missing_text_data_handling(self, test_domain_config: DomainColumnConfig) -> None:
         """Tests handling when textual data files are missing."""
         with tempfile.TemporaryDirectory() as temp_dir:
             data_dir = Path(temp_dir)
@@ -110,7 +125,7 @@ class TestTimeMmdDataset:
                 {
                     "start_date": dates.astype(str),
                     "end_date": dates.astype(str),
-                    "value": np.random.randn(100),
+                    "value1": np.random.randn(100),
                 }
             )
             numerical_data.to_csv(numerical_dir / "NoTextDomain.csv", index=False)
@@ -122,6 +137,7 @@ class TestTimeMmdDataset:
                 patch_len=8,
                 context_len=32,
                 horizon_len=16,
+                column_config=test_domain_config,
             )
 
             assert len(dataset) > 0
@@ -130,7 +146,7 @@ class TestTimeMmdDataset:
             sample = dataset[0]
             assert all(len(patch) == 0 for patch in sample["patched_texts"])
 
-    def test_missing_date_columns(self) -> None:
+    def test_missing_date_columns(self, test_domain_config: DomainColumnConfig) -> None:
         """Tests handling of missing date columns."""
         with tempfile.TemporaryDirectory() as temp_dir:
             data_dir = Path(temp_dir)
@@ -140,22 +156,23 @@ class TestTimeMmdDataset:
             # Create data without proper date columns
             bad_data = pd.DataFrame(
                 {
-                    "value": [1, 2, 3, 4, 5],
+                    "value1": [1, 2, 3, 4, 5],
                     "other_col": ["a", "b", "c", "d", "e"],
                 }
             )
             bad_data.to_csv(numerical_dir / "BadDomain.csv", index=False)
 
-            with pytest.raises(ValueError, match="No start_date column found"):
+            with pytest.raises(ValueError, match="Start date column 'start_date' not found"):
                 TimeMmdDataset(
                     data_dir=data_dir,
                     domain="BadDomain",
                     patch_len=1,
                     context_len=4,
                     horizon_len=2,
+                    column_config=test_domain_config,
                 )
 
-    def test_missing_end_date_column(self) -> None:
+    def test_missing_end_date_column(self, test_domain_config: DomainColumnConfig) -> None:
         """Tests handling of missing end_date column."""
         with tempfile.TemporaryDirectory() as temp_dir:
             data_dir = Path(temp_dir)
@@ -166,28 +183,29 @@ class TestTimeMmdDataset:
             bad_data = pd.DataFrame(
                 {
                     "start_date": ["2020-01-01", "2020-01-02"],
-                    "value": [1.0, 2.0],
+                    "value1": [1.0, 2.0],
                 }
             )
             bad_data.to_csv(numerical_dir / "BadDomain.csv", index=False)
 
-            with pytest.raises(ValueError, match="No end_date column found"):
+            with pytest.raises(ValueError, match="End date column 'end_date' not found"):
                 TimeMmdDataset(
                     data_dir=data_dir,
                     domain="BadDomain",
                     patch_len=1,
                     context_len=4,
                     horizon_len=2,
+                    column_config=test_domain_config,
                 )
 
-    def test_no_numeric_columns(self) -> None:
+    def test_no_numeric_columns(self, test_domain_config: DomainColumnConfig) -> None:
         """Tests handling when no numeric columns are found."""
         with tempfile.TemporaryDirectory() as temp_dir:
             data_dir = Path(temp_dir)
             numerical_dir = data_dir / "numerical" / "TextOnlyDomain"
             numerical_dir.mkdir(parents=True)
 
-            # Create data with only text columns
+            # Create data with only text columns (no value1 or value2)
             text_only_data = pd.DataFrame(
                 {
                     "start_date": ["2020-01-01", "2020-01-02"],
@@ -198,18 +216,18 @@ class TestTimeMmdDataset:
             )
             text_only_data.to_csv(numerical_dir / "TextOnlyDomain.csv", index=False)
 
-            dataset = TimeMmdDataset(
-                data_dir=data_dir,
-                domain="TextOnlyDomain",
-                patch_len=1,
-                context_len=4,
-                horizon_len=2,
-            )
+            # Should raise ValueError since value1 and value2 columns don't exist
+            with pytest.raises(ValueError, match="No time series columns found for domain 'TextOnlyDomain'"):
+                TimeMmdDataset(
+                    data_dir=data_dir,
+                    domain="TextOnlyDomain",
+                    patch_len=1,
+                    context_len=4,
+                    horizon_len=2,
+                    column_config=test_domain_config,
+                )
 
-            # Should result in empty dataset
-            assert len(dataset) == 0
-
-    def test_numeric_column_filtering(self, sample_data_dir: Path) -> None:
+    def test_numeric_column_filtering(self, sample_data_dir: Path, test_domain_config: DomainColumnConfig) -> None:
         """Tests that only numeric columns are processed as time series."""
         dataset = TimeMmdDataset(
             data_dir=sample_data_dir,
@@ -217,6 +235,7 @@ class TestTimeMmdDataset:
             patch_len=4,
             context_len=16,
             horizon_len=8,
+            column_config=test_domain_config,
         )
 
         # Should only have samples from value1 and value2 columns, not category
@@ -229,7 +248,7 @@ class TestTimeMmdDataset:
         assert "value2" in columns_found
         assert "category" not in columns_found
 
-    def test_train_test_split(self, sample_data_dir: Path) -> None:
+    def test_train_test_split(self, sample_data_dir: Path, test_domain_config: DomainColumnConfig) -> None:
         """Tests train/test split functionality."""
         train_dataset = TimeMmdDataset(
             data_dir=sample_data_dir,
@@ -238,6 +257,7 @@ class TestTimeMmdDataset:
             patch_len=4,
             context_len=8,
             horizon_len=4,
+            column_config=test_domain_config,
         )
 
         test_dataset = TimeMmdDataset(
@@ -247,6 +267,7 @@ class TestTimeMmdDataset:
             patch_len=4,
             context_len=8,
             horizon_len=4,
+            column_config=test_domain_config,
         )
 
         # Both splits should have data
@@ -260,7 +281,7 @@ class TestTimeMmdDataset:
         # Allow tolerance due to windowing effects and discrete sample counts
         assert 0.8 <= train_ratio < 1
 
-    def test_different_split_ratios(self, sample_data_dir: Path) -> None:
+    def test_different_split_ratios(self, sample_data_dir: Path, test_domain_config: DomainColumnConfig) -> None:
         """Tests different split ratios."""
         # Use smaller context/horizon to ensure we have enough data for both splits
         # 60/40 split
@@ -272,6 +293,7 @@ class TestTimeMmdDataset:
             patch_len=4,
             context_len=8,
             horizon_len=4,
+            column_config=test_domain_config,
         )
 
         test_dataset = TimeMmdDataset(
@@ -282,6 +304,7 @@ class TestTimeMmdDataset:
             patch_len=4,
             context_len=8,
             horizon_len=4,
+            column_config=test_domain_config,
         )
 
         # Both splits should have data
@@ -295,7 +318,9 @@ class TestTimeMmdDataset:
         # Allow tolerance due to windowing effects and discrete sample counts
         assert 0.6 <= train_ratio < 0.7
 
-    def test_init_invalid_context_patch_ratio(self, sample_data_dir: Path) -> None:
+    def test_init_invalid_context_patch_ratio(
+        self, sample_data_dir: Path, test_domain_config: DomainColumnConfig
+    ) -> None:
         """Tests initialization fails when context_len is not multiple of patch_len."""
         with pytest.raises(ValueError, match="context_len \\(31\\) must be an integer multiple of patch_len \\(8\\)"):
             TimeMmdDataset(
@@ -304,9 +329,12 @@ class TestTimeMmdDataset:
                 patch_len=8,
                 context_len=31,  # Not multiple of patch_len=8
                 horizon_len=16,
+                column_config=test_domain_config,
             )
 
-    def test_init_invalid_horizon_patch_ratio(self, sample_data_dir: Path) -> None:
+    def test_init_invalid_horizon_patch_ratio(
+        self, sample_data_dir: Path, test_domain_config: DomainColumnConfig
+    ) -> None:
         """Tests initialization fails when horizon_len is not multiple of patch_len."""
         with pytest.raises(ValueError, match="horizon_len \\(15\\) must be an integer multiple of patch_len \\(8\\)"):
             TimeMmdDataset(
@@ -315,9 +343,10 @@ class TestTimeMmdDataset:
                 patch_len=8,
                 context_len=32,
                 horizon_len=15,  # Not multiple of patch_len=8
+                column_config=test_domain_config,
             )
 
-    def test_insufficient_data_handling(self) -> None:
+    def test_insufficient_data_handling(self, test_domain_config: DomainColumnConfig) -> None:
         """Tests handling when data is too short for context + horizon."""
         with tempfile.TemporaryDirectory() as temp_dir:
             data_dir = Path(temp_dir)
@@ -329,7 +358,7 @@ class TestTimeMmdDataset:
                 {
                     "start_date": ["2020-01-01", "2020-01-02"],
                     "end_date": ["2020-01-01", "2020-01-02"],
-                    "value": [1.0, 2.0],
+                    "value1": [1.0, 2.0],
                 }
             )
             short_data.to_csv(numerical_dir / "ShortDomain.csv", index=False)
@@ -340,12 +369,15 @@ class TestTimeMmdDataset:
                 patch_len=8,
                 context_len=32,
                 horizon_len=16,
+                column_config=test_domain_config,
             )
 
             # Should handle gracefully with empty dataset
             assert len(dataset) == 0
 
-    def test_calculate_frequency_daily_data(self, sample_data_dir: Path) -> None:
+    def test_calculate_frequency_daily_data(
+        self, sample_data_dir: Path, test_domain_config: DomainColumnConfig
+    ) -> None:
         """Tests frequency calculation for daily data."""
         dataset = TimeMmdDataset(
             data_dir=sample_data_dir,
@@ -353,6 +385,7 @@ class TestTimeMmdDataset:
             patch_len=8,
             context_len=32,
             horizon_len=16,
+            column_config=test_domain_config,
         )
 
         # Create daily dates
@@ -362,7 +395,9 @@ class TestTimeMmdDataset:
         freq = dataset._calculate_frequency_for_sample(dates_series, 0, 30)
         assert freq == 0  # Daily frequency
 
-    def test_calculate_frequency_weekly_data(self, sample_data_dir: Path) -> None:
+    def test_calculate_frequency_weekly_data(
+        self, sample_data_dir: Path, test_domain_config: DomainColumnConfig
+    ) -> None:
         """Tests frequency calculation for weekly data."""
         dataset = TimeMmdDataset(
             data_dir=sample_data_dir,
@@ -370,6 +405,7 @@ class TestTimeMmdDataset:
             patch_len=8,
             context_len=32,
             horizon_len=16,
+            column_config=test_domain_config,
         )
 
         # Create weekly dates
@@ -379,7 +415,9 @@ class TestTimeMmdDataset:
         freq = dataset._calculate_frequency_for_sample(dates_series, 0, 15)
         assert freq == 1  # Weekly frequency
 
-    def test_calculate_frequency_monthly_data(self, sample_data_dir: Path) -> None:
+    def test_calculate_frequency_monthly_data(
+        self, sample_data_dir: Path, test_domain_config: DomainColumnConfig
+    ) -> None:
         """Tests frequency calculation for monthly data."""
         dataset = TimeMmdDataset(
             data_dir=sample_data_dir,
@@ -387,6 +425,7 @@ class TestTimeMmdDataset:
             patch_len=8,
             context_len=32,
             horizon_len=16,
+            column_config=test_domain_config,
         )
 
         # Create monthly dates
@@ -396,7 +435,9 @@ class TestTimeMmdDataset:
         freq = dataset._calculate_frequency_for_sample(dates_series, 0, 12)
         assert freq == 1  # Monthly frequency
 
-    def test_calculate_frequency_quarterly_data(self, sample_data_dir: Path) -> None:
+    def test_calculate_frequency_quarterly_data(
+        self, sample_data_dir: Path, test_domain_config: DomainColumnConfig
+    ) -> None:
         """Tests frequency calculation for quarterly data."""
         dataset = TimeMmdDataset(
             data_dir=sample_data_dir,
@@ -404,6 +445,7 @@ class TestTimeMmdDataset:
             patch_len=8,
             context_len=32,
             horizon_len=16,
+            column_config=test_domain_config,
         )
 
         # Create quarterly dates
@@ -413,7 +455,9 @@ class TestTimeMmdDataset:
         freq = dataset._calculate_frequency_for_sample(dates_series, 0, 10)
         assert freq == 2  # Quarterly frequency
 
-    def test_calculate_frequency_yearly_data(self, sample_data_dir: Path) -> None:
+    def test_calculate_frequency_yearly_data(
+        self, sample_data_dir: Path, test_domain_config: DomainColumnConfig
+    ) -> None:
         """Tests frequency calculation for yearly data."""
         dataset = TimeMmdDataset(
             data_dir=sample_data_dir,
@@ -421,6 +465,7 @@ class TestTimeMmdDataset:
             patch_len=8,
             context_len=32,
             horizon_len=16,
+            column_config=test_domain_config,
         )
 
         # Create yearly dates
@@ -430,7 +475,9 @@ class TestTimeMmdDataset:
         freq = dataset._calculate_frequency_for_sample(dates_series, 0, 6)
         assert freq == 2  # Yearly frequency
 
-    def test_calculate_frequency_insufficient_data(self, sample_data_dir: Path) -> None:
+    def test_calculate_frequency_insufficient_data(
+        self, sample_data_dir: Path, test_domain_config: DomainColumnConfig
+    ) -> None:
         """Tests frequency calculation with insufficient data points."""
         dataset = TimeMmdDataset(
             data_dir=sample_data_dir,
@@ -438,6 +485,7 @@ class TestTimeMmdDataset:
             patch_len=8,
             context_len=32,
             horizon_len=16,
+            column_config=test_domain_config,
         )
 
         dates_series = pd.Series(["2020-01-01"])
@@ -450,7 +498,9 @@ class TestTimeMmdDataset:
         freq = dataset._calculate_frequency_for_sample(dates_series, 0, 1)
         assert freq == 0
 
-    def test_calculate_frequency_single_date_range(self, sample_data_dir: Path) -> None:
+    def test_calculate_frequency_single_date_range(
+        self, sample_data_dir: Path, test_domain_config: DomainColumnConfig
+    ) -> None:
         """Tests frequency calculation with only one date difference."""
         dataset = TimeMmdDataset(
             data_dir=sample_data_dir,
@@ -458,6 +508,7 @@ class TestTimeMmdDataset:
             patch_len=8,
             context_len=32,
             horizon_len=16,
+            column_config=test_domain_config,
         )
 
         dates_series = pd.Series(["2020-01-01", "2020-01-02"])
@@ -465,7 +516,9 @@ class TestTimeMmdDataset:
         freq = dataset._calculate_frequency_for_sample(dates_series, 0, 2)
         assert freq == 0  # Single day interval
 
-    def test_calculate_frequency_mixed_intervals(self, sample_data_dir: Path) -> None:
+    def test_calculate_frequency_mixed_intervals(
+        self, sample_data_dir: Path, test_domain_config: DomainColumnConfig
+    ) -> None:
         """Tests frequency calculation with mixed intervals averaging to weekly."""
         dataset = TimeMmdDataset(
             data_dir=sample_data_dir,
@@ -473,6 +526,7 @@ class TestTimeMmdDataset:
             patch_len=8,
             context_len=32,
             horizon_len=16,
+            column_config=test_domain_config,
         )
 
         # Mix of 1-day and 25-day intervals (average ~7 days)
@@ -488,7 +542,9 @@ class TestTimeMmdDataset:
         freq = dataset._calculate_frequency_for_sample(dates_series, 0, 5)
         assert freq == 1  # Should classify as weekly (average ~7 days)
 
-    def test_calculate_frequency_subsample_range(self, sample_data_dir: Path) -> None:
+    def test_calculate_frequency_subsample_range(
+        self, sample_data_dir: Path, test_domain_config: DomainColumnConfig
+    ) -> None:
         """Tests frequency calculation on a subsample of the date series."""
         dataset = TimeMmdDataset(
             data_dir=sample_data_dir,
@@ -496,6 +552,7 @@ class TestTimeMmdDataset:
             patch_len=8,
             context_len=32,
             horizon_len=16,
+            column_config=test_domain_config,
         )
 
         # Create mixed frequency data
@@ -513,7 +570,9 @@ class TestTimeMmdDataset:
         freq_weekly = dataset._calculate_frequency_for_sample(dates_series, 10, 18)
         assert freq_weekly == 1
 
-    def test_calculate_frequency_boundary_cases(self, sample_data_dir: Path) -> None:
+    def test_calculate_frequency_boundary_cases(
+        self, sample_data_dir: Path, test_domain_config: DomainColumnConfig
+    ) -> None:
         """Tests frequency calculation at boundary values."""
         dataset = TimeMmdDataset(
             data_dir=sample_data_dir,
@@ -521,6 +580,7 @@ class TestTimeMmdDataset:
             patch_len=8,
             context_len=32,
             horizon_len=16,
+            column_config=test_domain_config,
         )
 
         # Test 3-day boundary (should be weekly/monthly category)
@@ -535,7 +595,7 @@ class TestTimeMmdDataset:
         freq = dataset._calculate_frequency_for_sample(dates_series, 0, 8)
         assert freq == 2
 
-    def test_text_patching_logic(self, sample_data_dir: Path) -> None:
+    def test_text_patching_logic(self, sample_data_dir: Path, test_domain_config: DomainColumnConfig) -> None:
         """Tests text patching logic."""
         dataset = TimeMmdDataset(
             data_dir=sample_data_dir,
@@ -543,6 +603,7 @@ class TestTimeMmdDataset:
             patch_len=4,
             context_len=16,
             horizon_len=8,
+            column_config=test_domain_config,
         )
 
         sample = dataset[0]
@@ -558,7 +619,7 @@ class TestTimeMmdDataset:
             for text in patch:
                 assert isinstance(text, str)
 
-    def test_text_data_with_missing_values(self) -> None:
+    def test_text_data_with_missing_values(self, test_domain_config: DomainColumnConfig) -> None:
         """Tests handling of text data with missing values."""
         with tempfile.TemporaryDirectory() as temp_dir:
             data_dir = Path(temp_dir)
@@ -573,7 +634,7 @@ class TestTimeMmdDataset:
                 {
                     "start_date": dates.astype(str),
                     "end_date": dates.astype(str),
-                    "value": np.random.randn(50),
+                    "value1": np.random.randn(50),
                 }
             )
             numerical_data.to_csv(numerical_dir / "MissingTextDomain.csv", index=False)
@@ -595,12 +656,13 @@ class TestTimeMmdDataset:
                 patch_len=4,
                 context_len=16,
                 horizon_len=8,
+                column_config=test_domain_config,
             )
 
             # Should handle gracefully without errors
             assert len(dataset) == 3
 
-    def test_text_filtering_na_values(self, sample_data_dir: Path) -> None:
+    def test_text_filtering_na_values(self, sample_data_dir: Path, test_domain_config: DomainColumnConfig) -> None:
         """Tests that NA values are filtered out from text data."""
         dataset = TimeMmdDataset(
             data_dir=sample_data_dir,
@@ -608,6 +670,7 @@ class TestTimeMmdDataset:
             patch_len=4,
             context_len=16,
             horizon_len=8,
+            column_config=test_domain_config,
         )
 
         # Check that no "NA" strings appear in text patches
@@ -617,7 +680,7 @@ class TestTimeMmdDataset:
                 for text in patch:
                     assert "NA" not in text
 
-    def test_getitem_bounds_checking(self, sample_data_dir: Path) -> None:
+    def test_getitem_bounds_checking(self, sample_data_dir: Path, test_domain_config: DomainColumnConfig) -> None:
         """Tests __getitem__ with invalid indices."""
         dataset = TimeMmdDataset(
             data_dir=sample_data_dir,
@@ -625,6 +688,7 @@ class TestTimeMmdDataset:
             patch_len=4,
             context_len=16,
             horizon_len=8,
+            column_config=test_domain_config,
         )
 
         # Valid index should work
@@ -637,7 +701,7 @@ class TestTimeMmdDataset:
         with pytest.raises(IndexError):
             dataset[-len(dataset) - 1]
 
-    def test_len_method(self, sample_data_dir: Path) -> None:
+    def test_len_method(self, sample_data_dir: Path, test_domain_config: DomainColumnConfig) -> None:
         """Tests __len__ method."""
         dataset = TimeMmdDataset(
             data_dir=sample_data_dir,
@@ -645,11 +709,12 @@ class TestTimeMmdDataset:
             patch_len=4,
             context_len=16,
             horizon_len=8,
+            column_config=test_domain_config,
         )
 
         assert len(dataset) == 16
 
-    def test_data_loading_and_structure(self, sample_data_dir: Path) -> None:
+    def test_data_loading_and_structure(self, sample_data_dir: Path, test_domain_config: DomainColumnConfig) -> None:
         """Tests that data is loaded correctly and has expected structure."""
         dataset = TimeMmdDataset(
             data_dir=sample_data_dir,
@@ -657,6 +722,7 @@ class TestTimeMmdDataset:
             patch_len=8,
             context_len=32,
             horizon_len=16,
+            column_config=test_domain_config,
         )
 
         assert len(dataset) > 0
@@ -688,7 +754,9 @@ class TestTimeMmdDataset:
         assert "column" in sample["metadata"]
         assert "start_index" in sample["metadata"]
 
-    def test_data_consistency_across_samples(self, sample_data_dir: Path) -> None:
+    def test_data_consistency_across_samples(
+        self, sample_data_dir: Path, test_domain_config: DomainColumnConfig
+    ) -> None:
         """Tests that all samples have consistent structure."""
         dataset = TimeMmdDataset(
             data_dir=sample_data_dir,
@@ -696,6 +764,7 @@ class TestTimeMmdDataset:
             patch_len=4,
             context_len=16,
             horizon_len=8,
+            column_config=test_domain_config,
         )
 
         first_sample = dataset[0]
