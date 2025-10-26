@@ -18,26 +18,31 @@ multimodal-timesfm/
 │       ├── multimodal_dataset.py            # Base multimodal dataset class
 │       ├── preprocessing.py                 # Data preprocessing utilities
 │       ├── trainer.py                       # Training logic
+│       ├── evaluation.py                    # Evaluation logic
+│       ├── cross_validation.py              # Cross-validation utilities
 │       └── utils/                           # Utility modules
 │           ├── __init__.py
 │           ├── collate.py                   # Data collation utilities
 │           ├── device.py                    # Device utilities
 │           ├── logging.py                   # Logging utilities
 │           ├── seed.py                      # Random seed utilities
+│           ├── model.py                     # Model utilities
 │           └── yaml.py                      # YAML configuration utilities
 ├── scripts/
-│   ├── train.py                             # Training script for Time-MMD
-│   └── evaluate.py                          # Evaluation script for Time-MMD
+│   ├── train_time_mmd_cv.py                 # Training script with cross-validation
+│   ├── evaluate_time_mmd_cv.py              # Evaluation script with cross-validation
+│   └── visualize_time_mmd_cv.py             # Visualize model predictions
 ├── examples/
 │   └── time_mmd/                            # Time-MMD dataset example components
 │       ├── configs/                         # Time-MMD specific configurations
 │       │   ├── __init__.py
 │       │   ├── training.py                  # Training configuration
-│       │   ├── evaluation.py                # Evaluation configuration
-│       │   └── model.py                     # Model architecture settings
+│       │   ├── model.py                     # Model architecture settings
+│       │   └── domain_columns.py            # Domain-specific column configurations
 │       └── data/
 │           ├── __init__.py
-│           └── time_mmd_dataset.py          # Time-MMD dataset loader
+│           ├── time_mmd_dataset.py          # Time-MMD dataset loader
+│           └── cross_validation.py          # Cross-validation split logic
 ├── data/
 │   └── Time-MMD/                            # Time-MMD dataset submodule
 │       ├── numerical/                       # Time series data by domain
@@ -49,7 +54,8 @@ multimodal-timesfm/
 │   ├── test_preprocessing.py
 │   ├── test_trainer.py
 │   ├── test_multimodal_fusion.py
-│   └── test_multimodal_patched_decoder.py
+│   ├── test_multimodal_patched_decoder.py
+│   └── test_cross_validation.py
 ├── .gitmodules                              # Git submodule configuration
 ├── .python-version                          # Python 3.11
 ├── pyproject.toml                           # Package configuration for PyPI
@@ -63,8 +69,9 @@ multimodal-timesfm/
 - `uv run ruff check`: Linting
 - `uv run ruff format`: Code formatting
 - `uv run pytest tests/ -v`: Run test suite
-- `PYTHONPATH=. uv run python scripts/train.py`: Train multimodal TimesFM on Time-MMD
-- `PYTHONPATH=. uv run python scripts/evaluate.py`: Evaluate trained models
+- `PYTHONPATH=. uv run python scripts/train_time_mmd_cv.py`: Train multimodal TimesFM on Time-MMD with cross-validation
+- `PYTHONPATH=. uv run python scripts/evaluate_time_mmd_cv.py`: Evaluate trained models with cross-validation
+- `PYTHONPATH=. uv run python scripts/visualize_time_mmd_cv.py`: Visualize model predictions
 
 ## Data Access
 

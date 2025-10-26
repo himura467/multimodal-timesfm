@@ -24,9 +24,16 @@ def multimodal_collate_fn(batch: list[dict[str, Any]]) -> dict[str, Any]:
     for sample in batch:
         patched_texts.append(sample["patched_texts"])
 
+    # Collect metadata for each batch item
+    metadata = []
+    for sample in batch:
+        if "metadata" in sample:
+            metadata.append(sample["metadata"])
+
     return {
         "context": context.squeeze(-1),
         "future": future.squeeze(-1),
         "freq": freq.unsqueeze(-1),
         "patched_texts": patched_texts,
+        "metadata": metadata,
     }
