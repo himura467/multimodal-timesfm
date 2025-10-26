@@ -31,7 +31,7 @@ multimodal-timesfm/
 ├── scripts/
 │   ├── train_time_mmd_cv.py                 # Training script with cross-validation
 │   ├── evaluate_time_mmd_cv.py              # Evaluation script with cross-validation
-│   └── visualize_predictions.py             # Visualize model predictions
+│   └── visualize_time_mmd_cv.py             # Visualize model predictions
 ├── examples/
 │   └── time_mmd/                            # Time-MMD dataset example components
 │       ├── configs/                         # Time-MMD specific configurations
@@ -71,7 +71,7 @@ multimodal-timesfm/
 - `uv run pytest tests/ -v`: Run test suite
 - `PYTHONPATH=. uv run python scripts/train_time_mmd_cv.py`: Train multimodal TimesFM on Time-MMD with cross-validation
 - `PYTHONPATH=. uv run python scripts/evaluate_time_mmd_cv.py`: Evaluate trained models with cross-validation
-- `PYTHONPATH=. uv run python scripts/visualize_predictions.py`: Visualize model predictions
+- `PYTHONPATH=. uv run python scripts/visualize_time_mmd_cv.py`: Visualize model predictions
 
 ## Data Access
 
