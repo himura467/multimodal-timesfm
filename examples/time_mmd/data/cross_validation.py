@@ -19,7 +19,7 @@ from multimodal_timesfm.cross_validation import (
 
 def _time_mmd_dataset_factory(
     data_path: Path,
-    entity: str,
+    domain: str,
     patch_len: int,
     context_len: int,
     horizon_len: int,
@@ -29,7 +29,7 @@ def _time_mmd_dataset_factory(
 
     Args:
         data_path: Root directory containing Time-MMD dataset.
-        entity: Domain name.
+        domain: Domain name.
         patch_len: Length of input patches.
         context_len: Length of context window.
         horizon_len: Length of forecasting horizon.
@@ -40,7 +40,7 @@ def _time_mmd_dataset_factory(
     """
     return TimeMmdDataset(
         data_dir=data_path,
-        domain=entity,
+        domain=domain,
         split_ratio=1.0,  # Use all data from each domain in CV mode
         split="train",
         patch_len=patch_len,
