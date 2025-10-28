@@ -274,6 +274,39 @@ PYTHONPATH=. uv run python scripts/visualize_time_mmd_cv.py \
 - Time series plots showing context, ground truth, and predictions
 - Metric comparison bar charts (MSE and MAE)
 
+### Forecasting with Custom Parameters
+
+Generate forecasts with manually configurable context and horizon lengths:
+
+```bash
+# Forecast on all folds
+PYTHONPATH=. uv run python scripts/forecast_time_mmd.py \
+    --cv-results logs/cv_results.json \
+    --context-len 512 \
+    --horizon-len 128
+
+# Forecast on a specific fold
+PYTHONPATH=. uv run python scripts/forecast_time_mmd.py \
+    --cv-results logs/cv_results.json \
+    --fold 0 \
+    --context-len 512 \
+    --horizon-len 128
+
+# Forecast with custom settings
+PYTHONPATH=. uv run python scripts/forecast_time_mmd.py \
+    --cv-results logs/cv_results.json \
+    --context-len 256 \
+    --horizon-len 64 \
+    --num-samples 10 \
+    --output-dir custom_plots
+```
+
+This script compares multimodal model forecasts against baseline TimesFM forecasts, providing:
+
+- Time series plots comparing multimodal vs baseline predictions
+- Bar charts comparing MSE and MAE metrics
+- JSON output with all forecasts and metrics
+
 ## Acknowledgments
 
 We thank the [Time-MMD](https://github.com/AdityaLab/Time-MMD) team for providing the multimodal time series dataset used in our examples and experiments.

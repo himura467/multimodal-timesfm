@@ -31,7 +31,8 @@ multimodal-timesfm/
 ├── scripts/
 │   ├── train_time_mmd_cv.py                 # Training script with cross-validation
 │   ├── evaluate_time_mmd_cv.py              # Evaluation script with cross-validation
-│   └── visualize_time_mmd_cv.py             # Visualize model predictions
+│   ├── visualize_time_mmd_cv.py             # Visualize model predictions
+│   └── forecast_time_mmd.py                 # Forecasting script with custom parameters
 ├── examples/
 │   └── time_mmd/                            # Time-MMD dataset example components
 │       ├── configs/                         # Time-MMD specific configurations
@@ -72,6 +73,7 @@ multimodal-timesfm/
 - `PYTHONPATH=. uv run python scripts/train_time_mmd_cv.py`: Train multimodal TimesFM on Time-MMD with cross-validation
 - `PYTHONPATH=. uv run python scripts/evaluate_time_mmd_cv.py`: Evaluate trained models with cross-validation
 - `PYTHONPATH=. uv run python scripts/visualize_time_mmd_cv.py`: Visualize model predictions
+- `PYTHONPATH=. uv run python scripts/forecast_time_mmd.py --cv-results logs/cv_results.json --context-len 512 --horizon-len 128`: Generate forecasts with custom context/horizon lengths
 
 ## Data Access
 
