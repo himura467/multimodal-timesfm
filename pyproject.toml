@@ -28,6 +28,9 @@ Repository = "https://github.com/himura467/multimodal-timesfm"
 plot = [
     "matplotlib>=3.10.7",
 ]
+all = [
+    "matplotlib>=3.10.7",
+]
 
 [dependency-groups]
 dev = [
