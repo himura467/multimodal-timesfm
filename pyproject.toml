@@ -24,6 +24,11 @@ Documentation = "https://github.com/himura467/multimodal-timesfm"
 Repository = "https://github.com/himura467/multimodal-timesfm"
 "Bug Tracker" = "https://github.com/himura467/multimodal-timesfm/issues"
 
+[project.optional-dependencies]
+plot = [
+    "matplotlib>=3.10.7",
+]
+
 [dependency-groups]
 dev = [
     "mypy>=1.17.1",
