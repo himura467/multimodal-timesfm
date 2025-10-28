@@ -2,7 +2,6 @@
 name = "multimodal-timesfm"
 version = "0.1.2"
 dependencies = [
-    "matplotlib>=3.10.7",
     "sentence-transformers>=5.1.0",
     "sentencepiece>=0.2.1",
     "timesfm[torch]>=1.3.0",
