@@ -5,7 +5,7 @@ A multimodal extension of Google's [TimesFM](https://github.com/google-research/
 ## Installation
 
 ```bash
-pip install multimodal-timesfm
+pip install multimodal-timesfm[all]
 ```
 
 ## Quick Start
