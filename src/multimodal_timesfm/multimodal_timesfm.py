@@ -253,7 +253,7 @@ class MultimodalTimesFM:
                     text_descriptions=batched_text_descriptions,
                 )
 
-                if self.hparams.backend == "gpu":
+                if self.device.type != "cpu":
                     t_mean_output = t_mean_output.cpu()
                     t_full_output = t_full_output.cpu()
                 mean_output = t_mean_output.detach().numpy()
