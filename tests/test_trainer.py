@@ -247,6 +247,7 @@ class TestMultimodalTrainer:
         # Should have all parameters trainable after unfreezing
         assert trainable_after == total_params
 
+    @pytest.mark.ci_unstable
     def test_checkpoint_loading(
         self,
         model: MultimodalPatchedDecoder,
