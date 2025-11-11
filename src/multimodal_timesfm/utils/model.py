@@ -143,3 +143,34 @@ def load_multimodal_checkpoint(
     logger.info("Successfully loaded multimodal model checkpoint")
 
     return model
+
+
+def load_baseline_checkpoint(
+    checkpoint_path: Path,
+    config: TimesFMConfig,
+    device: torch.device,
+) -> PatchedTimeSeriesDecoder:
+    """Load trained baseline TimesFM model from checkpoint.
+
+    Args:
+        checkpoint_path: Path to model checkpoint file.
+        config: TimesFMConfig instance.
+        device: Device to place the model on.
+
+    Returns:
+        Loaded baseline TimesFM model instance.
+    """
+    logger = get_logger()
+
+    # Create model
+    model = PatchedTimeSeriesDecoder(config)
+    model.to(device)
+
+    # Load checkpoint
+    logger.info(f"Loading baseline model from {checkpoint_path}")
+    checkpoint = torch.load(checkpoint_path, weights_only=True)
+    model.load_state_dict(checkpoint["model_state_dict"])
+
+    logger.info("Successfully loaded baseline model checkpoint")
+
+    return model

@@ -16,7 +16,11 @@ from multimodal_timesfm.multimodal_patched_decoder import MultimodalTimesFMConfi
 from multimodal_timesfm.utils.collate import multimodal_collate_fn
 from multimodal_timesfm.utils.device import get_pin_memory, resolve_device
 from multimodal_timesfm.utils.logging import get_logger, setup_logger
-from multimodal_timesfm.utils.model import create_baseline_timesfm_model, load_multimodal_checkpoint
+from multimodal_timesfm.utils.model import (
+    create_baseline_timesfm_model,
+    load_baseline_checkpoint,
+    load_multimodal_checkpoint,
+)
 from multimodal_timesfm.utils.seed import set_seed
 
 
@@ -29,6 +33,12 @@ def parse_args() -> argparse.Namespace:
         type=str,
         required=True,
         help="Path to cross-validation results JSON file",
+    )
+
+    parser.add_argument(
+        "--baseline-cv-results",
+        type=str,
+        help="Path to baseline cross-validation results JSON file (for fine-tuned baseline comparison)",
     )
 
     parser.add_argument(
@@ -100,31 +110,49 @@ def main() -> int:
     logger.info(f"Loaded cross-validation results from {cv_results_path}")
     logger.info(f"Number of folds: {len(cv_results)}")
 
+    # Load baseline CV results if provided (for fine-tuned baseline comparison)
+    baseline_cv_results = None
+    if args.baseline_cv_results:
+        baseline_cv_results_path = Path(args.baseline_cv_results)
+        if not baseline_cv_results_path.exists():
+            logger.error(f"Baseline CV results file not found: {baseline_cv_results_path}")
+            return 1
+        with open(baseline_cv_results_path) as f:
+            baseline_cv_results = json.load(f)
+        logger.info(f"Loaded baseline CV results from {baseline_cv_results_path}")
+        logger.info(f"Baseline folds: {len(baseline_cv_results)}")
+        # Validate that baseline and multimodal have same number of folds
+        if len(baseline_cv_results) != len(cv_results):
+            logger.error(f"Baseline folds ({len(baseline_cv_results)}) != multimodal folds ({len(cv_results)})")
+            return 1
+
     # Setup device
     device = resolve_device()
     logger.info(f"Using device: {device}")
 
-    # Create baseline model if needed
-    baseline_model = None
+    # Create baseline TimesFM config
+    baseline_config = TimesFMConfig(
+        num_layers=model_config.timesfm.num_layers,
+        num_heads=model_config.timesfm.num_heads,
+        num_kv_heads=model_config.timesfm.num_kv_heads,
+        hidden_size=model_config.timesfm.model_dims,
+        intermediate_size=model_config.timesfm.model_dims,
+        head_dim=model_config.timesfm.model_dims // model_config.timesfm.num_heads,
+        rms_norm_eps=model_config.timesfm.rms_norm_eps,
+        patch_len=model_config.timesfm.input_patch_len,
+        horizon_len=model_config.timesfm.output_patch_len,
+        quantiles=model_config.timesfm.quantiles,
+        pad_val=model_config.timesfm.pad_val,
+        tolerance=model_config.timesfm.tolerance,
+        dtype=model_config.timesfm.dtype,
+        use_positional_embedding=model_config.timesfm.use_positional_embedding,
+    )
+
+    # Create pretrained baseline model if needed
+    pretrained_baseline_model = None
     if args.compare_baseline:
-        logger.info("Creating baseline TimesFM model...")
-        baseline_config = TimesFMConfig(
-            num_layers=model_config.timesfm.num_layers,
-            num_heads=model_config.timesfm.num_heads,
-            num_kv_heads=model_config.timesfm.num_kv_heads,
-            hidden_size=model_config.timesfm.model_dims,
-            intermediate_size=model_config.timesfm.model_dims,
-            head_dim=model_config.timesfm.model_dims // model_config.timesfm.num_heads,
-            rms_norm_eps=model_config.timesfm.rms_norm_eps,
-            patch_len=model_config.timesfm.input_patch_len,
-            horizon_len=model_config.timesfm.output_patch_len,
-            quantiles=model_config.timesfm.quantiles,
-            pad_val=model_config.timesfm.pad_val,
-            tolerance=model_config.timesfm.tolerance,
-            dtype=model_config.timesfm.dtype,
-            use_positional_embedding=model_config.timesfm.use_positional_embedding,
-        )
-        baseline_model = create_baseline_timesfm_model(baseline_config, load_pretrained=True)
+        logger.info("Creating pretrained baseline TimesFM model (no fine-tuning)...")
+        pretrained_baseline_model = create_baseline_timesfm_model(baseline_config, load_pretrained=True)
 
     # Evaluate each fold
     fold_results = []
@@ -184,12 +212,32 @@ def main() -> int:
         multimodal_metrics = evaluate_multimodal_model(multimodal_model, test_dataloader, device)
         logger.info(f"Multimodal metrics: MSE={multimodal_metrics['mse']:.6f}, MAE={multimodal_metrics['mae']:.6f}")
 
-        # Evaluate baseline if requested
-        baseline_metrics = None
-        if baseline_model is not None:
-            logger.info("Evaluating baseline model...")
-            baseline_metrics = evaluate_baseline_model(baseline_model, test_dataloader, device)
-            logger.info(f"Baseline metrics: MSE={baseline_metrics['mse']:.6f}, MAE={baseline_metrics['mae']:.6f}")
+        # Evaluate baseline models if requested
+        pretrained_baseline_metrics = None
+        finetuned_baseline_metrics = None
+
+        # Evaluate pretrained baseline (no fine-tuning)
+        if pretrained_baseline_model is not None:
+            logger.info("Evaluating pretrained baseline model (no fine-tuning)...")
+            pretrained_baseline_metrics = evaluate_baseline_model(pretrained_baseline_model, test_dataloader, device)
+            logger.info(
+                f"Pretrained baseline metrics: MSE={pretrained_baseline_metrics['mse']:.6f}, "
+                f"MAE={pretrained_baseline_metrics['mae']:.6f}"
+            )
+
+        # Evaluate fine-tuned baseline (if checkpoints provided)
+        if baseline_cv_results is not None:
+            baseline_fold_data = baseline_cv_results[fold_idx]
+            baseline_checkpoint_path = Path(baseline_fold_data["checkpoint"])
+            logger.info(f"Loading fine-tuned baseline model from {baseline_checkpoint_path}")
+            finetuned_baseline_model = load_baseline_checkpoint(baseline_checkpoint_path, baseline_config, device)
+
+            logger.info("Evaluating fine-tuned baseline model...")
+            finetuned_baseline_metrics = evaluate_baseline_model(finetuned_baseline_model, test_dataloader, device)
+            logger.info(
+                f"Fine-tuned baseline metrics: MSE={finetuned_baseline_metrics['mse']:.6f}, "
+                f"MAE={finetuned_baseline_metrics['mae']:.6f}"
+            )
 
         # Store results
         result = {
@@ -198,8 +246,10 @@ def main() -> int:
             "num_test_samples": len(test_dataset),
             "multimodal": multimodal_metrics,
         }
-        if baseline_metrics is not None:
-            result["baseline"] = baseline_metrics
+        if pretrained_baseline_metrics is not None:
+            result["pretrained_baseline"] = pretrained_baseline_metrics
+        if finetuned_baseline_metrics is not None:
+            result["finetuned_baseline"] = finetuned_baseline_metrics
         fold_results.append(result)
 
     # Compute average metrics across folds
@@ -213,21 +263,7 @@ def main() -> int:
     logger.info(f"  Average test MSE: {avg_multimodal_mse:.6f}")
     logger.info(f"  Average test MAE: {avg_multimodal_mae:.6f}")
 
-    if args.compare_baseline:
-        avg_baseline_mse = sum(r["baseline"]["mse"] for r in fold_results) / len(fold_results)
-        avg_baseline_mae = sum(r["baseline"]["mae"] for r in fold_results) / len(fold_results)
-
-        logger.info("Baseline model:")
-        logger.info(f"  Average test MSE: {avg_baseline_mse:.6f}")
-        logger.info(f"  Average test MAE: {avg_baseline_mae:.6f}")
-
-        logger.info("Improvement:")
-        mse_improvement = ((avg_baseline_mse - avg_multimodal_mse) / avg_baseline_mse) * 100
-        mae_improvement = ((avg_baseline_mae - avg_multimodal_mae) / avg_baseline_mae) * 100
-        logger.info(f"  MSE improvement: {mse_improvement:+.2f}%")
-        logger.info(f"  MAE improvement: {mae_improvement:+.2f}%")
-
-    # Save evaluation results
+    # Prepare evaluation results dictionary
     eval_results: dict[str, Any] = {
         "fold_results": fold_results,
         "average_metrics": {
@@ -236,11 +272,53 @@ def main() -> int:
         },
     }
 
-    if args.compare_baseline:
-        eval_results["average_metrics"]["baseline_mse"] = avg_baseline_mse
-        eval_results["average_metrics"]["baseline_mae"] = avg_baseline_mae
-        eval_results["average_metrics"]["mse_improvement_pct"] = mse_improvement
-        eval_results["average_metrics"]["mae_improvement_pct"] = mae_improvement
+    # Show pretrained baseline comparison
+    if args.compare_baseline and pretrained_baseline_model is not None:
+        avg_pretrained_baseline_mse = sum(r["pretrained_baseline"]["mse"] for r in fold_results) / len(fold_results)
+        avg_pretrained_baseline_mae = sum(r["pretrained_baseline"]["mae"] for r in fold_results) / len(fold_results)
+
+        logger.info("Pretrained baseline model (no fine-tuning):")
+        logger.info(f"  Average test MSE: {avg_pretrained_baseline_mse:.6f}")
+        logger.info(f"  Average test MAE: {avg_pretrained_baseline_mae:.6f}")
+
+        logger.info("Multimodal vs Pretrained baseline improvement:")
+        pretrained_mse_improvement = (
+            (avg_pretrained_baseline_mse - avg_multimodal_mse) / avg_pretrained_baseline_mse
+        ) * 100
+        pretrained_mae_improvement = (
+            (avg_pretrained_baseline_mae - avg_multimodal_mae) / avg_pretrained_baseline_mae
+        ) * 100
+        logger.info(f"  MSE improvement: {pretrained_mse_improvement:+.2f}%")
+        logger.info(f"  MAE improvement: {pretrained_mae_improvement:+.2f}%")
+
+        eval_results["average_metrics"]["pretrained_baseline_mse"] = avg_pretrained_baseline_mse
+        eval_results["average_metrics"]["pretrained_baseline_mae"] = avg_pretrained_baseline_mae
+        eval_results["average_metrics"]["pretrained_mse_improvement_pct"] = pretrained_mse_improvement
+        eval_results["average_metrics"]["pretrained_mae_improvement_pct"] = pretrained_mae_improvement
+
+    # Show fine-tuned baseline comparison
+    if baseline_cv_results is not None:
+        avg_finetuned_baseline_mse = sum(r["finetuned_baseline"]["mse"] for r in fold_results) / len(fold_results)
+        avg_finetuned_baseline_mae = sum(r["finetuned_baseline"]["mae"] for r in fold_results) / len(fold_results)
+
+        logger.info("Fine-tuned baseline model (TimesFM fine-tuned on data):")
+        logger.info(f"  Average test MSE: {avg_finetuned_baseline_mse:.6f}")
+        logger.info(f"  Average test MAE: {avg_finetuned_baseline_mae:.6f}")
+
+        logger.info("Multimodal vs Fine-tuned baseline improvement:")
+        finetuned_mse_improvement = (
+            (avg_finetuned_baseline_mse - avg_multimodal_mse) / avg_finetuned_baseline_mse
+        ) * 100
+        finetuned_mae_improvement = (
+            (avg_finetuned_baseline_mae - avg_multimodal_mae) / avg_finetuned_baseline_mae
+        ) * 100
+        logger.info(f"  MSE improvement: {finetuned_mse_improvement:+.2f}%")
+        logger.info(f"  MAE improvement: {finetuned_mae_improvement:+.2f}%")
+
+        eval_results["average_metrics"]["finetuned_baseline_mse"] = avg_finetuned_baseline_mse
+        eval_results["average_metrics"]["finetuned_baseline_mae"] = avg_finetuned_baseline_mae
+        eval_results["average_metrics"]["finetuned_mse_improvement_pct"] = finetuned_mse_improvement
+        eval_results["average_metrics"]["finetuned_mae_improvement_pct"] = finetuned_mae_improvement
 
     eval_results_path = cv_results_path.parent / "cv_evaluation_results.json"
     with open(eval_results_path, "w") as f:

@@ -7,15 +7,18 @@ from pathlib import Path
 from typing import Any
 
 import torch
+from timesfm.pytorch_patched_decoder import PatchedTimeSeriesDecoder, TimesFMConfig
 from torch.utils.data import ConcatDataset
 
 from examples.time_mmd.configs import ModelConfig, TrainingConfig
 from examples.time_mmd.data.cross_validation import create_fold_datasets, get_all_domains, get_cross_validation_splits
+from multimodal_timesfm.baseline_trainer import BaselineTrainer
 from multimodal_timesfm.multimodal_patched_decoder import MultimodalPatchedDecoder, MultimodalTimesFMConfig
 from multimodal_timesfm.trainer import MultimodalTrainer
 from multimodal_timesfm.utils.device import resolve_device
 from multimodal_timesfm.utils.logging import get_logger, setup_logger
-from multimodal_timesfm.utils.model import create_multimodal_model
+from multimodal_timesfm.utils.model import create_baseline_timesfm_model
+from multimodal_timesfm.utils.model import create_multimodal_model as create_multimodal_model_core
 from multimodal_timesfm.utils.seed import set_seed
 
 
@@ -41,10 +44,16 @@ def parse_args() -> argparse.Namespace:
         help="Random seed for reproducibility (if not provided, no seed will be set)",
     )
 
+    parser.add_argument(
+        "--train-baseline",
+        action="store_true",
+        help="Also train baseline TimesFM model (fine-tuned, no text) on same splits",
+    )
+
     return parser.parse_args()
 
 
-def create_model(model_config: ModelConfig, device: torch.device) -> MultimodalPatchedDecoder:
+def create_multimodal_model(model_config: ModelConfig, device: torch.device) -> MultimodalPatchedDecoder:
     """Create multimodal model from configuration and load pretrained TimesFM weights."""
     config = MultimodalTimesFMConfig(
         num_layers=model_config.timesfm.num_layers,
@@ -64,10 +73,32 @@ def create_model(model_config: ModelConfig, device: torch.device) -> MultimodalP
         text_encoder_type=model_config.text_encoder.text_encoder_type,
     )
 
-    return create_multimodal_model(config=config, device=device, load_pretrained=True)
+    return create_multimodal_model_core(config=config, device=device, load_pretrained=True)
 
 
-def train_fold(
+def create_baseline_model(model_config: ModelConfig, load_pretrained: bool = True) -> PatchedTimeSeriesDecoder:
+    """Create baseline TimesFM model from configuration."""
+    config = TimesFMConfig(
+        num_layers=model_config.timesfm.num_layers,
+        num_heads=model_config.timesfm.num_heads,
+        num_kv_heads=model_config.timesfm.num_kv_heads,
+        hidden_size=model_config.timesfm.model_dims,
+        intermediate_size=model_config.timesfm.model_dims,
+        head_dim=model_config.timesfm.model_dims // model_config.timesfm.num_heads,
+        rms_norm_eps=model_config.timesfm.rms_norm_eps,
+        patch_len=model_config.timesfm.input_patch_len,
+        horizon_len=model_config.timesfm.output_patch_len,
+        quantiles=model_config.timesfm.quantiles,
+        pad_val=model_config.timesfm.pad_val,
+        tolerance=model_config.timesfm.tolerance,
+        dtype=model_config.timesfm.dtype,
+        use_positional_embedding=model_config.timesfm.use_positional_embedding,
+    )
+
+    return create_baseline_timesfm_model(config=config, load_pretrained=load_pretrained)
+
+
+def train_multimodal_fold(
     training_config: TrainingConfig,
     fold_idx: int,
     model: MultimodalPatchedDecoder,
@@ -75,12 +106,12 @@ def train_fold(
     val_dataset: ConcatDataset[dict[str, Any]],
     device: torch.device,
 ) -> tuple[Path, dict[str, float]]:
-    """Train a model for one fold and return the path to the best checkpoint and validation metrics.
+    """Train a multimodal model for one fold and return the path to the best checkpoint and validation metrics.
 
     Args:
         training_config: Training configuration.
         fold_idx: Index of the current fold.
-        model: Model to train.
+        model: Multimodal model to train.
         train_dataset: Training dataset.
         val_dataset: Validation dataset.
         device: Device to use for training.
@@ -123,6 +154,77 @@ def train_fold(
 
     epochs = training_config.runner.num_epochs
     logger.info(f"Training fusion components only for {epochs} epochs (TimesFM and text encoder frozen)")
+
+    trainer.train(
+        num_epochs=epochs,
+        save_every=training_config.checkpoint.save_frequency,
+    )
+
+    # Get best validation metrics
+    best_checkpoint = fold_checkpoint_dir / "best_model.pt"
+    checkpoint = torch.load(best_checkpoint, weights_only=True)
+    val_metrics = {
+        "val_loss": checkpoint["best_val_loss"],
+    }
+
+    return best_checkpoint, val_metrics
+
+
+def train_baseline_fold(
+    training_config: TrainingConfig,
+    fold_idx: int,
+    model: PatchedTimeSeriesDecoder,
+    train_dataset: ConcatDataset[dict[str, Any]],
+    val_dataset: ConcatDataset[dict[str, Any]],
+    device: torch.device,
+) -> tuple[Path, dict[str, float]]:
+    """Train a baseline model for one fold and return the path to the best checkpoint and validation metrics.
+
+    Args:
+        training_config: Training configuration.
+        fold_idx: Index of the current fold.
+        model: Baseline TimesFM model to train.
+        train_dataset: Training dataset.
+        val_dataset: Validation dataset.
+        device: Device to use for training.
+
+    Returns:
+        Tuple of (checkpoint_path, validation_metrics).
+    """
+    logger = get_logger()
+
+    # Create fold-specific directories for baseline
+    fold_log_dir = Path(training_config.log.save_dir) / "baseline_finetuned" / f"fold_{fold_idx}"
+    fold_checkpoint_dir = Path(training_config.checkpoint.save_dir) / "baseline_finetuned" / f"fold_{fold_idx}"
+
+    fold_log_dir.mkdir(parents=True, exist_ok=True)
+    fold_checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create baseline trainer
+    wandb_run_name = f"{training_config.runner.wandb_run_name}_baseline_finetuned_fold_{fold_idx}"
+    trainer = BaselineTrainer(
+        model=model,
+        train_dataset=train_dataset,
+        val_dataset=val_dataset,
+        batch_size=training_config.runner.batch_size,
+        gradient_accumulation_steps=training_config.runner.gradient_accumulation_steps,
+        max_grad_norm=training_config.runner.max_grad_norm,
+        device=device,
+        learning_rate=training_config.runner.learning_rate,
+        weight_decay=training_config.runner.weight_decay,
+        log_dir=fold_log_dir,
+        checkpoint_dir=fold_checkpoint_dir,
+        wandb_project="baseline-timesfm",
+        wandb_run_name=wandb_run_name,
+        freeze_timesfm=False,
+    )
+
+    logger.info(f"Training baseline (fine-tuned) fold {fold_idx}")
+    logger.info(f"  Training samples: {len(train_dataset)}")
+    logger.info(f"  Validation samples: {len(val_dataset)}")
+
+    epochs = training_config.runner.num_epochs
+    logger.info(f"Fine-tuning TimesFM for {epochs} epochs")
 
     trainer.train(
         num_epochs=epochs,
@@ -192,7 +294,8 @@ def main() -> int:
     logger.info(f"Using device: {device}")
 
     # Store results for all folds
-    all_results: list[dict[str, Any]] = []
+    multimodal_results: list[dict[str, Any]] = []
+    baseline_finetuned_results: list[dict[str, Any]] = []
 
     # Train each fold
     for fold_idx, (train_domains, val_domains, test_domains) in enumerate(cv_splits):
@@ -214,11 +317,13 @@ def main() -> int:
             horizon_len=training_config.data.horizon_len,
         )
 
-        # Create a fresh model for this fold
-        model = create_model(model_config, device)
-
+        # Train multimodal model
         try:
-            checkpoint_path, val_metrics = train_fold(
+            logger.info("=" * 50)
+            logger.info("TRAINING MULTIMODAL MODEL")
+            logger.info("=" * 50)
+            model = create_multimodal_model(model_config, device)
+            checkpoint_path, val_metrics = train_multimodal_fold(
                 fold_idx=fold_idx,
                 model=model,
                 train_dataset=train_dataset,
@@ -226,10 +331,9 @@ def main() -> int:
                 training_config=training_config,
                 device=device,
             )
-            logger.info(f"Fold {fold_idx} training completed. Checkpoint: {checkpoint_path}")
-            logger.info(f"Fold {fold_idx} validation metrics: {val_metrics}")
+            logger.info(f"Multimodal fold {fold_idx} completed. Checkpoint: {checkpoint_path}")
+            logger.info(f"Multimodal fold {fold_idx} validation metrics: {val_metrics}")
 
-            # Store results
             fold_results = {
                 "fold": fold_idx,
                 "checkpoint": str(checkpoint_path),
@@ -238,27 +342,72 @@ def main() -> int:
                 "test_domains": test_domains,
                 "val_metrics": val_metrics,
             }
-            all_results.append(fold_results)
+            multimodal_results.append(fold_results)
 
         except Exception as e:
-            logger.error(f"Fold {fold_idx} training failed: {e}")
+            logger.error(f"Multimodal fold {fold_idx} training failed: {e}")
             return 1
 
-    # Save cross-validation results
-    cv_results_path = Path(training_config.log.save_dir) / "cv_results.json"
-    with open(cv_results_path, "w") as f:
-        json.dump(all_results, f, indent=2)
+        # Train fine-tuned baseline if requested
+        if args.train_baseline:
+            try:
+                logger.info("=" * 50)
+                logger.info("TRAINING BASELINE (FINE-TUNED)")
+                logger.info("=" * 50)
+                baseline_model = create_baseline_model(model_config, load_pretrained=True)
+                checkpoint_path, val_metrics = train_baseline_fold(
+                    training_config=training_config,
+                    fold_idx=fold_idx,
+                    model=baseline_model,
+                    train_dataset=train_dataset,
+                    val_dataset=val_dataset,
+                    device=device,
+                )
+                logger.info(f"Baseline (fine-tuned) fold {fold_idx} completed. Checkpoint: {checkpoint_path}")
+                logger.info(f"Baseline (fine-tuned) fold {fold_idx} validation metrics: {val_metrics}")
 
-    logger.info(f"Cross-validation results saved to {cv_results_path}")
+                fold_results = {
+                    "fold": fold_idx,
+                    "checkpoint": str(checkpoint_path),
+                    "train_domains": train_domains,
+                    "val_domains": val_domains,
+                    "test_domains": test_domains,
+                    "val_metrics": val_metrics,
+                }
+                baseline_finetuned_results.append(fold_results)
 
-    # Compute average metrics across folds
-    avg_val_loss = sum(r["val_metrics"]["val_loss"] for r in all_results) / len(all_results)
+            except Exception as e:
+                logger.error(f"Baseline (fine-tuned) fold {fold_idx} training failed: {e}")
+                return 1
+
+    # Save cross-validation results for each model type
     logger.info("=" * 50)
-    logger.info("Cross-validation summary:")
-    logger.info(f"Average validation loss: {avg_val_loss:.6f}")
+    logger.info("Saving cross-validation results")
     logger.info("=" * 50)
 
+    if multimodal_results:
+        cv_results_path = Path(training_config.log.save_dir) / "cv_results.json"
+        with open(cv_results_path, "w") as f:
+            json.dump(multimodal_results, f, indent=2)
+        logger.info(f"Multimodal CV results saved to {cv_results_path}")
+
+        avg_val_loss = sum(r["val_metrics"]["val_loss"] for r in multimodal_results) / len(multimodal_results)
+        logger.info(f"Multimodal average validation loss: {avg_val_loss:.6f}")
+
+    if baseline_finetuned_results:
+        baseline_cv_path = Path(training_config.log.save_dir) / "baseline_finetuned_cv_results.json"
+        with open(baseline_cv_path, "w") as f:
+            json.dump(baseline_finetuned_results, f, indent=2)
+        logger.info(f"Baseline (fine-tuned) CV results saved to {baseline_cv_path}")
+
+        avg_val_loss = sum(r["val_metrics"]["val_loss"] for r in baseline_finetuned_results) / len(
+            baseline_finetuned_results
+        )
+        logger.info(f"Baseline (fine-tuned) average validation loss: {avg_val_loss:.6f}")
+
+    logger.info("=" * 50)
     logger.info("Cross-validation training completed successfully!")
+    logger.info("=" * 50)
 
     return 0
 

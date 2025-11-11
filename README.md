@@ -228,6 +228,12 @@ The dataset contains multimodal time series data across 10 domains: Agriculture,
 Train a multimodal TimesFM model using cross-validation:
 
 ```bash
+# Train both multimodal and fine-tuned baseline (recommended)
+PYTHONPATH=. uv run python scripts/train_time_mmd_cv.py \
+    --train-baseline \
+    --seed 42
+
+# Train only multimodal model
 PYTHONPATH=. uv run python scripts/train_time_mmd_cv.py \
     --seed 42
 ```
@@ -238,7 +244,7 @@ PYTHONPATH=. uv run python scripts/train_time_mmd_cv.py \
 - Training config: Batch size, learning rate, domains, cross-validation settings, etc.
 - See [examples/time_mmd/configs/](examples/time_mmd/configs/) for configuration templates
 
-The script will:
+The scripts will:
 
 - Create train/validation splits for each cross-validation fold
 - Train a separate model for each fold
@@ -249,12 +255,40 @@ The script will:
 Evaluate trained models on the test set:
 
 ```bash
+# Evaluate multimodal model only
 PYTHONPATH=. uv run python scripts/evaluate_time_mmd_cv.py \
     --cv-results logs/cv_results.json \
     --seed 42
+
+# Compare with pretrained baseline (no fine-tuning)
+PYTHONPATH=. uv run python scripts/evaluate_time_mmd_cv.py \
+    --cv-results logs/cv_results.json \
+    --compare-baseline \
+    --seed 42
+
+# Compare with fine-tuned baseline
+PYTHONPATH=. uv run python scripts/evaluate_time_mmd_cv.py \
+    --cv-results logs/cv_results.json \
+    --baseline-cv-results logs/baseline_finetuned_cv_results.json \
+    --seed 42
+
+# Compare all three models (recommended)
+PYTHONPATH=. uv run python scripts/evaluate_time_mmd_cv.py \
+    --cv-results logs/cv_results.json \
+    --compare-baseline \
+    --baseline-cv-results logs/baseline_finetuned_cv_results.json \
+    --seed 42
 ```
 
-This evaluates both the multimodal model and a baseline TimesFM model (without text inputs), reporting:
+This evaluates and compares up to three model variants:
+
+1. **Multimodal model** (always evaluated): TimesFM with text encoder and fusion layer
+2. **Pretrained baseline** (with `--compare-baseline`): TimesFM without fine-tuning (untrained, frozen weights)
+3. **Fine-tuned baseline** (with `--baseline-cv-results`): TimesFM fine-tuned on time series only (no text)
+
+You can compare all three models at once by providing both `--compare-baseline` and `--baseline-cv-results` flags.
+
+**Metrics reported:**
 
 - Mean Squared Error (MSE)
 - Mean Absolute Error (MAE)
