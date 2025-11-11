@@ -1,4 +1,4 @@
-"""Tests for multimodal trainer."""
+"""Tests for baseline TimesFM trainer."""
 
 import tempfile
 from pathlib import Path
@@ -8,17 +8,17 @@ from unittest.mock import Mock, patch
 import numpy as np
 import pytest
 import torch
+from timesfm.pytorch_patched_decoder import PatchedTimeSeriesDecoder, TimesFMConfig
 
 from examples.time_mmd.configs import ModelConfig
+from multimodal_timesfm.baseline_trainer import BaselineTrainer
 from multimodal_timesfm.multimodal_dataset import MultimodalDatasetBase
-from multimodal_timesfm.multimodal_patched_decoder import MultimodalPatchedDecoder, MultimodalTimesFMConfig
-from multimodal_timesfm.trainer import MultimodalTrainer
 
 
-class MockMultimodalDataset(MultimodalDatasetBase):
-    """Mock dataset for testing training loop."""
+class MockBaselineDataset(MultimodalDatasetBase):
+    """Mock dataset for testing baseline training loop."""
 
-    def __init__(self, size: int = 100, context_len: int = 512, horizon_len: int = 128):
+    def __init__(self, size: int = 100, context_len: int = 128, horizon_len: int = 32):
         self.size = size
 
         # Initialize base class - will call _load_data()
@@ -68,47 +68,46 @@ class MockMultimodalDataset(MultimodalDatasetBase):
         return len(self.data)
 
 
-class TestMultimodalTrainer:
-    """Test cases for MultimodalTrainer class."""
+class TestBaselineTrainer:
+    """Test cases for BaselineTrainer class."""
 
     @pytest.fixture(scope="session")
-    def model_config(self) -> MultimodalTimesFMConfig:
+    def model_config(self) -> TimesFMConfig:
         """Load model configuration from YAML file."""
-        model_config = ModelConfig()
+        config = ModelConfig()
 
-        return MultimodalTimesFMConfig(
-            num_layers=model_config.timesfm.num_layers,
-            num_heads=model_config.timesfm.num_heads,
-            num_kv_heads=model_config.timesfm.num_kv_heads,
-            hidden_size=model_config.timesfm.model_dims,
-            intermediate_size=model_config.timesfm.model_dims,
-            head_dim=model_config.timesfm.model_dims // model_config.timesfm.num_heads,
-            rms_norm_eps=model_config.timesfm.rms_norm_eps,
-            patch_len=model_config.timesfm.input_patch_len,
-            horizon_len=model_config.timesfm.output_patch_len,
-            quantiles=model_config.timesfm.quantiles,
-            pad_val=model_config.timesfm.pad_val,
-            tolerance=model_config.timesfm.tolerance,
-            dtype=model_config.timesfm.dtype,
-            use_positional_embedding=model_config.timesfm.use_positional_embedding,
-            text_encoder_type=model_config.text_encoder.text_encoder_type,
+        return TimesFMConfig(
+            num_layers=config.timesfm.num_layers,
+            num_heads=config.timesfm.num_heads,
+            num_kv_heads=config.timesfm.num_kv_heads,
+            hidden_size=config.timesfm.model_dims,
+            intermediate_size=config.timesfm.model_dims,
+            head_dim=config.timesfm.model_dims // config.timesfm.num_heads,
+            rms_norm_eps=config.timesfm.rms_norm_eps,
+            patch_len=config.timesfm.input_patch_len,
+            horizon_len=config.timesfm.output_patch_len,
+            quantiles=config.timesfm.quantiles,
+            pad_val=config.timesfm.pad_val,
+            tolerance=config.timesfm.tolerance,
+            dtype=config.timesfm.dtype,
+            use_positional_embedding=config.timesfm.use_positional_embedding,
         )
 
     @pytest.fixture(scope="session")
-    def mock_datasets(self) -> tuple[MockMultimodalDataset, MockMultimodalDataset]:
+    def mock_datasets(self) -> tuple[MockBaselineDataset, MockBaselineDataset]:
         """Create mock training and validation datasets."""
         # Set seeds for reproducible test data
         torch.manual_seed(42)
         np.random.seed(42)
 
-        train_dataset = MockMultimodalDataset(size=10, context_len=128, horizon_len=128)
-        val_dataset = MockMultimodalDataset(size=5, context_len=128, horizon_len=128)
+        train_dataset = MockBaselineDataset(size=10, context_len=128, horizon_len=128)
+        val_dataset = MockBaselineDataset(size=5, context_len=128, horizon_len=128)
         return train_dataset, val_dataset
 
-    @pytest.fixture(scope="session")
-    def model(self, model_config: MultimodalTimesFMConfig) -> MultimodalPatchedDecoder:
-        """Create multimodal model."""
-        return MultimodalPatchedDecoder(model_config)
+    @pytest.fixture
+    def model(self, model_config: TimesFMConfig) -> PatchedTimeSeriesDecoder:
+        """Create baseline TimesFM model."""
+        return PatchedTimeSeriesDecoder(model_config)
 
     @pytest.fixture(scope="session")
     def temp_dirs(self) -> Generator[tuple[Path, Path], None, None]:
@@ -121,7 +120,7 @@ class TestMultimodalTrainer:
     @pytest.fixture(scope="session", autouse=True)
     def mock_wandb(self) -> Generator[Mock, None, None]:
         """Mock wandb to avoid initialization and deprecation warnings during tests."""
-        with patch("multimodal_timesfm.trainer.wandb") as mock_wandb:
+        with patch("multimodal_timesfm.baseline_trainer.wandb") as mock_wandb:
             mock_wandb.init = Mock()
             mock_wandb.log = Mock()
             mock_wandb.finish = Mock()
@@ -129,15 +128,15 @@ class TestMultimodalTrainer:
 
     def test_trainer_initialization(
         self,
-        model: MultimodalPatchedDecoder,
-        mock_datasets: tuple[MockMultimodalDataset, MockMultimodalDataset],
+        model: PatchedTimeSeriesDecoder,
+        mock_datasets: tuple[MockBaselineDataset, MockBaselineDataset],
         temp_dirs: tuple[Path, Path],
     ) -> None:
-        """Test trainer initialization."""
+        """Test baseline trainer initialization."""
         train_dataset, val_dataset = mock_datasets
         log_dir, checkpoint_dir = temp_dirs
 
-        trainer = MultimodalTrainer(
+        trainer = BaselineTrainer(
             model=model,
             train_dataset=train_dataset,
             val_dataset=val_dataset,
@@ -145,31 +144,101 @@ class TestMultimodalTrainer:
             gradient_accumulation_steps=2,
             log_dir=log_dir,
             checkpoint_dir=checkpoint_dir,
+            wandb_project="test-project",
+            wandb_run_name="test-run",
+            freeze_timesfm=False,
         )
 
         # Test trainer properties
+        assert trainer.model is not None
         assert len(trainer.train_loader) > 0
         assert len(trainer.val_loader) > 0
         assert trainer.device.type in ["cuda", "mps", "cpu"]
+        assert trainer.freeze_timesfm is False
 
-    def test_forward_pass(
+    def test_frozen_mode(
         self,
-        model: MultimodalPatchedDecoder,
-        mock_datasets: tuple[MockMultimodalDataset, MockMultimodalDataset],
+        model: PatchedTimeSeriesDecoder,
+        mock_datasets: tuple[MockBaselineDataset, MockBaselineDataset],
         temp_dirs: tuple[Path, Path],
     ) -> None:
-        """Test single forward pass through the model."""
+        """Test baseline trainer with frozen TimesFM parameters."""
         train_dataset, val_dataset = mock_datasets
         log_dir, checkpoint_dir = temp_dirs
 
-        trainer = MultimodalTrainer(
+        trainer = BaselineTrainer(
             model=model,
             train_dataset=train_dataset,
             val_dataset=val_dataset,
             batch_size=2,
-            gradient_accumulation_steps=2,
             log_dir=log_dir,
             checkpoint_dir=checkpoint_dir,
+            wandb_project="test-project",
+            wandb_run_name="test-run-frozen",
+            freeze_timesfm=True,
+        )
+
+        assert trainer.freeze_timesfm is True
+
+        # Check that all parameters are frozen
+        for param in trainer.model.parameters():
+            assert param.requires_grad is False
+
+        # Check that optimizer is None (no trainable parameters)
+        assert trainer.optimizer is None
+
+        # Verify that attempting to train raises an error
+        with pytest.raises(RuntimeError, match="Cannot train with frozen model"):
+            trainer.train_epoch()
+
+    def test_training_mode(
+        self,
+        model: PatchedTimeSeriesDecoder,
+        mock_datasets: tuple[MockBaselineDataset, MockBaselineDataset],
+        temp_dirs: tuple[Path, Path],
+    ) -> None:
+        """Test baseline trainer with trainable TimesFM parameters."""
+        train_dataset, val_dataset = mock_datasets
+        log_dir, checkpoint_dir = temp_dirs
+
+        trainer = BaselineTrainer(
+            model=model,
+            train_dataset=train_dataset,
+            val_dataset=val_dataset,
+            batch_size=2,
+            log_dir=log_dir,
+            checkpoint_dir=checkpoint_dir,
+            wandb_project="test-project",
+            wandb_run_name="test-run-trainable",
+            freeze_timesfm=False,
+        )
+
+        assert trainer.freeze_timesfm is False
+
+        # Check that parameters are trainable
+        trainable_params = [p for p in trainer.model.parameters() if p.requires_grad]
+        assert len(trainable_params) > 0
+
+    def test_forward_pass(
+        self,
+        model: PatchedTimeSeriesDecoder,
+        mock_datasets: tuple[MockBaselineDataset, MockBaselineDataset],
+        temp_dirs: tuple[Path, Path],
+    ) -> None:
+        """Test single forward pass through the baseline model."""
+        train_dataset, val_dataset = mock_datasets
+        log_dir, checkpoint_dir = temp_dirs
+
+        trainer = BaselineTrainer(
+            model=model,
+            train_dataset=train_dataset,
+            val_dataset=val_dataset,
+            batch_size=2,
+            log_dir=log_dir,
+            checkpoint_dir=checkpoint_dir,
+            wandb_project="test-project",
+            wandb_run_name="test-run-forward",
+            freeze_timesfm=False,
         )
 
         # Get a batch from the trainer
@@ -179,12 +248,10 @@ class TestMultimodalTrainer:
         assert "context" in sample_batch
         assert "future" in sample_batch
         assert "freq" in sample_batch
-        assert "patched_texts" in sample_batch
 
         # Move batch to device
         context = sample_batch["context"].to(trainer.device)
         freq = sample_batch["freq"].to(trainer.device)
-        patched_texts = sample_batch["patched_texts"]
 
         input_padding = torch.zeros_like(context)
 
@@ -195,7 +262,6 @@ class TestMultimodalTrainer:
                 input_ts=context,
                 input_padding=input_padding,
                 freq=freq,
-                text_descriptions=patched_texts,
             )
 
         # Check output shape
@@ -205,15 +271,15 @@ class TestMultimodalTrainer:
 
     def test_training_loop(
         self,
-        model: MultimodalPatchedDecoder,
-        mock_datasets: tuple[MockMultimodalDataset, MockMultimodalDataset],
+        model: PatchedTimeSeriesDecoder,
+        mock_datasets: tuple[MockBaselineDataset, MockBaselineDataset],
         temp_dirs: tuple[Path, Path],
     ) -> None:
         """Test training loop execution."""
         train_dataset, val_dataset = mock_datasets
         log_dir, checkpoint_dir = temp_dirs
 
-        trainer = MultimodalTrainer(
+        trainer = BaselineTrainer(
             model=model,
             train_dataset=train_dataset,
             val_dataset=val_dataset,
@@ -221,17 +287,17 @@ class TestMultimodalTrainer:
             gradient_accumulation_steps=2,
             log_dir=log_dir,
             checkpoint_dir=checkpoint_dir,
+            wandb_project="test-project",
+            wandb_run_name="test-run-training",
+            freeze_timesfm=False,
         )
-
-        # Test parameter freezing
-        trainer.freeze_pretrained_parameters()
 
         # Count trainable parameters
         trainable_before = sum(p.numel() for p in model.parameters() if p.requires_grad)
         total_params = sum(p.numel() for p in model.parameters())
 
-        # Should have fewer trainable parameters when frozen
-        assert trainable_before < total_params
+        # Should have all parameters trainable when not frozen
+        assert trainable_before == total_params
 
         # Test short training run
         trainer.train(num_epochs=1, save_every=1)
@@ -239,52 +305,3 @@ class TestMultimodalTrainer:
         # Test checkpoint exists
         checkpoint_files = list(checkpoint_dir.glob("*.pt"))
         assert len(checkpoint_files) in [1, 2]  # Epoch checkpoint, possibly best model too
-
-        # Test parameter unfreezing
-        trainer.unfreeze_all_parameters()
-        trainable_after = sum(p.numel() for p in model.parameters() if p.requires_grad)
-
-        # Should have all parameters trainable after unfreezing
-        assert trainable_after == total_params
-
-    @pytest.mark.ci_unstable
-    def test_checkpoint_loading(
-        self,
-        model: MultimodalPatchedDecoder,
-        mock_datasets: tuple[MockMultimodalDataset, MockMultimodalDataset],
-        temp_dirs: tuple[Path, Path],
-    ) -> None:
-        """Test checkpoint saving and loading."""
-        train_dataset, val_dataset = mock_datasets
-        log_dir, checkpoint_dir = temp_dirs
-
-        trainer = MultimodalTrainer(
-            model=model,
-            train_dataset=train_dataset,
-            val_dataset=val_dataset,
-            batch_size=2,
-            gradient_accumulation_steps=2,
-            log_dir=log_dir,
-            checkpoint_dir=checkpoint_dir,
-        )
-
-        # Train for two epochs
-        trainer.train(num_epochs=2, save_every=1)
-
-        # Find checkpoint files - specifically look for epoch checkpoints (not best_model.pt)
-        epoch_checkpoints = sorted(checkpoint_dir.glob("checkpoint_epoch_*.pt"))
-        assert len(epoch_checkpoints) == 2  # Epoch 0 and 1
-
-        # Test loading the first epoch checkpoint
-        checkpoint_path = epoch_checkpoints[0]
-        trainer.load_checkpoint(checkpoint_path)
-
-        # Verify checkpoint loaded - should be epoch 0
-        assert trainer.current_epoch == 0
-
-        # Test loading the second epoch checkpoint
-        checkpoint_path = epoch_checkpoints[1]
-        trainer.load_checkpoint(checkpoint_path)
-
-        # Verify checkpoint loaded - should be epoch 1
-        assert trainer.current_epoch == 1

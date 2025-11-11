@@ -92,3 +92,8 @@ select = [
 ignore = [
     "E501",  # line-too-long
 ]
+
+[tool.pytest.ini_options]
+markers = [
+    "ci_unstable: marks tests that are unstable in CI environments (deselect with '-m \"not ci_unstable\"')",
+]

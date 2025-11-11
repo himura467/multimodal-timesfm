@@ -17,20 +17,21 @@ multimodal-timesfm/
 │       ├── multimodal_patched_decoder.py    # Patched decoder for multimodal
 │       ├── multimodal_dataset.py            # Base multimodal dataset class
 │       ├── preprocessing.py                 # Data preprocessing utilities
-│       ├── trainer.py                       # Training logic
+│       ├── trainer.py                       # Multimodal training logic
+│       ├── baseline_trainer.py              # Baseline (non-multimodal) training logic
 │       ├── evaluation.py                    # Evaluation logic
 │       ├── cross_validation.py              # Cross-validation utilities
 │       └── utils/                           # Utility modules
 │           ├── __init__.py
-│           ├── collate.py                   # Data collation utilities
+│           ├── collate.py                   # Data collation utilities (multimodal & baseline)
 │           ├── device.py                    # Device utilities
 │           ├── logging.py                   # Logging utilities
 │           ├── seed.py                      # Random seed utilities
-│           ├── model.py                     # Model utilities
+│           ├── model.py                     # Model utilities (creation & loading)
 │           └── yaml.py                      # YAML configuration utilities
 ├── scripts/
-│   ├── train_time_mmd_cv.py                 # Training script with cross-validation
-│   ├── evaluate_time_mmd_cv.py              # Evaluation script with cross-validation
+│   ├── train_time_mmd_cv.py                 # Train models (multimodal & baseline) with cross-validation
+│   ├── evaluate_time_mmd_cv.py              # Evaluate models with cross-validation
 │   ├── visualize_time_mmd_cv.py             # Visualize model predictions
 │   └── forecast_time_mmd.py                 # Forecasting script with custom parameters
 ├── examples/
@@ -54,6 +55,7 @@ multimodal-timesfm/
 │   ├── test_time_mmd_dataset.py
 │   ├── test_preprocessing.py
 │   ├── test_trainer.py
+│   ├── test_baseline_trainer.py
 │   ├── test_multimodal_fusion.py
 │   ├── test_multimodal_patched_decoder.py
 │   └── test_cross_validation.py
@@ -66,12 +68,27 @@ multimodal-timesfm/
 
 ## Bash Commands
 
+### Development
+
 - `uv run mypy .`: Type checking
 - `uv run ruff check`: Linting
 - `uv run ruff format`: Code formatting
 - `uv run pytest tests/ -v`: Run test suite
-- `PYTHONPATH=. uv run python scripts/train_time_mmd_cv.py`: Train multimodal TimesFM on Time-MMD with cross-validation
-- `PYTHONPATH=. uv run python scripts/evaluate_time_mmd_cv.py`: Evaluate trained models with cross-validation
+
+### Training
+
+- `PYTHONPATH=. uv run python scripts/train_time_mmd_cv.py --train-baseline --seed 42`: Train both multimodal and fine-tuned baseline on same CV splits (recommended)
+- `PYTHONPATH=. uv run python scripts/train_time_mmd_cv.py --seed 42`: Train only multimodal TimesFM
+
+### Evaluation
+
+- `PYTHONPATH=. uv run python scripts/evaluate_time_mmd_cv.py --cv-results logs/cv_results.json`: Evaluate multimodal model only
+- `PYTHONPATH=. uv run python scripts/evaluate_time_mmd_cv.py --cv-results logs/cv_results.json --compare-baseline`: Compare with pretrained baseline (untrained)
+- `PYTHONPATH=. uv run python scripts/evaluate_time_mmd_cv.py --cv-results logs/cv_results.json --baseline-cv-results logs/baseline_finetuned_cv_results.json`: Compare with fine-tuned baseline
+- `PYTHONPATH=. uv run python scripts/evaluate_time_mmd_cv.py --cv-results logs/cv_results.json --compare-baseline --baseline-cv-results logs/baseline_finetuned_cv_results.json`: Compare all three models (recommended)
+
+### Visualization & Forecasting
+
 - `PYTHONPATH=. uv run python scripts/visualize_time_mmd_cv.py`: Visualize model predictions
 - `PYTHONPATH=. uv run python scripts/forecast_time_mmd.py --cv-results logs/cv_results.json --context-len 512 --horizon-len 128`: Generate forecasts with custom context/horizon lengths
 
