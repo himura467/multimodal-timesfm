@@ -25,6 +25,9 @@ Repository = "https://github.com/himura467/multimodal-timesfm"
 "Bug Tracker" = "https://github.com/himura467/multimodal-timesfm/issues"
 
 [project.optional-dependencies]
+experiment = [
+    "statsmodels>=0.14.5",
+]
 plot = [
     "matplotlib>=3.10.7",
 ]
