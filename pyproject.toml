@@ -33,6 +33,7 @@ plot = [
 ]
 all = [
     "matplotlib>=3.10.7",
+    "statsmodels>=0.14.5",
 ]
 
 [dependency-groups]

@@ -639,6 +639,7 @@ dependencies = [
 [package.optional-dependencies]
 all = [
     { name = "matplotlib" },
+    { name = "statsmodels" },
 ]
 experiment = [
     { name = "statsmodels" },
@@ -663,11 +664,12 @@ requires-dist = [
     { name = "matplotlib", marker = "extra == 'plot'", specifier = ">=3.10.7" },
     { name = "sentence-transformers", specifier = ">=5.1.0" },
     { name = "sentencepiece", specifier = ">=0.2.1" },
+    { name = "statsmodels", marker = "extra == 'all'", specifier = ">=0.14.5" },
     { name = "statsmodels", marker = "extra == 'experiment'", specifier = ">=0.14.5" },
     { name = "timesfm", extras = ["torch"], specifier = ">=1.3.0" },
     { name = "torch", specifier = ">=2.8.0", index = "https://download.pytorch.org/whl/cpu" },
 ]
-provides-extras = ["plot", "all", "experiment"]
+provides-extras = ["experiment", "plot", "all"]
 
 [package.metadata.requires-dev]
 dev = [
