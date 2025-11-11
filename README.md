@@ -272,21 +272,36 @@ PYTHONPATH=. uv run python scripts/evaluate_time_mmd_cv.py \
     --baseline-cv-results logs/baseline_finetuned_cv_results.json \
     --seed 42
 
-# Compare all three models (recommended)
+# Compare with ARIMA baseline
+PYTHONPATH=. uv run python scripts/evaluate_time_mmd_cv.py \
+    --cv-results logs/cv_results.json \
+    --compare-arima \
+    --seed 42
+
+# Compare with ARIMA using custom order (p, d, q)
+PYTHONPATH=. uv run python scripts/evaluate_time_mmd_cv.py \
+    --cv-results logs/cv_results.json \
+    --compare-arima \
+    --arima-order 7 1 2 \
+    --seed 42
+
+# Compare all models (recommended)
 PYTHONPATH=. uv run python scripts/evaluate_time_mmd_cv.py \
     --cv-results logs/cv_results.json \
     --compare-baseline \
     --baseline-cv-results logs/baseline_finetuned_cv_results.json \
+    --compare-arima \
     --seed 42
 ```
 
-This evaluates and compares up to three model variants:
+This evaluates and compares up to four model variants:
 
 1. **Multimodal model** (always evaluated): TimesFM with text encoder and fusion layer
 2. **Pretrained baseline** (with `--compare-baseline`): TimesFM without fine-tuning (untrained, frozen weights)
 3. **Fine-tuned baseline** (with `--baseline-cv-results`): TimesFM fine-tuned on time series only (no text)
+4. **ARIMA baseline** (with `--compare-arima`): Traditional ARIMA model with configurable order (default: 32, 1, 1)
 
-You can compare all three models at once by providing both `--compare-baseline` and `--baseline-cv-results` flags.
+You can compare all models at once by providing `--compare-baseline`, `--baseline-cv-results`, and `--compare-arima` flags together.
 
 **Metrics reported:**
 

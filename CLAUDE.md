@@ -19,6 +19,7 @@ multimodal-timesfm/
 │       ├── preprocessing.py                 # Data preprocessing utilities
 │       ├── trainer.py                       # Multimodal training logic
 │       ├── baseline_trainer.py              # Baseline (non-multimodal) training logic
+│       ├── arima_baseline.py                # ARIMA baseline for comparison
 │       ├── evaluation.py                    # Evaluation logic
 │       ├── cross_validation.py              # Cross-validation utilities
 │       └── utils/                           # Utility modules
@@ -85,7 +86,9 @@ multimodal-timesfm/
 - `PYTHONPATH=. uv run python scripts/evaluate_time_mmd_cv.py --cv-results logs/cv_results.json`: Evaluate multimodal model only
 - `PYTHONPATH=. uv run python scripts/evaluate_time_mmd_cv.py --cv-results logs/cv_results.json --compare-baseline`: Compare with pretrained baseline (untrained)
 - `PYTHONPATH=. uv run python scripts/evaluate_time_mmd_cv.py --cv-results logs/cv_results.json --baseline-cv-results logs/baseline_finetuned_cv_results.json`: Compare with fine-tuned baseline
-- `PYTHONPATH=. uv run python scripts/evaluate_time_mmd_cv.py --cv-results logs/cv_results.json --compare-baseline --baseline-cv-results logs/baseline_finetuned_cv_results.json`: Compare all three models (recommended)
+- `PYTHONPATH=. uv run python scripts/evaluate_time_mmd_cv.py --cv-results logs/cv_results.json --compare-arima`: Compare with ARIMA baseline
+- `PYTHONPATH=. uv run python scripts/evaluate_time_mmd_cv.py --cv-results logs/cv_results.json --compare-arima --arima-order 5 1 2`: Compare with ARIMA using custom order (p, d, q)
+- `PYTHONPATH=. uv run python scripts/evaluate_time_mmd_cv.py --cv-results logs/cv_results.json --compare-baseline --baseline-cv-results logs/baseline_finetuned_cv_results.json --compare-arima`: Compare all models (multimodal, pretrained, fine-tuned, ARIMA)
 
 ### Visualization & Forecasting
 

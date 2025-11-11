@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 
 from examples.time_mmd.configs import ModelConfig, TrainingConfig
 from examples.time_mmd.data.cross_validation import create_fold_datasets
+from multimodal_timesfm.arima_baseline import evaluate_arima_model
 from multimodal_timesfm.evaluation import evaluate_baseline_model, evaluate_multimodal_model
 from multimodal_timesfm.multimodal_patched_decoder import MultimodalTimesFMConfig
 from multimodal_timesfm.utils.collate import multimodal_collate_fn
@@ -70,6 +71,20 @@ def parse_args() -> argparse.Namespace:
         "--compare-baseline",
         action="store_true",
         help="Compare with baseline TimesFM model (without text)",
+    )
+
+    parser.add_argument(
+        "--compare-arima",
+        action="store_true",
+        help="Compare with ARIMA baseline model",
+    )
+
+    parser.add_argument(
+        "--arima-order",
+        type=int,
+        nargs=3,
+        default=[32, 1, 1],
+        help="ARIMA order (p, d, q) for baseline comparison (default: 32 1 1)",
     )
 
     return parser.parse_args()
@@ -215,6 +230,13 @@ def main() -> int:
         # Evaluate baseline models if requested
         pretrained_baseline_metrics = None
         finetuned_baseline_metrics = None
+        arima_metrics = None
+
+        # Evaluate ARIMA baseline if requested
+        if args.compare_arima:
+            logger.info(f"Evaluating ARIMA baseline (order={tuple(args.arima_order)})...")
+            arima_metrics = evaluate_arima_model(test_dataloader, device, order=tuple(args.arima_order))
+            logger.info(f"ARIMA baseline metrics: MSE={arima_metrics['mse']:.6f}, MAE={arima_metrics['mae']:.6f}")
 
         # Evaluate pretrained baseline (no fine-tuning)
         if pretrained_baseline_model is not None:
@@ -246,6 +268,8 @@ def main() -> int:
             "num_test_samples": len(test_dataset),
             "multimodal": multimodal_metrics,
         }
+        if arima_metrics is not None:
+            result["arima"] = arima_metrics
         if pretrained_baseline_metrics is not None:
             result["pretrained_baseline"] = pretrained_baseline_metrics
         if finetuned_baseline_metrics is not None:
@@ -271,6 +295,26 @@ def main() -> int:
             "multimodal_mae": avg_multimodal_mae,
         },
     }
+
+    # Show ARIMA baseline comparison
+    if args.compare_arima:
+        avg_arima_mse = sum(r["arima"]["mse"] for r in fold_results) / len(fold_results)
+        avg_arima_mae = sum(r["arima"]["mae"] for r in fold_results) / len(fold_results)
+
+        logger.info(f"ARIMA baseline model (order={tuple(args.arima_order)}):")
+        logger.info(f"  Average test MSE: {avg_arima_mse:.6f}")
+        logger.info(f"  Average test MAE: {avg_arima_mae:.6f}")
+
+        logger.info("Multimodal vs ARIMA improvement:")
+        arima_mse_improvement = ((avg_arima_mse - avg_multimodal_mse) / avg_arima_mse) * 100
+        arima_mae_improvement = ((avg_arima_mae - avg_multimodal_mae) / avg_arima_mae) * 100
+        logger.info(f"  MSE improvement: {arima_mse_improvement:+.2f}%")
+        logger.info(f"  MAE improvement: {arima_mae_improvement:+.2f}%")
+
+        eval_results["average_metrics"]["arima_mse"] = avg_arima_mse
+        eval_results["average_metrics"]["arima_mae"] = avg_arima_mae
+        eval_results["average_metrics"]["arima_mse_improvement_pct"] = arima_mse_improvement
+        eval_results["average_metrics"]["arima_mae_improvement_pct"] = arima_mae_improvement
 
     # Show pretrained baseline comparison
     if args.compare_baseline and pretrained_baseline_model is not None:
