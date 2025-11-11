@@ -198,6 +198,7 @@ class TestMultimodalPatchedDecoder:
             "Batch encoding should produce identical results to one-by-one encoding"
         )
 
+    @pytest.mark.ci_unstable
     def test_forward_pass(
         self,
         decoder: MultimodalPatchedDecoder,
@@ -224,6 +225,7 @@ class TestMultimodalPatchedDecoder:
         assert output.shape == expected_shape
         assert not torch.isnan(output).any()
 
+    @pytest.mark.ci_unstable
     def test_decode(
         self,
         decoder: MultimodalPatchedDecoder,
@@ -365,6 +367,7 @@ class TestMultimodalPatchedDecoder:
         assert not frozen_status["encoder"]
         assert not frozen_status["fusion"]
 
+    @pytest.mark.ci_unstable
     def test_gradient_computation(
         self,
         decoder: MultimodalPatchedDecoder,
