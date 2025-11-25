@@ -40,7 +40,6 @@ multimodal-timesfm/
 │   └── time_mmd/                            # Time-MMD dataset example components
 │       ├── configs/                         # Time-MMD specific configurations
 │       │   ├── __init__.py
-│       │   ├── training.py                  # Training configuration
 │       │   ├── model.py                     # Model architecture settings
 │       │   └── domain_columns.py            # Domain-specific column configurations
 │       └── data/

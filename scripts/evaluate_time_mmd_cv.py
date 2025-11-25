@@ -9,7 +9,7 @@ from typing import Any
 from timesfm.pytorch_patched_decoder import TimesFMConfig
 from torch.utils.data import DataLoader
 
-from examples.time_mmd.configs import ModelConfig
+from examples.time_mmd.configs.model import ModelConfig
 from examples.time_mmd.data.cross_validation import create_fold_datasets
 from multimodal_timesfm.arima_baseline import evaluate_arima_model
 from multimodal_timesfm.evaluation import evaluate_baseline_model, evaluate_multimodal_model

@@ -11,7 +11,7 @@ import torch
 from timesfm.pytorch_patched_decoder import PatchedTimeSeriesDecoder, TimesFMConfig
 from torch.utils.data import ConcatDataset
 
-from examples.time_mmd.configs import ModelConfig
+from examples.time_mmd.configs.model import ModelConfig
 from examples.time_mmd.data.cross_validation import create_fold_datasets, get_all_domains, get_cross_validation_splits
 from multimodal_timesfm.baseline_trainer import BaselineTrainer
 from multimodal_timesfm.multimodal_patched_decoder import MultimodalPatchedDecoder, MultimodalTimesFMConfig

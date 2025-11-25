@@ -13,7 +13,7 @@ from timesfm.pytorch_patched_decoder import TimesFMConfig
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from examples.time_mmd.configs import ModelConfig
+from examples.time_mmd.configs.model import ModelConfig
 from examples.time_mmd.data.cross_validation import create_fold_datasets
 from multimodal_timesfm.multimodal_patched_decoder import MultimodalTimesFMConfig
 from multimodal_timesfm.training_args import TrainingArguments
