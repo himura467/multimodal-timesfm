@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 import torch
 
-from examples.time_mmd.configs import ModelConfig
+from examples.time_mmd.configs.model import ModelConfig
 from multimodal_timesfm.multimodal_dataset import MultimodalDatasetBase
 from multimodal_timesfm.multimodal_patched_decoder import MultimodalPatchedDecoder, MultimodalTimesFMConfig
 from multimodal_timesfm.trainer import MultimodalTrainer

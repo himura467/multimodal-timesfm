@@ -10,7 +10,7 @@ import pytest
 import torch
 from timesfm.pytorch_patched_decoder import PatchedTimeSeriesDecoder, TimesFMConfig
 
-from examples.time_mmd.configs import ModelConfig
+from examples.time_mmd.configs.model import ModelConfig
 from multimodal_timesfm.baseline_trainer import BaselineTrainer
 from multimodal_timesfm.multimodal_dataset import MultimodalDatasetBase
 from multimodal_timesfm.training_args import TrainingArguments
