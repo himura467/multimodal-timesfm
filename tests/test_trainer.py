@@ -1,6 +1,7 @@
 """Tests for multimodal trainer."""
 
 import tempfile
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Generator
 from unittest.mock import Mock, patch
@@ -13,6 +14,7 @@ from examples.time_mmd.configs import ModelConfig
 from multimodal_timesfm.multimodal_dataset import MultimodalDatasetBase
 from multimodal_timesfm.multimodal_patched_decoder import MultimodalPatchedDecoder, MultimodalTimesFMConfig
 from multimodal_timesfm.trainer import MultimodalTrainer
+from multimodal_timesfm.training_args import TrainingArguments
 
 
 class MockMultimodalDataset(MultimodalDatasetBase):
@@ -111,12 +113,19 @@ class TestMultimodalTrainer:
         return MultimodalPatchedDecoder(model_config)
 
     @pytest.fixture(scope="session")
-    def temp_dirs(self) -> Generator[tuple[Path, Path], None, None]:
-        """Create temporary directories for logging and checkpoints."""
+    def training_args(self) -> Generator[TrainingArguments, None, None]:
+        """Create training arguments for testing."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            log_dir = Path(temp_dir) / "logs"
-            checkpoint_dir = Path(temp_dir) / "checkpoints"
-            yield log_dir, checkpoint_dir
+            yield TrainingArguments(
+                output_dir=temp_dir,
+                per_device_train_batch_size=2,
+                per_device_eval_batch_size=2,
+                gradient_accumulation_steps=2,
+                num_train_epochs=1,
+                logging_steps=10,
+                save_strategy="epoch",
+                eval_strategy="epoch",
+            )
 
     @pytest.fixture(scope="session", autouse=True)
     def mock_wandb(self) -> Generator[Mock, None, None]:
@@ -131,20 +140,16 @@ class TestMultimodalTrainer:
         self,
         model: MultimodalPatchedDecoder,
         mock_datasets: tuple[MockMultimodalDataset, MockMultimodalDataset],
-        temp_dirs: tuple[Path, Path],
+        training_args: TrainingArguments,
     ) -> None:
         """Test trainer initialization."""
         train_dataset, val_dataset = mock_datasets
-        log_dir, checkpoint_dir = temp_dirs
 
         trainer = MultimodalTrainer(
             model=model,
+            args=training_args,
             train_dataset=train_dataset,
             val_dataset=val_dataset,
-            batch_size=2,
-            gradient_accumulation_steps=2,
-            log_dir=log_dir,
-            checkpoint_dir=checkpoint_dir,
         )
 
         # Test trainer properties
@@ -156,20 +161,16 @@ class TestMultimodalTrainer:
         self,
         model: MultimodalPatchedDecoder,
         mock_datasets: tuple[MockMultimodalDataset, MockMultimodalDataset],
-        temp_dirs: tuple[Path, Path],
+        training_args: TrainingArguments,
     ) -> None:
         """Test single forward pass through the model."""
         train_dataset, val_dataset = mock_datasets
-        log_dir, checkpoint_dir = temp_dirs
 
         trainer = MultimodalTrainer(
             model=model,
+            args=training_args,
             train_dataset=train_dataset,
             val_dataset=val_dataset,
-            batch_size=2,
-            gradient_accumulation_steps=2,
-            log_dir=log_dir,
-            checkpoint_dir=checkpoint_dir,
         )
 
         # Get a batch from the trainer
@@ -207,20 +208,16 @@ class TestMultimodalTrainer:
         self,
         model: MultimodalPatchedDecoder,
         mock_datasets: tuple[MockMultimodalDataset, MockMultimodalDataset],
-        temp_dirs: tuple[Path, Path],
+        training_args: TrainingArguments,
     ) -> None:
         """Test training loop execution."""
         train_dataset, val_dataset = mock_datasets
-        log_dir, checkpoint_dir = temp_dirs
 
         trainer = MultimodalTrainer(
             model=model,
+            args=training_args,
             train_dataset=train_dataset,
             val_dataset=val_dataset,
-            batch_size=2,
-            gradient_accumulation_steps=2,
-            log_dir=log_dir,
-            checkpoint_dir=checkpoint_dir,
         )
 
         # Test parameter freezing
@@ -234,9 +231,10 @@ class TestMultimodalTrainer:
         assert trainable_before < total_params
 
         # Test short training run
-        trainer.train(num_epochs=1, save_every=1)
+        trainer.train()
 
         # Test checkpoint exists
+        checkpoint_dir = training_args.checkpoint_dir
         checkpoint_files = list(checkpoint_dir.glob("*.pt"))
         assert len(checkpoint_files) in [1, 2]  # Epoch checkpoint, possibly best model too
 
@@ -252,26 +250,26 @@ class TestMultimodalTrainer:
         self,
         model: MultimodalPatchedDecoder,
         mock_datasets: tuple[MockMultimodalDataset, MockMultimodalDataset],
-        temp_dirs: tuple[Path, Path],
+        training_args: TrainingArguments,
     ) -> None:
         """Test checkpoint saving and loading."""
         train_dataset, val_dataset = mock_datasets
-        log_dir, checkpoint_dir = temp_dirs
+
+        # Use training args with 2 epochs for this test
+        test_args = replace(training_args, num_train_epochs=2)
 
         trainer = MultimodalTrainer(
             model=model,
+            args=test_args,
             train_dataset=train_dataset,
             val_dataset=val_dataset,
-            batch_size=2,
-            gradient_accumulation_steps=2,
-            log_dir=log_dir,
-            checkpoint_dir=checkpoint_dir,
         )
 
         # Train for two epochs
-        trainer.train(num_epochs=2, save_every=1)
+        trainer.train()
 
         # Find checkpoint files - specifically look for epoch checkpoints (not best_model.pt)
+        checkpoint_dir = test_args.checkpoint_dir
         epoch_checkpoints = sorted(checkpoint_dir.glob("checkpoint_epoch_*.pt"))
         assert len(epoch_checkpoints) == 2  # Epoch 0 and 1
 

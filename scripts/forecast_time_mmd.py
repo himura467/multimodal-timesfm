@@ -1,36 +1,5 @@
 #!/usr/bin/env python3
-"""Forecasting script for multimodal TimesFM on Time-MMD dataset.
-
-This script runs forecasting with manually configurable context_len and horizon_len parameters,
-comparing multimodal model forecasts against baseline TimesFM forecasts.
-
-Usage:
-    # Forecasting on all folds with custom parameters
-    PYTHONPATH=. uv run python scripts/forecast_time_mmd.py \
-        --cv-results logs/cv_results.json \
-        --context-len 512 \
-        --horizon-len 128
-
-    # Forecasting on a specific fold
-    PYTHONPATH=. uv run python scripts/forecast_time_mmd.py \
-        --cv-results logs/cv_results.json \
-        --fold 0 \
-        --context-len 512 \
-        --horizon-len 128
-
-    # Forecasting with custom settings
-    PYTHONPATH=. uv run python scripts/forecast_time_mmd.py \
-        --cv-results logs/cv_results.json \
-        --context-len 256 \
-        --horizon-len 64 \
-        --num-samples 10 \
-        --output-dir custom_plots
-
-Output:
-    - fold_N_forecasts.png: Time series plots comparing multimodal vs baseline
-    - fold_N_metrics_comparison.png: Bar charts comparing MSE and MAE metrics
-    - fold_N_forecasts.json: JSON file with all forecasts and metrics
-"""
+"""Forecasting script for multimodal TimesFM on Time-MMD dataset."""
 
 import argparse
 import json
@@ -43,10 +12,11 @@ from timesfm import TimesFm, TimesFmCheckpoint
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from examples.time_mmd.configs import ModelConfig, TrainingConfig
+from examples.time_mmd.configs import ModelConfig
 from examples.time_mmd.data.cross_validation import create_fold_datasets
 from multimodal_timesfm.multimodal_patched_decoder import MultimodalTimesFMConfig
 from multimodal_timesfm.multimodal_timesfm import MultimodalTimesFM, TimesFmHparams
+from multimodal_timesfm.training_args import TrainingArguments
 from multimodal_timesfm.utils.collate import multimodal_collate_fn
 from multimodal_timesfm.utils.device import get_pin_memory, resolve_device
 from multimodal_timesfm.utils.logging import get_logger, setup_logger
@@ -56,13 +26,6 @@ from multimodal_timesfm.utils.seed import set_seed
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Run forecasting with MultimodalTimesFM on Time-MMD dataset")
-
-    parser.add_argument(
-        "--cv-results",
-        type=str,
-        required=True,
-        help="Path to cross-validation results JSON file",
-    )
 
     parser.add_argument(
         "--context-len",
@@ -79,22 +42,35 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--cv-results",
+        type=str,
+        required=True,
+        help="Path to cross-validation results JSON file",
+    )
+
+    parser.add_argument(
+        "--training-args",
+        type=str,
+        help="Path to training arguments file",
+    )
+
+    parser.add_argument(
         "--model-config",
         type=str,
         help="Path to model configuration file",
     )
 
     parser.add_argument(
-        "--training-config",
+        "--data-path",
         type=str,
-        help="Path to training configuration file",
+        default="data/Time-MMD",
+        help="Path to Time-MMD dataset",
     )
 
     parser.add_argument(
-        "--batch-size",
+        "--fold",
         type=int,
-        default=8,
-        help="Batch size for forecasting",
+        help="Specific fold to use for forecasting (if not provided, all folds will be processed)",
     )
 
     parser.add_argument(
@@ -105,22 +81,16 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "--output-dir",
-        type=str,
-        default="visualizations",
-        help="Directory to save visualization plots and predictions",
+        "--batch-size",
+        type=int,
+        default=8,
+        help="Batch size for forecasting",
     )
 
     parser.add_argument(
         "--seed",
         type=int,
         help="Random seed for reproducibility (if not provided, no seed will be set)",
-    )
-
-    parser.add_argument(
-        "--fold",
-        type=int,
-        help="Specific fold to use for forecasting (if not provided, all folds will be processed)",
     )
 
     return parser.parse_args()
@@ -288,33 +258,34 @@ def plot_forecasts(
 
 def main() -> int:
     """Main forecasting function."""
-    args = parse_args()
+    parsed_args = parse_args()
 
     # Load configurations
-    if args.model_config:
-        model_config = ModelConfig.from_yaml(Path(args.model_config))
+    if parsed_args.training_args:
+        training_args = TrainingArguments.from_yaml(Path(parsed_args.training_args))
+    else:
+        training_args = TrainingArguments()
+
+    if parsed_args.model_config:
+        model_config = ModelConfig.from_yaml(Path(parsed_args.model_config))
     else:
         model_config = ModelConfig()
-    if args.training_config:
-        training_config = TrainingConfig.from_yaml(Path(args.training_config))
-    else:
-        training_config = TrainingConfig()
 
     # Set random seed for reproducibility if provided
-    if args.seed is not None:
-        set_seed(args.seed)
+    if parsed_args.seed is not None:
+        set_seed(parsed_args.seed)
 
     # Setup logging
     setup_logger()
 
     logger = get_logger()
 
-    # Create output directory
-    output_dir = Path(args.output_dir)
+    # Create output directory for forecasts
+    output_dir = Path(training_args.output_dir) / "forecasts"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Load cross-validation results
-    cv_results_path = Path(args.cv_results)
+    cv_results_path = Path(parsed_args.cv_results)
     if not cv_results_path.exists():
         logger.error(f"Cross-validation results file not found: {cv_results_path}")
         return 1
@@ -327,20 +298,22 @@ def main() -> int:
     logger.info(f"Using device: {device}")
 
     # Filter folds if specific fold is requested
-    folds_to_process = cv_results if args.fold is None else [f for f in cv_results if f["fold"] == args.fold]
+    folds_to_process = (
+        cv_results if parsed_args.fold is None else [f for f in cv_results if f["fold"] == parsed_args.fold]
+    )
 
     if not folds_to_process:
-        logger.error(f"Fold {args.fold} not found in cross-validation results")
+        logger.error(f"Fold {parsed_args.fold} not found in cross-validation results")
         return 1
 
-    logger.info(f"Context length: {args.context_len}, Horizon length: {args.horizon_len}")
+    logger.info(f"Context length: {parsed_args.context_len}, Horizon length: {parsed_args.horizon_len}")
 
     # Create TimesFM hyperparameters for wrappers
     # Note: per_core_batch_size must divide evenly into the actual batch size
     # Setting it to 1 allows any batch size
     hparams = TimesFmHparams(
-        context_len=args.context_len,
-        horizon_len=args.horizon_len,
+        context_len=parsed_args.context_len,
+        horizon_len=parsed_args.horizon_len,
         input_patch_len=model_config.timesfm.input_patch_len,
         output_patch_len=model_config.timesfm.output_patch_len,
         num_layers=model_config.timesfm.num_layers,
@@ -371,18 +344,18 @@ def main() -> int:
         val_domains = fold_data["val_domains"]
 
         _, _, test_dataset = create_fold_datasets(
-            data_path=Path(training_config.data.data_path),
+            data_path=Path(parsed_args.data_path),
             train_domains=train_domains,
             val_domains=val_domains,
             test_domains=test_domains,
-            patch_len=training_config.data.patch_len,
-            context_len=args.context_len,
-            horizon_len=args.horizon_len,
+            patch_len=training_args.patch_len,
+            context_len=parsed_args.context_len,
+            horizon_len=parsed_args.horizon_len,
         )
 
         test_loader = DataLoader(
             test_dataset,
-            batch_size=args.batch_size,
+            batch_size=parsed_args.batch_size,
             shuffle=False,
             num_workers=0,
             collate_fn=multimodal_collate_fn,
@@ -419,7 +392,7 @@ def main() -> int:
 
         # Run forecasting
         logger.info("Generating forecasts...")
-        results = generate_forecasts(multimodal_model, baseline_model, test_loader, args.context_len)
+        results = generate_forecasts(multimodal_model, baseline_model, test_loader, parsed_args.context_len)
 
         # Compute summary metrics
         mm_metrics = [
@@ -450,7 +423,7 @@ def main() -> int:
 
         # Generate plots
         logger.info("Generating visualization plots...")
-        plot_forecasts(results, output_dir, fold_idx, args.num_samples)
+        plot_forecasts(results, output_dir, fold_idx, parsed_args.num_samples)
         logger.info(f"Plots saved to: {output_dir}")
 
         # Save forecasts
@@ -459,8 +432,8 @@ def main() -> int:
                 "fold": fold_idx,
                 "checkpoint": str(checkpoint_path),
                 "domains": test_domains,
-                "context_len": args.context_len,
-                "horizon_len": args.horizon_len,
+                "context_len": parsed_args.context_len,
+                "horizon_len": parsed_args.horizon_len,
                 "num_samples": len(results["contexts"]),
             },
             "summary_metrics": {

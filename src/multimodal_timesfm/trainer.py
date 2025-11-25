@@ -1,6 +1,5 @@
 """Multimodal trainer for TimesFM with text inputs."""
 
-from pathlib import Path
 from typing import Any
 
 import torch
@@ -12,6 +11,7 @@ from torch.utils.data import ConcatDataset, DataLoader
 
 from multimodal_timesfm.multimodal_dataset import MultimodalDatasetBase
 from multimodal_timesfm.multimodal_patched_decoder import MultimodalPatchedDecoder
+from multimodal_timesfm.training_args import TrainingArguments
 from multimodal_timesfm.utils.collate import multimodal_collate_fn
 from multimodal_timesfm.utils.device import get_pin_memory, move_to_device, resolve_device
 from multimodal_timesfm.utils.logging import setup_logger
@@ -31,52 +31,31 @@ class MultimodalTrainer:
     def __init__(
         self,
         model: MultimodalPatchedDecoder,
+        args: TrainingArguments,
         train_dataset: MultimodalDatasetBase | ConcatDataset[dict[str, Any]],
         val_dataset: MultimodalDatasetBase | ConcatDataset[dict[str, Any]],
-        batch_size: int = 8,
-        gradient_accumulation_steps: int = 4,
-        max_grad_norm: float = 1.0,
-        device: torch.device | str | None = None,
-        learning_rate: float = 1e-4,
-        weight_decay: float = 0.01,
-        log_dir: Path = Path("logs"),
-        checkpoint_dir: Path = Path("checkpoints"),
-        wandb_project: str = "multimodal-timesfm",
-        wandb_run_name: str | None = None,
     ) -> None:
         """Initialize MultimodalTrainer.
 
         Args:
             model: MultimodalPatchedDecoder model to train.
+            args: Training arguments.
             train_dataset: Training dataset.
             val_dataset: Validation dataset.
-            batch_size: Batch size for training.
-            gradient_accumulation_steps: Number of steps to accumulate gradients.
-            max_grad_norm: Maximum gradient norm for clipping.
-            device: Device to run training on (str or torch.device, auto-detected if None).
-            learning_rate: Learning rate for optimizer.
-            weight_decay: Weight decay for optimizer.
-            log_dir: Directory for logs.
-            checkpoint_dir: Directory for model checkpoints.
-            wandb_project: W&B project name.
-            wandb_run_name: W&B run name (auto-generated if None).
         """
         self.model = model
+        self.args = args
         self.train_dataset = train_dataset
         self.val_dataset = val_dataset
-        self.batch_size = batch_size
-        self.gradient_accumulation_steps = gradient_accumulation_steps
-        self.max_grad_norm = max_grad_norm
 
         # Set up device
-        self.device = resolve_device(device)
-
+        self.device = resolve_device(args.device)
         self.model.to(self.device)
 
         # Set up data loaders
         self.train_loader: DataLoader[dict[str, Any]] = DataLoader(
             train_dataset,
-            batch_size=batch_size,
+            batch_size=args.per_device_train_batch_size,
             shuffle=True,
             num_workers=0,
             collate_fn=multimodal_collate_fn,
@@ -84,38 +63,31 @@ class MultimodalTrainer:
         )
         self.val_loader: DataLoader[dict[str, Any]] = DataLoader(
             val_dataset,
-            batch_size=batch_size,
+            batch_size=args.per_device_eval_batch_size,
             shuffle=False,
             num_workers=0,
             collate_fn=multimodal_collate_fn,
             pin_memory=get_pin_memory(self.device),
         )
 
-        # Set up optimizer and scheduler
+        # Set up optimizer
         self.optimizer = AdamW(
             self.model.parameters(),
-            lr=learning_rate,
-            weight_decay=weight_decay,
+            lr=args.learning_rate,
+            weight_decay=args.weight_decay,
         )
 
         # Set up loss function (MSE for forecasting)
         self.loss_fn = nn.MSELoss()
 
         # Set up logger
-        self.logger = setup_logger(log_file=log_dir / "training.log")
-
-        # Set up model checkpoints
-        self.checkpoint_dir = checkpoint_dir
-        self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        self.logger = setup_logger(log_file=args.logging_dir / "training.log")
 
         # Initialize W&B
         wandb.init(
-            project=wandb_project,
-            name=wandb_run_name,
-            config={
-                "lr": learning_rate,
-                "batch_size": batch_size,
-            },
+            project="multimodal-timesfm",
+            name=args.run_name,
+            config=args.__dict__,
         )
 
         # Training state
@@ -164,15 +136,15 @@ class MultimodalTrainer:
             loss = self.loss_fn(last_patch_pred, future)
 
             # Scale loss for gradient accumulation
-            loss = loss / self.gradient_accumulation_steps
+            loss = loss / self.args.gradient_accumulation_steps
 
             # Backward pass
             loss.backward()
 
             # Gradient accumulation
-            if (batch_idx + 1) % self.gradient_accumulation_steps == 0:
+            if (batch_idx + 1) % self.args.gradient_accumulation_steps == 0:
                 # Gradient clipping
-                torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.max_grad_norm)
 
                 # Optimizer step
                 self.optimizer.step()
@@ -181,22 +153,22 @@ class MultimodalTrainer:
                 self.global_step += 1
 
                 # Log training metrics
-                if self.global_step % 100 == 0:
+                if self.global_step % self.args.logging_steps == 0:
                     metrics = {
-                        "train/loss": loss.item() * self.gradient_accumulation_steps,
+                        "train/loss": loss.item() * self.args.gradient_accumulation_steps,
                         "train/learning_rate": self.optimizer.param_groups[0]["lr"],
                         "global_step": self.global_step,
                     }
 
                     wandb.log(metrics)
 
-            total_loss += loss.item() * self.gradient_accumulation_steps
+            total_loss += loss.item() * self.args.gradient_accumulation_steps
 
             # Log progress
-            if batch_idx % 100 == 0:
+            if batch_idx % self.args.logging_steps == 0:
                 self.logger.info(
                     f"Epoch {self.current_epoch}, Batch {batch_idx}/{len(self.train_loader)}, "
-                    f"Loss: {loss.item() * self.gradient_accumulation_steps:.6f}"
+                    f"Loss: {loss.item() * self.args.gradient_accumulation_steps:.6f}"
                 )
 
         return total_loss / num_batches
@@ -210,6 +182,10 @@ class MultimodalTrainer:
         self.model.eval()
         total_loss = 0.0
         num_batches = len(self.val_loader)
+
+        if num_batches == 0:
+            self.logger.warning("Validation dataset is empty, skipping validation")
+            return float("inf")
 
         with torch.no_grad():
             for batch in self.val_loader:
@@ -263,15 +239,36 @@ class MultimodalTrainer:
         }
 
         # Save regular checkpoint
-        checkpoint_path = self.checkpoint_dir / f"checkpoint_epoch_{self.current_epoch}.pt"
+        checkpoint_path = self.args.checkpoint_dir / f"checkpoint_epoch_{self.current_epoch}.pt"
         torch.save(checkpoint, checkpoint_path)
         self.logger.info(f"Saved checkpoint at epoch {self.current_epoch}")
 
         # Save best checkpoint
         if is_best:
-            best_path = self.checkpoint_dir / "best_model.pt"
+            best_path = self.args.checkpoint_dir / "best_model.pt"
             torch.save(checkpoint, best_path)
             self.logger.info(f"Saved best model checkpoint at epoch {self.current_epoch}")
+
+        # Clean up old checkpoints if save_total_limit is set
+        if self.args.save_total_limit is not None:
+            self._rotate_checkpoints()
+
+    def _rotate_checkpoints(self) -> None:
+        """Remove old checkpoints to maintain save_total_limit."""
+        if self.args.save_total_limit is None or self.args.save_total_limit <= 0:
+            return
+
+        # Get all checkpoint files (excluding best_model.pt)
+        checkpoints = sorted(
+            [p for p in self.args.checkpoint_dir.glob("checkpoint_epoch_*.pt")],
+            key=lambda p: p.stat().st_mtime,
+        )
+
+        # Remove oldest checkpoints if we exceed the limit
+        if len(checkpoints) > self.args.save_total_limit:
+            for checkpoint in checkpoints[: -self.args.save_total_limit]:
+                checkpoint.unlink()
+                self.logger.info(f"Deleted old checkpoint: {checkpoint.name}")
 
     def load_checkpoint(self, checkpoint_path: FileLike) -> None:
         """Load model checkpoint.
@@ -289,55 +286,60 @@ class MultimodalTrainer:
 
         self.logger.info(f"Loaded checkpoint from epoch {self.current_epoch}")
 
-    def train(
-        self,
-        num_epochs: int = 20,
-        scheduler: torch.optim.lr_scheduler.LRScheduler | None = None,
-        save_every: int = 5,
-    ) -> None:
+    def train(self, scheduler: torch.optim.lr_scheduler.LRScheduler | None = None) -> None:
         """Main training loop.
 
         Args:
-            num_epochs: Number of epochs to train.
             scheduler: Learning rate scheduler (optional).
-            save_every: Save checkpoint every N epochs.
         """
-        self.logger.info(f"Starting training for {num_epochs} epochs")
+        self.logger.info(f"Starting training for {self.args.num_train_epochs} epochs")
         self.logger.info(f"Training on device: {self.device}")
         self.logger.info(f"Train dataset size: {len(self.train_dataset)}")
         self.logger.info(f"Validation dataset size: {len(self.val_dataset)}")
 
-        for epoch in range(num_epochs):
+        for epoch in range(self.args.num_train_epochs):
             self.current_epoch = epoch
 
             # Train one epoch
             train_loss = self.train_epoch()
 
             # Validate
-            val_loss = self.validate()
+            if self.args.eval_strategy == "epoch":
+                val_loss = self.validate()
+            else:
+                val_loss = None
 
             # Log epoch metrics
-            epoch_metrics = {
-                "epoch/train_loss": train_loss,
-                "epoch/val_loss": val_loss,
-                "epoch": epoch,
-            }
+            epoch_metrics = {"epoch/train_loss": train_loss, "epoch": epoch}
+            if val_loss is not None:
+                epoch_metrics["epoch/val_loss"] = val_loss
 
             wandb.log(epoch_metrics)
 
-            self.logger.info(f"Epoch {epoch}: Train Loss = {train_loss:.6f}, Val Loss = {val_loss:.6f}")
+            if val_loss is not None:
+                self.logger.info(f"Epoch {epoch}: Train Loss = {train_loss:.6f}, Val Loss = {val_loss:.6f}")
+            else:
+                self.logger.info(f"Epoch {epoch}: Train Loss = {train_loss:.6f}")
 
             # Update learning rate scheduler
             if scheduler is not None:
                 scheduler.step()
 
             # Save checkpoint
-            is_best = val_loss < self.best_val_loss
-            if is_best:
-                self.best_val_loss = val_loss
-
-            if epoch % save_every == 0 or is_best:
+            if self.args.save_strategy == "epoch":
+                is_best = False
+                if val_loss is not None:
+                    if val_loss < self.best_val_loss:
+                        is_best = True
+                        self.best_val_loss = val_loss
                 self.save_checkpoint(is_best=is_best)
+
+        # Load best model at end if requested
+        if self.args.load_best_model_at_end:
+            best_path = self.args.checkpoint_dir / "best_model.pt"
+            if best_path.exists():
+                self.load_checkpoint(best_path)
+                self.logger.info("Loaded best model at end of training")
 
         self.logger.info("Training completed!")
 

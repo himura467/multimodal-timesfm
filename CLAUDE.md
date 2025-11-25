@@ -19,6 +19,7 @@ multimodal-timesfm/
 │       ├── preprocessing.py                 # Data preprocessing utilities
 │       ├── trainer.py                       # Multimodal training logic
 │       ├── baseline_trainer.py              # Baseline (non-multimodal) training logic
+│       ├── training_args.py                 # Training arguments configuration
 │       ├── arima_baseline.py                # ARIMA baseline for comparison
 │       ├── evaluation.py                    # Evaluation logic
 │       ├── cross_validation.py              # Cross-validation utilities

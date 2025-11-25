@@ -13,6 +13,7 @@ from timesfm.pytorch_patched_decoder import PatchedTimeSeriesDecoder, TimesFMCon
 from examples.time_mmd.configs import ModelConfig
 from multimodal_timesfm.baseline_trainer import BaselineTrainer
 from multimodal_timesfm.multimodal_dataset import MultimodalDatasetBase
+from multimodal_timesfm.training_args import TrainingArguments
 
 
 class MockBaselineDataset(MultimodalDatasetBase):
@@ -110,12 +111,19 @@ class TestBaselineTrainer:
         return PatchedTimeSeriesDecoder(model_config)
 
     @pytest.fixture(scope="session")
-    def temp_dirs(self) -> Generator[tuple[Path, Path], None, None]:
-        """Create temporary directories for logging and checkpoints."""
+    def training_args(self) -> Generator[TrainingArguments, None, None]:
+        """Create training arguments for testing."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            log_dir = Path(temp_dir) / "logs"
-            checkpoint_dir = Path(temp_dir) / "checkpoints"
-            yield log_dir, checkpoint_dir
+            yield TrainingArguments(
+                output_dir=temp_dir,
+                per_device_train_batch_size=2,
+                per_device_eval_batch_size=2,
+                gradient_accumulation_steps=2,
+                num_train_epochs=1,
+                logging_steps=10,
+                save_strategy="epoch",
+                eval_strategy="epoch",
+            )
 
     @pytest.fixture(scope="session", autouse=True)
     def mock_wandb(self) -> Generator[Mock, None, None]:
@@ -130,22 +138,16 @@ class TestBaselineTrainer:
         self,
         model: PatchedTimeSeriesDecoder,
         mock_datasets: tuple[MockBaselineDataset, MockBaselineDataset],
-        temp_dirs: tuple[Path, Path],
+        training_args: TrainingArguments,
     ) -> None:
         """Test baseline trainer initialization."""
         train_dataset, val_dataset = mock_datasets
-        log_dir, checkpoint_dir = temp_dirs
 
         trainer = BaselineTrainer(
             model=model,
+            args=training_args,
             train_dataset=train_dataset,
             val_dataset=val_dataset,
-            batch_size=2,
-            gradient_accumulation_steps=2,
-            log_dir=log_dir,
-            checkpoint_dir=checkpoint_dir,
-            wandb_project="test-project",
-            wandb_run_name="test-run",
             freeze_timesfm=False,
         )
 
@@ -160,21 +162,16 @@ class TestBaselineTrainer:
         self,
         model: PatchedTimeSeriesDecoder,
         mock_datasets: tuple[MockBaselineDataset, MockBaselineDataset],
-        temp_dirs: tuple[Path, Path],
+        training_args: TrainingArguments,
     ) -> None:
         """Test baseline trainer with frozen TimesFM parameters."""
         train_dataset, val_dataset = mock_datasets
-        log_dir, checkpoint_dir = temp_dirs
 
         trainer = BaselineTrainer(
             model=model,
+            args=training_args,
             train_dataset=train_dataset,
             val_dataset=val_dataset,
-            batch_size=2,
-            log_dir=log_dir,
-            checkpoint_dir=checkpoint_dir,
-            wandb_project="test-project",
-            wandb_run_name="test-run-frozen",
             freeze_timesfm=True,
         )
 
@@ -195,21 +192,16 @@ class TestBaselineTrainer:
         self,
         model: PatchedTimeSeriesDecoder,
         mock_datasets: tuple[MockBaselineDataset, MockBaselineDataset],
-        temp_dirs: tuple[Path, Path],
+        training_args: TrainingArguments,
     ) -> None:
         """Test baseline trainer with trainable TimesFM parameters."""
         train_dataset, val_dataset = mock_datasets
-        log_dir, checkpoint_dir = temp_dirs
 
         trainer = BaselineTrainer(
             model=model,
+            args=training_args,
             train_dataset=train_dataset,
             val_dataset=val_dataset,
-            batch_size=2,
-            log_dir=log_dir,
-            checkpoint_dir=checkpoint_dir,
-            wandb_project="test-project",
-            wandb_run_name="test-run-trainable",
             freeze_timesfm=False,
         )
 
@@ -223,21 +215,16 @@ class TestBaselineTrainer:
         self,
         model: PatchedTimeSeriesDecoder,
         mock_datasets: tuple[MockBaselineDataset, MockBaselineDataset],
-        temp_dirs: tuple[Path, Path],
+        training_args: TrainingArguments,
     ) -> None:
         """Test single forward pass through the baseline model."""
         train_dataset, val_dataset = mock_datasets
-        log_dir, checkpoint_dir = temp_dirs
 
         trainer = BaselineTrainer(
             model=model,
+            args=training_args,
             train_dataset=train_dataset,
             val_dataset=val_dataset,
-            batch_size=2,
-            log_dir=log_dir,
-            checkpoint_dir=checkpoint_dir,
-            wandb_project="test-project",
-            wandb_run_name="test-run-forward",
             freeze_timesfm=False,
         )
 
@@ -273,22 +260,16 @@ class TestBaselineTrainer:
         self,
         model: PatchedTimeSeriesDecoder,
         mock_datasets: tuple[MockBaselineDataset, MockBaselineDataset],
-        temp_dirs: tuple[Path, Path],
+        training_args: TrainingArguments,
     ) -> None:
         """Test training loop execution."""
         train_dataset, val_dataset = mock_datasets
-        log_dir, checkpoint_dir = temp_dirs
 
         trainer = BaselineTrainer(
             model=model,
+            args=training_args,
             train_dataset=train_dataset,
             val_dataset=val_dataset,
-            batch_size=2,
-            gradient_accumulation_steps=2,
-            log_dir=log_dir,
-            checkpoint_dir=checkpoint_dir,
-            wandb_project="test-project",
-            wandb_run_name="test-run-training",
             freeze_timesfm=False,
         )
 
@@ -300,8 +281,9 @@ class TestBaselineTrainer:
         assert trainable_before == total_params
 
         # Test short training run
-        trainer.train(num_epochs=1, save_every=1)
+        trainer.train()
 
         # Test checkpoint exists
+        checkpoint_dir = training_args.checkpoint_dir
         checkpoint_files = list(checkpoint_dir.glob("*.pt"))
         assert len(checkpoint_files) in [1, 2]  # Epoch checkpoint, possibly best model too

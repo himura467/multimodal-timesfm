@@ -9,11 +9,12 @@ from typing import Any
 from timesfm.pytorch_patched_decoder import TimesFMConfig
 from torch.utils.data import DataLoader
 
-from examples.time_mmd.configs import ModelConfig, TrainingConfig
+from examples.time_mmd.configs import ModelConfig
 from examples.time_mmd.data.cross_validation import create_fold_datasets
 from multimodal_timesfm.arima_baseline import evaluate_arima_model
 from multimodal_timesfm.evaluation import evaluate_baseline_model, evaluate_multimodal_model
 from multimodal_timesfm.multimodal_patched_decoder import MultimodalTimesFMConfig
+from multimodal_timesfm.training_args import TrainingArguments
 from multimodal_timesfm.utils.collate import multimodal_collate_fn
 from multimodal_timesfm.utils.device import get_pin_memory, resolve_device
 from multimodal_timesfm.utils.logging import get_logger, setup_logger
@@ -43,28 +44,22 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--training-args",
+        type=str,
+        help="Path to training arguments file",
+    )
+
+    parser.add_argument(
         "--model-config",
         type=str,
         help="Path to model configuration file",
     )
 
     parser.add_argument(
-        "--training-config",
+        "--data-path",
         type=str,
-        help="Path to training configuration file",
-    )
-
-    parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=8,
-        help="Batch size for evaluation",
-    )
-
-    parser.add_argument(
-        "--seed",
-        type=int,
-        help="Random seed for reproducibility (if not provided, no seed will be set)",
+        default="data/Time-MMD",
+        help="Path to Time-MMD dataset",
     )
 
     parser.add_argument(
@@ -87,26 +82,40 @@ def parse_args() -> argparse.Namespace:
         help="ARIMA order (p, d, q) for baseline comparison (default: 32 1 1)",
     )
 
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=8,
+        help="Batch size for evaluation",
+    )
+
+    parser.add_argument(
+        "--seed",
+        type=int,
+        help="Random seed for reproducibility (if not provided, no seed will be set)",
+    )
+
     return parser.parse_args()
 
 
 def main() -> int:
     """Main cross-validation evaluation function."""
-    args = parse_args()
+    parsed_args = parse_args()
 
     # Load configurations
-    if args.model_config:
-        model_config = ModelConfig.from_yaml(Path(args.model_config))
+    if parsed_args.training_args:
+        training_args = TrainingArguments.from_yaml(Path(parsed_args.training_args))
+    else:
+        training_args = TrainingArguments()
+
+    if parsed_args.model_config:
+        model_config = ModelConfig.from_yaml(Path(parsed_args.model_config))
     else:
         model_config = ModelConfig()
-    if args.training_config:
-        training_config = TrainingConfig.from_yaml(Path(args.training_config))
-    else:
-        training_config = TrainingConfig()
 
     # Set random seed for reproducibility if provided
-    if args.seed is not None:
-        set_seed(args.seed)
+    if parsed_args.seed is not None:
+        set_seed(parsed_args.seed)
 
     # Setup logging
     setup_logger()
@@ -114,7 +123,7 @@ def main() -> int:
     logger = get_logger()
 
     # Load cross-validation results
-    cv_results_path = Path(args.cv_results)
+    cv_results_path = Path(parsed_args.cv_results)
     if not cv_results_path.exists():
         logger.error(f"Cross-validation results file not found: {cv_results_path}")
         return 1
@@ -127,8 +136,8 @@ def main() -> int:
 
     # Load baseline CV results if provided (for fine-tuned baseline comparison)
     baseline_cv_results = None
-    if args.baseline_cv_results:
-        baseline_cv_results_path = Path(args.baseline_cv_results)
+    if parsed_args.baseline_cv_results:
+        baseline_cv_results_path = Path(parsed_args.baseline_cv_results)
         if not baseline_cv_results_path.exists():
             logger.error(f"Baseline CV results file not found: {baseline_cv_results_path}")
             return 1
@@ -165,13 +174,13 @@ def main() -> int:
 
     # Create pretrained baseline model if needed
     pretrained_baseline_model = None
-    if args.compare_baseline:
+    if parsed_args.compare_baseline:
         logger.info("Creating pretrained baseline TimesFM model (no fine-tuning)...")
         pretrained_baseline_model = create_baseline_timesfm_model(baseline_config, load_pretrained=True)
 
     # Evaluate each fold
     fold_results = []
-    data_path = Path(training_config.data.data_path)
+    data_path = Path(parsed_args.data_path)
 
     for fold_data in cv_results:
         fold_idx = fold_data["fold"]
@@ -185,16 +194,16 @@ def main() -> int:
             train_domains=fold_data["train_domains"],
             val_domains=fold_data["val_domains"],
             test_domains=fold_data["test_domains"],
-            patch_len=training_config.data.patch_len,
-            context_len=training_config.data.context_len,
-            horizon_len=training_config.data.horizon_len,
+            patch_len=training_args.patch_len,
+            context_len=training_args.context_len,
+            horizon_len=training_args.horizon_len,
         )
 
         logger.info(f"Test samples: {len(test_dataset)}")
 
         test_dataloader = DataLoader(
             test_dataset,
-            batch_size=args.batch_size,
+            batch_size=parsed_args.batch_size,
             shuffle=False,
             num_workers=0,
             collate_fn=multimodal_collate_fn,
@@ -233,9 +242,9 @@ def main() -> int:
         arima_metrics = None
 
         # Evaluate ARIMA baseline if requested
-        if args.compare_arima:
-            logger.info(f"Evaluating ARIMA baseline (order={tuple(args.arima_order)})...")
-            arima_metrics = evaluate_arima_model(test_dataloader, device, order=tuple(args.arima_order))
+        if parsed_args.compare_arima:
+            logger.info(f"Evaluating ARIMA baseline (order={tuple(parsed_args.arima_order)})...")
+            arima_metrics = evaluate_arima_model(test_dataloader, device, order=tuple(parsed_args.arima_order))
             logger.info(f"ARIMA baseline metrics: MSE={arima_metrics['mse']:.6f}, MAE={arima_metrics['mae']:.6f}")
 
         # Evaluate pretrained baseline (no fine-tuning)
@@ -297,11 +306,11 @@ def main() -> int:
     }
 
     # Show ARIMA baseline comparison
-    if args.compare_arima:
+    if parsed_args.compare_arima:
         avg_arima_mse = sum(r["arima"]["mse"] for r in fold_results) / len(fold_results)
         avg_arima_mae = sum(r["arima"]["mae"] for r in fold_results) / len(fold_results)
 
-        logger.info(f"ARIMA baseline model (order={tuple(args.arima_order)}):")
+        logger.info(f"ARIMA baseline model (order={tuple(parsed_args.arima_order)}):")
         logger.info(f"  Average test MSE: {avg_arima_mse:.6f}")
         logger.info(f"  Average test MAE: {avg_arima_mae:.6f}")
 
@@ -317,7 +326,7 @@ def main() -> int:
         eval_results["average_metrics"]["arima_mae_improvement_pct"] = arima_mae_improvement
 
     # Show pretrained baseline comparison
-    if args.compare_baseline and pretrained_baseline_model is not None:
+    if parsed_args.compare_baseline and pretrained_baseline_model is not None:
         avg_pretrained_baseline_mse = sum(r["pretrained_baseline"]["mse"] for r in fold_results) / len(fold_results)
         avg_pretrained_baseline_mae = sum(r["pretrained_baseline"]["mae"] for r in fold_results) / len(fold_results)
 
