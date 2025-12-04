@@ -33,6 +33,7 @@ multimodal-timesfm/
 │           └── yaml.py                      # YAML configuration utilities
 ├── scripts/
 │   ├── train_time_mmd_cv.py                 # Train models (multimodal & baseline) with cross-validation
+│   ├── tune_time_mmd_sweep.py               # Hyperparameter tuning with WandB Sweep
 │   ├── evaluate_time_mmd_cv.py              # Evaluate models with cross-validation
 │   ├── visualize_time_mmd_cv.py             # Visualize model predictions
 │   └── forecast_time_mmd.py                 # Forecasting script with custom parameters
