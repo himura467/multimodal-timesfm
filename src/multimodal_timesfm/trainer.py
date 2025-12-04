@@ -4,11 +4,11 @@ from typing import Any
 
 import torch
 import torch.nn as nn
-import wandb
 from torch.optim import AdamW
 from torch.types import FileLike
 from torch.utils.data import ConcatDataset, DataLoader
 
+import wandb
 from multimodal_timesfm.multimodal_dataset import MultimodalDatasetBase
 from multimodal_timesfm.multimodal_patched_decoder import MultimodalPatchedDecoder
 from multimodal_timesfm.training_args import TrainingArguments
@@ -34,6 +34,7 @@ class MultimodalTrainer:
         args: TrainingArguments,
         train_dataset: MultimodalDatasetBase | ConcatDataset[dict[str, Any]],
         val_dataset: MultimodalDatasetBase | ConcatDataset[dict[str, Any]],
+        init_wandb: bool = True,
     ) -> None:
         """Initialize MultimodalTrainer.
 
@@ -42,6 +43,7 @@ class MultimodalTrainer:
             args: Training arguments.
             train_dataset: Training dataset.
             val_dataset: Validation dataset.
+            init_wandb: Whether to initialize wandb (default: True). Set to False for sweep runs.
         """
         self.model = model
         self.args = args
@@ -83,17 +85,19 @@ class MultimodalTrainer:
         # Set up logger
         self.logger = setup_logger(log_file=args.logging_dir / "training.log")
 
-        # Initialize W&B
-        wandb.init(
-            project="multimodal-timesfm",
-            name=args.run_name,
-            config=args.__dict__,
-        )
+        # Initialize W&B (skip if already initialized, e.g., in sweep runs)
+        if init_wandb:
+            wandb.init(
+                project="multimodal-timesfm",
+                name=args.run_name,
+                config=args.__dict__,
+            )
 
         # Training state
         self.global_step = 0
         self.current_epoch = 0
         self.best_val_loss = float("inf")
+        self.init_wandb = init_wandb
 
     def train_epoch(self) -> float:
         """Train one epoch.
@@ -343,8 +347,9 @@ class MultimodalTrainer:
 
         self.logger.info("Training completed!")
 
-        # Close W&B run
-        wandb.finish()
+        # Close W&B run (skip if externally managed, e.g., in sweep runs)
+        if self.init_wandb:
+            wandb.finish()
 
     def freeze_pretrained_parameters(self) -> None:
         """Freeze pretrained TimesFM and text encoder parameters - only train fusion components."""
