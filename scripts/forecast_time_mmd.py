@@ -3,6 +3,7 @@
 
 import argparse
 import json
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -261,15 +262,21 @@ def main() -> int:
     parsed_args = parse_args()
 
     # Load configurations
-    if parsed_args.training_args:
-        training_args = TrainingArguments.from_yaml(Path(parsed_args.training_args))
-    else:
-        training_args = TrainingArguments()
-
     if parsed_args.model_config:
         model_config = ModelConfig.from_yaml(Path(parsed_args.model_config))
     else:
         model_config = ModelConfig()
+
+    if parsed_args.training_args:
+        training_args = TrainingArguments.from_yaml(Path(parsed_args.training_args))
+    else:
+        # Use values from model_config when training_args aren't provided
+        training_args = TrainingArguments()
+        training_args = replace(
+            training_args,
+            context_len=model_config.timesfm.context_len,
+            horizon_len=model_config.timesfm.horizon_len,
+        )
 
     # Set random seed for reproducibility if provided
     if parsed_args.seed is not None:

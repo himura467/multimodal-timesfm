@@ -11,9 +11,9 @@ from dataclasses import replace
 from pathlib import Path
 
 import torch
+import wandb
 from torch.utils.data import DataLoader
 
-import wandb
 from examples.time_mmd.configs.model import ModelConfig
 from examples.time_mmd.data.cross_validation import create_fold_datasets, get_all_domains
 from multimodal_timesfm.evaluation import evaluate_multimodal_model
@@ -234,6 +234,7 @@ def main() -> int:
         model_config = ModelConfig()
 
     # Base training arguments (will be overridden by sweep config)
+    # Use values from model_config for context_len and horizon_len
     base_training_args = TrainingArguments(
         output_dir="outputs/sweep",
         eval_strategy="epoch",
@@ -241,6 +242,8 @@ def main() -> int:
         save_total_limit=1,
         load_best_model_at_end=False,
         seed=parsed_args.seed,
+        context_len=model_config.timesfm.context_len,
+        horizon_len=model_config.timesfm.horizon_len,
     )
 
     # Set random seed for reproducibility if provided
