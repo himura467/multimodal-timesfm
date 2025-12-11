@@ -6,3 +6,4 @@ RUN apt update -y && \
   cd multimodal-timesfm && \
   git submodule update --init && \
   $HOME/.local/bin/uv sync
+WORKDIR /multimodal-timesfm
