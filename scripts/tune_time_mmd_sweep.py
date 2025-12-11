@@ -238,7 +238,7 @@ def main() -> int:
     base_training_args = TrainingArguments(
         output_dir="outputs/sweep",
         eval_strategy="epoch",
-        save_strategy="epoch",
+        save_strategy="no",
         save_total_limit=1,
         load_best_model_at_end=False,
         seed=parsed_args.seed,
