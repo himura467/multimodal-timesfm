@@ -7,6 +7,7 @@ datasets as training dataset for hyperparameter optimization.
 
 import argparse
 import json
+import shutil
 from dataclasses import replace
 from pathlib import Path
 
@@ -216,6 +217,12 @@ def train_and_evaluate(
         }
     )
 
+    # Clean up checkpoints after evaluation
+    checkpoint_dir = training_args.checkpoint_dir
+    if checkpoint_dir.exists():
+        logger.info(f"Cleaning up checkpoints in {checkpoint_dir}")
+        shutil.rmtree(checkpoint_dir)
+
     return {
         "val_loss": val_loss,
         "test_mse": test_metrics["mse"],
@@ -238,7 +245,7 @@ def main() -> int:
     base_training_args = TrainingArguments(
         output_dir="outputs/sweep",
         eval_strategy="epoch",
-        save_strategy="no",
+        save_strategy="epoch",
         save_total_limit=1,
         load_best_model_at_end=False,
         seed=parsed_args.seed,
