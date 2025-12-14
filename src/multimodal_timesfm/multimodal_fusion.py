@@ -27,12 +27,13 @@ class MultimodalFusion(nn.Module):
         >>> print(fused.shape)  # torch.Size([2, 32, 1280])
     """
 
-    def __init__(self, ts_feature_dim: int, text_feature_dim: int) -> None:
+    def __init__(self, ts_feature_dim: int, text_feature_dim: int, use_bias: bool = True) -> None:
         """Initialize the addition-based fusion module.
 
         Args:
             ts_feature_dim: Dimension of time series features.
             text_feature_dim: Dimension of text features.
+            use_bias: Whether to use bias in the projection layer. Defaults to True.
 
         Raises:
             ValueError: If feature dimensions are not positive integers.
@@ -47,9 +48,10 @@ class MultimodalFusion(nn.Module):
 
         self.ts_feature_dim = ts_feature_dim
         self.text_feature_dim = text_feature_dim
+        self.use_bias = use_bias
 
         # Projection layer: text_dim -> ts_dim
-        self.text_projection = nn.Linear(text_feature_dim, ts_feature_dim)
+        self.text_projection = nn.Linear(in_features=text_feature_dim, out_features=ts_feature_dim, bias=use_bias)
 
         # ReLU activation
         self.activation = nn.ReLU()
@@ -60,7 +62,8 @@ class MultimodalFusion(nn.Module):
     def _initialize_weights(self) -> None:
         """Initialize projection layer weights using Xavier uniform initialization."""
         nn.init.xavier_uniform_(self.text_projection.weight)
-        nn.init.zeros_(self.text_projection.bias)
+        if self.use_bias:
+            nn.init.zeros_(self.text_projection.bias)
 
     def _validate_inputs(self, ts_features: torch.Tensor, text_features: torch.Tensor) -> None:
         """Validate input tensor shapes, types, and compatibility.
@@ -112,14 +115,14 @@ class MultimodalFusion(nn.Module):
                 f"Device mismatch: ts_features on {ts_features.device}, text_features on {text_features.device}"
             )
 
-    def _validate_parameters(self, parameters: dict[str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
+    def _validate_parameters(self, parameters: dict[str, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor | None]:
         """Validate projection parameters for setting.
 
         Args:
-            parameters: Dictionary containing 'weight' and 'bias' tensors.
+            parameters: Dictionary containing 'weight' and optionally 'bias' tensors.
 
         Returns:
-            Tuple of (weight, bias) tensors after validation.
+            Tuple of (weight, bias) tensors after validation. Bias is None if use_bias is False.
 
         Raises:
             KeyError: If required parameter keys are missing.
@@ -128,20 +131,20 @@ class MultimodalFusion(nn.Module):
         # Check for required keys
         if "weight" not in parameters:
             raise KeyError("Missing 'weight' parameter")
-        if "bias" not in parameters:
+        if self.use_bias and "bias" not in parameters:
             raise KeyError("Missing 'bias' parameter")
 
         weight = parameters["weight"]
-        bias = parameters["bias"]
+        bias = parameters.get("bias", None)
 
         # Validate parameter shapes
         expected_weight_shape = (self.ts_feature_dim, self.text_feature_dim)
-        expected_bias_shape = (self.ts_feature_dim,)
-
         if weight.shape != expected_weight_shape:
             raise ValueError(f"Weight shape mismatch: expected {expected_weight_shape}, got {weight.shape}")
-        if bias.shape != expected_bias_shape:
-            raise ValueError(f"Bias shape mismatch: expected {expected_bias_shape}, got {bias.shape}")
+        if self.use_bias and bias is not None:
+            expected_bias_shape = (self.ts_feature_dim,)
+            if bias.shape != expected_bias_shape:
+                raise ValueError(f"Bias shape mismatch: expected {expected_bias_shape}, got {bias.shape}")
 
         return weight, bias
 
@@ -177,15 +180,18 @@ class MultimodalFusion(nn.Module):
         """Get projection layer parameters for TimesFM integration.
 
         Returns:
-            Dictionary containing 'weight' and 'bias' parameters of the projection layer.
+            Dictionary containing 'weight' and optionally 'bias' parameters of the projection layer.
         """
-        return {"weight": self.text_projection.weight.clone(), "bias": self.text_projection.bias.clone()}
+        params = {"weight": self.text_projection.weight.clone()}
+        if self.use_bias:
+            params["bias"] = self.text_projection.bias.clone()
+        return params
 
     def set_projection_parameters(self, parameters: dict[str, torch.Tensor]) -> None:
         """Set projection layer parameters for TimesFM integration.
 
         Args:
-            parameters: Dictionary containing 'weight' and 'bias' tensors.
+            parameters: Dictionary containing 'weight' and optionally 'bias' tensors.
 
         Raises:
             KeyError: If required parameter keys are missing.
@@ -197,7 +203,8 @@ class MultimodalFusion(nn.Module):
         # Set parameters
         with torch.no_grad():
             self.text_projection.weight.copy_(weight)
-            self.text_projection.bias.copy_(bias)
+            if self.use_bias and bias is not None:
+                self.text_projection.bias.copy_(bias)
 
     def freeze_projection(self) -> None:
         """Freeze projection layer parameters for selective training."""
