@@ -306,8 +306,8 @@ def main() -> int:
     # Define function for each sweep run
     def run() -> None:
         """Execute a single hyperparameter configuration trial."""
-        with wandb.init(project="multimodal-timesfm-time-mmd-sweep"):
-            logger.info(f"Starting sweep run: {wandb.run.id}")
+        with wandb.init(project="multimodal-timesfm-time-mmd-sweep") as run:
+            logger.info(f"Starting sweep run: {run.id}")
             logger.info(f"Hyperparameters: {dict(wandb.config)}")
 
             try:
@@ -321,10 +321,10 @@ def main() -> int:
                     device=device,
                 )
 
-                logger.info(f"Sweep run {wandb.run.id} completed. Test metrics: {metrics}")
+                logger.info(f"Sweep run {run.id} completed. Test metrics: {metrics}")
 
             except Exception as e:
-                logger.error(f"Sweep run {wandb.run.id} failed: {e}")
+                logger.error(f"Sweep run {run.id} failed: {e}")
                 raise
 
     # Initialize or continue sweep
