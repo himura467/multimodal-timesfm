@@ -16,6 +16,11 @@ parameters:
   use_bias:
     values: [true, false]
 
+  # Multiple seeds for statistical reliability (0-100 range)
+  seed:
+    min: 0
+    max: 100
+
   # Fixed hyperparameters (use reasonable defaults from previous tuning)
   learning_rate:
     value: 1e-3

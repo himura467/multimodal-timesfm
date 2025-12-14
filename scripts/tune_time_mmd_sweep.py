@@ -142,31 +142,39 @@ def train_and_evaluate(
     # Get use_bias parameter (default to True if not in sweep config)
     use_bias: bool = config.get("use_bias", True)  # type: ignore[no-untyped-call]
 
+    # Get seed parameter (use from sweep config or fall back to base_training_args)
+    seed: int = config.get("seed", base_training_args.seed)  # type: ignore[no-untyped-call]
+
     # Create a unique run name for this sweep trial
     run_name = f"sweep_{config.learning_rate:.0e}_bs{config.batch_size}_wd{config.weight_decay:.0e}"
     # Only add bias suffix if use_bias is explicitly set in the sweep config
     if "use_bias" in config:
         bias_str = "bias" if use_bias else "nobias"
         run_name = f"{run_name}_{bias_str}"
+    # Add seed to run name if it's specified in sweep config
+    if "seed" in config:
+        run_name = f"{run_name}_seed{seed}"
 
     # Override training args with sweep hyperparameters
     training_args = replace(
         base_training_args,
-        learning_rate=config.learning_rate,
-        weight_decay=config.weight_decay,
+        output_dir=str(Path(base_training_args.output_dir) / run_name),
         per_device_train_batch_size=config.batch_size,
         gradient_accumulation_steps=config.gradient_accumulation_steps,
+        learning_rate=config.learning_rate,
+        weight_decay=config.weight_decay,
         num_train_epochs=config.num_epochs,
         run_name=run_name,
-        output_dir=str(Path(base_training_args.output_dir) / run_name),
+        seed=seed,
     )
 
     logger.info("Training with hyperparameters:")
-    logger.info(f"  Learning rate: {training_args.learning_rate}")
-    logger.info(f"  Weight decay: {training_args.weight_decay}")
     logger.info(f"  Batch size: {training_args.per_device_train_batch_size}")
     logger.info(f"  Gradient accumulation steps: {training_args.gradient_accumulation_steps}")
+    logger.info(f"  Learning rate: {training_args.learning_rate}")
+    logger.info(f"  Weight decay: {training_args.weight_decay}")
     logger.info(f"  Num epochs: {training_args.num_train_epochs}")
+    logger.info(f"  Seed: {seed}")
     logger.info(f"  Use bias: {use_bias}")
 
     # Create datasets
