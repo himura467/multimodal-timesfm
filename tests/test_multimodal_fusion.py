@@ -16,10 +16,26 @@ class TestMultimodalFusion:
 
         assert fusion.ts_feature_dim == 1280
         assert fusion.text_feature_dim == 384
+        assert fusion.use_bias is True
         assert isinstance(fusion.text_projection, nn.Linear)
         assert isinstance(fusion.activation, nn.ReLU)
         assert fusion.text_projection.in_features == 384
         assert fusion.text_projection.out_features == 1280
+        assert fusion.text_projection.bias is not None
+        assert fusion.text_projection.bias.shape == (1280,)
+
+    def test_init_use_bias_false(self) -> None:
+        """Tests initialization with use_bias=False."""
+        fusion = MultimodalFusion(ts_feature_dim=128, text_feature_dim=64, use_bias=False)
+
+        assert fusion.ts_feature_dim == 128
+        assert fusion.text_feature_dim == 64
+        assert fusion.use_bias is False
+        assert isinstance(fusion.text_projection, nn.Linear)
+        assert isinstance(fusion.activation, nn.ReLU)
+        assert fusion.text_projection.in_features == 64
+        assert fusion.text_projection.out_features == 128
+        assert fusion.text_projection.bias is None
 
     def test_init_invalid_ts_dimension(self) -> None:
         """Tests initialization with invalid time series dimension."""

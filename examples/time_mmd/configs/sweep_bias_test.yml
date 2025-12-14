@@ -1,0 +1,38 @@
+# WandB Sweep Configuration for Testing Bias Hypothesis in Fusion Layer
+# This configuration tests whether bias in the fully connected projection layer is necessary
+# Uses Climate as validation, Energy as test, and all others as training
+
+# Sweep method: grid search to test all combinations
+method: grid
+
+# Metric to optimize (test MSE on Energy dataset)
+metric:
+  name: test_mse
+  goal: minimize
+
+# Hyperparameter search space
+parameters:
+  # Main parameter: test with and without bias
+  use_bias:
+    values: [true, false]
+
+  # Multiple seeds for statistical reliability (0-100 range)
+  seed:
+    min: 0
+    max: 100
+
+  # Fixed hyperparameters (use reasonable defaults from previous tuning)
+  learning_rate:
+    value: 1e-3
+
+  weight_decay:
+    value: 0.05
+
+  batch_size:
+    value: 4
+
+  gradient_accumulation_steps:
+    value: 2
+
+  num_epochs:
+    value: 10

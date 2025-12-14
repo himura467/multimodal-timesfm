@@ -18,6 +18,7 @@ class TestMultimodalTimesFMConfig:
 
         # Test multimodal-specific defaults
         assert config.text_encoder_type == "english"
+        assert config.use_bias is True
 
         # Test inherited TimesFM defaults
         assert config.num_layers == 20
@@ -27,10 +28,12 @@ class TestMultimodalTimesFMConfig:
         config = MultimodalTimesFMConfig(
             text_encoder_type="japanese",
             num_layers=50,
+            use_bias=False,
         )
 
         assert config.text_encoder_type == "japanese"
         assert config.num_layers == 50
+        assert config.use_bias is False
 
 
 class TestMultimodalPatchedDecoder:
