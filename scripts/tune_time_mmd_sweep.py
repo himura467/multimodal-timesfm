@@ -12,9 +12,9 @@ from dataclasses import replace
 from pathlib import Path
 
 import torch
-import wandb
 from torch.utils.data import DataLoader
 
+import wandb
 from examples.time_mmd.configs.model import ModelConfig
 from examples.time_mmd.data.cross_validation import create_fold_datasets, get_all_domains
 from multimodal_timesfm.evaluation import evaluate_multimodal_model
@@ -76,8 +76,19 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def create_multimodal_model(model_config: ModelConfig, device: torch.device) -> MultimodalPatchedDecoder:
-    """Create multimodal model from configuration and load pretrained TimesFM weights."""
+def create_multimodal_model(
+    model_config: ModelConfig, device: torch.device, use_bias: bool = True
+) -> MultimodalPatchedDecoder:
+    """Create multimodal model from configuration and load pretrained TimesFM weights.
+
+    Args:
+        model_config: Model configuration.
+        device: Device to create model on.
+        use_bias: Whether to use bias in the fusion projection layer.
+
+    Returns:
+        Multimodal model with pretrained weights.
+    """
     config = MultimodalTimesFMConfig(
         num_layers=model_config.timesfm.num_layers,
         num_heads=model_config.timesfm.num_heads,
@@ -94,6 +105,7 @@ def create_multimodal_model(model_config: ModelConfig, device: torch.device) -> 
         dtype=model_config.timesfm.dtype,
         use_positional_embedding=model_config.timesfm.use_positional_embedding,
         text_encoder_type=model_config.text_encoder.text_encoder_type,
+        use_bias=use_bias,
     )
 
     return create_multimodal_model_core(config=config, device=device, load_pretrained=True)
@@ -127,8 +139,15 @@ def train_and_evaluate(
     # Get hyperparameters from wandb.config (set by sweep agent)
     config = wandb.config
 
+    # Get use_bias parameter (default to True if not in sweep config)
+    use_bias: bool = config.get("use_bias", True)  # type: ignore[no-untyped-call]
+
     # Create a unique run name for this sweep trial
     run_name = f"sweep_{config.learning_rate:.0e}_bs{config.batch_size}_wd{config.weight_decay:.0e}"
+    # Only add bias suffix if use_bias is explicitly set in the sweep config
+    if "use_bias" in config:
+        bias_str = "bias" if use_bias else "nobias"
+        run_name = f"{run_name}_{bias_str}"
 
     # Override training args with sweep hyperparameters
     training_args = replace(
@@ -148,6 +167,7 @@ def train_and_evaluate(
     logger.info(f"  Batch size: {training_args.per_device_train_batch_size}")
     logger.info(f"  Gradient accumulation steps: {training_args.gradient_accumulation_steps}")
     logger.info(f"  Num epochs: {training_args.num_train_epochs}")
+    logger.info(f"  Use bias: {use_bias}")
 
     # Create datasets
     train_dataset, val_dataset, test_dataset = create_fold_datasets(
@@ -165,7 +185,7 @@ def train_and_evaluate(
     logger.info(f"Test samples: {len(test_dataset)}")
 
     # Create model
-    model = create_multimodal_model(model_config, device)
+    model = create_multimodal_model(model_config, device, use_bias=use_bias)
 
     # Create trainer
     trainer = MultimodalTrainer(
