@@ -20,9 +20,11 @@ class MultimodalTimesFMConfig(TimesFMConfig):  # type: ignore[misc]
 
     Attributes:
         text_encoder_type: Type of text encoder to use ('english' or 'japanese').
+        use_bias: Whether to use bias in the fusion projection layer. Defaults to True.
     """
 
     text_encoder_type: Literal["english", "japanese"] = "english"
+    use_bias: bool = True
 
 
 class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
@@ -72,6 +74,7 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
         self.multimodal_fusion = MultimodalFusion(
             ts_feature_dim=config.hidden_size,
             text_feature_dim=self.text_encoder.embedding_dim,
+            use_bias=config.use_bias,
         )
 
         # Move the entire decoder to the selected device
