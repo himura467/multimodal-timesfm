@@ -1,0 +1,37 @@
+# WandB Sweep Configuration for Baseline (Fine-tuned) TimesFM Hyperparameter Tuning
+# This configuration uses Climate as validation, Energy as test, and all others as training
+# Optimizes based on test MSE on Energy dataset
+
+# Sweep method: random, grid, or bayes
+method: bayes
+
+# Metric to optimize (test MSE on Energy dataset)
+metric:
+  name: test_mse
+  goal: minimize
+
+# Hyperparameter search space
+parameters:
+  # Learning rate
+  learning_rate:
+    distribution: log_uniform_values
+    min: 1e-6
+    max: 1e-2
+
+  # Weight decay (L2 regularization)
+  weight_decay:
+    distribution: log_uniform_values
+    min: 1e-4
+    max: 1e-1
+
+  # Batch size
+  batch_size:
+    values: [2, 4, 8, 16]
+
+  # Gradient accumulation steps
+  gradient_accumulation_steps:
+    values: [1, 2, 4, 8]
+
+  # Number of training epochs
+  num_epochs:
+    values: [5, 10, 15, 20]
