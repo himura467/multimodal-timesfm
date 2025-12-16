@@ -193,7 +193,8 @@ def train_and_evaluate(
         args=training_args,
         train_dataset=train_dataset,
         val_dataset=val_dataset,
-        freeze_timesfm=False,  # Fine-tune all parameters
+        freeze_timesfm=False,
+        init_wandb=False,
     )
 
     logger.info(f"Fine-tuning baseline TimesFM for {training_args.num_train_epochs} epochs")
