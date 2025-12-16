@@ -33,7 +33,8 @@ multimodal-timesfm/
 │           └── yaml.py                      # YAML configuration utilities
 ├── scripts/
 │   ├── train_time_mmd_cv.py                 # Train models (multimodal & baseline) with cross-validation
-│   ├── tune_time_mmd_sweep.py               # Hyperparameter tuning with WandB Sweep
+│   ├── tune_time_mmd_sweep.py               # Hyperparameter tuning for multimodal TimesFM with WandB Sweep
+│   ├── tune_baseline_sweep.py               # Hyperparameter tuning for baseline TimesFM with WandB Sweep
 │   ├── evaluate_time_mmd_cv.py              # Evaluate models with cross-validation
 │   ├── visualize_time_mmd_cv.py             # Visualize model predictions
 │   └── forecast_time_mmd.py                 # Forecasting script with custom parameters
@@ -42,7 +43,9 @@ multimodal-timesfm/
 │       ├── configs/                         # Time-MMD specific configurations
 │       │   ├── __init__.py
 │       │   ├── model.py                     # Model architecture settings
-│       │   └── domain_columns.py            # Domain-specific column configurations
+│       │   ├── domain_columns.py            # Domain-specific column configurations
+│       │   ├── sweep_config.yml             # WandB sweep config for multimodal TimesFM
+│       │   └── baseline_sweep_config.yml    # WandB sweep config for baseline TimesFM
 │       └── data/
 │           ├── __init__.py
 │           ├── time_mmd_dataset.py          # Time-MMD dataset loader

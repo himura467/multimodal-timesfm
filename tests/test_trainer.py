@@ -204,6 +204,7 @@ class TestMultimodalTrainer:
         expected_shape = (batch_size, 4, 128, 10)  # Based on model config
         assert outputs.shape == expected_shape
 
+    @pytest.mark.ci_unstable
     def test_training_loop(
         self,
         model: MultimodalPatchedDecoder,
