@@ -38,6 +38,7 @@ class BaselineTrainer:
         train_dataset: MultimodalDatasetBase | ConcatDataset[dict[str, Any]],
         val_dataset: MultimodalDatasetBase | ConcatDataset[dict[str, Any]],
         freeze_timesfm: bool = False,
+        init_wandb: bool = True,
     ) -> None:
         """Initialize BaselineTrainer.
 
@@ -47,6 +48,7 @@ class BaselineTrainer:
             train_dataset: Training dataset.
             val_dataset: Validation dataset.
             freeze_timesfm: If True, freeze all TimesFM parameters (no fine-tuning).
+            init_wandb: Whether to initialize wandb (default: True). Set to False for sweep runs.
         """
         self.model = model
         self.args = args
@@ -98,17 +100,19 @@ class BaselineTrainer:
         # Set up logger
         self.logger = setup_logger(log_file=args.logging_dir / "training.log")
 
-        # Initialize W&B
-        wandb.init(
-            project="baseline-timesfm",
-            name=args.run_name,
-            config={**args.__dict__, "freeze_timesfm": freeze_timesfm, "model_type": "baseline_timesfm"},
-        )
+        # Initialize W&B (skip if already initialized, e.g., in sweep runs)
+        if init_wandb:
+            wandb.init(
+                project="baseline-timesfm",
+                name=args.run_name,
+                config={**args.__dict__, "freeze_timesfm": freeze_timesfm, "model_type": "baseline_timesfm"},
+            )
 
         # Training state
         self.global_step = 0
         self.current_epoch = 0
         self.best_val_loss = float("inf")
+        self.init_wandb = init_wandb
 
     def train_epoch(self) -> float:
         """Train one epoch.
@@ -359,5 +363,6 @@ class BaselineTrainer:
 
         self.logger.info("Training completed!")
 
-        # Close W&B run
-        wandb.finish()
+        # Close W&B run (skip if externally managed, e.g., in sweep runs)
+        if self.init_wandb:
+            wandb.finish()
