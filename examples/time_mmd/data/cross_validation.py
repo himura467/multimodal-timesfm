@@ -4,7 +4,7 @@ This module provides Time-MMD-specific wrappers around the core cross-validation
 """
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from torch.utils.data import ConcatDataset, Dataset
 
@@ -15,6 +15,8 @@ from multimodal_timesfm.cross_validation import (
 from multimodal_timesfm.cross_validation import (
     get_cross_validation_splits as get_cross_validation_splits_core,
 )
+from multimodal_timesfm.utils.cache import DatasetCache
+from multimodal_timesfm.utils.cached_dataset import CachedDataset
 
 
 def _time_mmd_dataset_factory(
@@ -107,9 +109,12 @@ def create_fold_datasets(
     train_domains: list[str],
     val_domains: list[str],
     test_domains: list[str],
+    split_ratio: float,
     patch_len: int,
     context_len: int,
     horizon_len: int,
+    text_encoder_type: Literal["english", "japanese"] | None,
+    cache_dir: Path | None = None,
 ) -> tuple[ConcatDataset[dict[str, Any]], ConcatDataset[dict[str, Any]], ConcatDataset[dict[str, Any]]]:
     """Create datasets for a single fold.
 
@@ -118,20 +123,53 @@ def create_fold_datasets(
         train_domains: List of domain names for training.
         val_domains: List of domain names for validation.
         test_domains: List of domain names for testing.
+        split_ratio: Train/test split ratio used when generating cache.
         patch_len: Length of input patches.
         context_len: Length of context window.
         horizon_len: Length of forecasting horizon.
+        text_encoder_type: Type of text encoder used for caching. If None, uses baseline cache.
+        cache_dir: Optional directory containing cached datasets. If provided, loads from cache.
 
     Returns:
         Tuple of (train_dataset, val_dataset, test_dataset).
     """
-    return create_fold_datasets_core(
-        data_path=data_path,
-        train_entities=train_domains,
-        val_entities=val_domains,
-        test_entities=test_domains,
-        dataset_factory=_time_mmd_dataset_factory,
-        patch_len=patch_len,
-        context_len=context_len,
-        horizon_len=horizon_len,
-    )
+    if cache_dir is not None:
+        cache = DatasetCache(cache_dir)
+
+        def load_cached_domains(domains: list[str]) -> list[Dataset[dict[str, Any]]]:
+            datasets = []
+            for domain in domains:
+                cache_path = cache.get_cache_path(
+                    dataset_name="time_mmd",
+                    domain=domain,
+                    split_ratio=split_ratio,
+                    split="train",  # CV mode uses split="train" with split_ratio=1.0
+                    patch_len=patch_len,
+                    context_len=context_len,
+                    horizon_len=horizon_len,
+                    text_encoder_type=text_encoder_type,
+                )
+                cached_data = cache.load(cache_path)
+                datasets.append(CachedDataset(cached_data))
+            return datasets
+
+        train_datasets = load_cached_domains(train_domains)
+        val_datasets = load_cached_domains(val_domains)
+        test_datasets = load_cached_domains(test_domains)
+
+        return (
+            ConcatDataset(train_datasets),
+            ConcatDataset(val_datasets),
+            ConcatDataset(test_datasets),
+        )
+    else:
+        return create_fold_datasets_core(
+            data_path=data_path,
+            train_entities=train_domains,
+            val_entities=val_domains,
+            test_entities=test_domains,
+            dataset_factory=_time_mmd_dataset_factory,
+            patch_len=patch_len,
+            context_len=context_len,
+            horizon_len=horizon_len,
+        )
