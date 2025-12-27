@@ -25,13 +25,16 @@ multimodal-timesfm/
 │       ├── cross_validation.py              # Cross-validation utilities
 │       └── utils/                           # Utility modules
 │           ├── __init__.py
-│           ├── collate.py                   # Data collation utilities (multimodal & baseline)
+│           ├── cache.py                     # Dataset caching utilities
+│           ├── cached_dataset.py            # Cached dataset wrapper
+│           ├── collate.py                   # Data collation utilities (multimodal, cached & baseline)
 │           ├── device.py                    # Device utilities
 │           ├── logging.py                   # Logging utilities
 │           ├── seed.py                      # Random seed utilities
 │           ├── model.py                     # Model utilities (creation & loading)
 │           └── yaml.py                      # YAML configuration utilities
 ├── scripts/
+│   ├── generate_cached_datasets.py          # Generate cached datasets with pre-computed embeddings
 │   ├── train_time_mmd_cv.py                 # Train models (multimodal & baseline) with cross-validation
 │   ├── tune_time_mmd_sweep.py               # Hyperparameter tuning for multimodal TimesFM with WandB Sweep
 │   ├── tune_baseline_sweep.py               # Hyperparameter tuning for baseline TimesFM with WandB Sweep
