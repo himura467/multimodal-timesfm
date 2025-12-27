@@ -4,11 +4,11 @@ from typing import Any
 
 import torch
 import torch.nn as nn
+import wandb
 from torch.optim import AdamW
 from torch.types import FileLike
 from torch.utils.data import ConcatDataset, DataLoader
 
-import wandb
 from multimodal_timesfm.multimodal_dataset import MultimodalDatasetBase
 from multimodal_timesfm.multimodal_patched_decoder import MultimodalPatchedDecoder
 from multimodal_timesfm.training_args import TrainingArguments
@@ -118,18 +118,31 @@ class MultimodalTrainer:
             context = batch_tensors["context"]
             future = batch_tensors["future"]
             freq = batch_tensors["freq"]
-            patched_texts = batch["patched_texts"]
 
             # Create input_padding tensor (zeros for now)
             input_padding = torch.zeros_like(context)
 
-            # Forward pass
-            predictions = self.model(
-                input_ts=context,
-                input_padding=input_padding.float(),
-                freq=freq,
-                text_descriptions=patched_texts,
-            )
+            # Forward pass - handle both raw text and pre-computed embeddings
+            if "text_embeddings" in batch:
+                # Using cached dataset with pre-computed embeddings
+                text_embeddings = move_to_device({"text_embeddings": batch["text_embeddings"]}, self.device)[
+                    "text_embeddings"
+                ]
+                predictions = self.model(
+                    input_ts=context,
+                    input_padding=input_padding.float(),
+                    freq=freq,
+                    text_embeddings=text_embeddings,
+                )
+            else:
+                # Using raw dataset with text descriptions
+                patched_texts = batch["patched_texts"]
+                predictions = self.model(
+                    input_ts=context,
+                    input_padding=input_padding.float(),
+                    freq=freq,
+                    text_descriptions=patched_texts,
+                )
 
             # Extract predictions following TimesFM implementation
             # Model output shape: (batch_size, num_patches, patch_len, num_quantiles)
@@ -201,18 +214,31 @@ class MultimodalTrainer:
                 context = batch_tensors["context"]
                 future = batch_tensors["future"]
                 freq = batch_tensors["freq"]
-                patched_texts = batch["patched_texts"]
 
                 # Create input_padding tensor (zeros for now)
                 input_padding = torch.zeros_like(context)
 
-                # Forward pass
-                predictions = self.model(
-                    input_ts=context,
-                    input_padding=input_padding,
-                    freq=freq,
-                    text_descriptions=patched_texts,
-                )
+                # Forward pass - handle both raw text and pre-computed embeddings
+                if "text_embeddings" in batch:
+                    # Using cached dataset with pre-computed embeddings
+                    text_embeddings = move_to_device({"text_embeddings": batch["text_embeddings"]}, self.device)[
+                        "text_embeddings"
+                    ]
+                    predictions = self.model(
+                        input_ts=context,
+                        input_padding=input_padding,
+                        freq=freq,
+                        text_embeddings=text_embeddings,
+                    )
+                else:
+                    # Using raw dataset with text descriptions
+                    patched_texts = batch["patched_texts"]
+                    predictions = self.model(
+                        input_ts=context,
+                        input_padding=input_padding,
+                        freq=freq,
+                        text_descriptions=patched_texts,
+                    )
 
                 # Extract predictions following TimesFM implementation
                 # Model output shape: (batch_size, num_patches, patch_len, num_quantiles)
