@@ -84,7 +84,8 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
         self,
         input_ts: torch.Tensor,
         input_padding: torch.Tensor,
-        text_descriptions: list[list[list[str]]],
+        text_descriptions: list[list[list[str]]] | None = None,
+        text_embeddings: torch.Tensor | None = None,
     ) -> tuple[
         torch.Tensor,
         torch.Tensor,
@@ -102,6 +103,9 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
             text_descriptions: List of text descriptions organized as
                               [batch][patch] where each patch can have multiple text strings.
                               Shape: (batch_size, num_patches, variable_texts_per_patch).
+                              If None, text_embeddings must be provided.
+            text_embeddings: Pre-computed text embeddings of shape (batch_size, num_patches, embedding_dim).
+                            If provided, text_descriptions is ignored.
 
         Returns:
             Tuple containing:
@@ -109,6 +113,9 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
             - patched_padding: Padding tensor for patches
             - stats: Normalization statistics (mean, std)
             - patched_inputs: Original patched inputs
+
+        Raises:
+            ValueError: If neither text_descriptions nor text_embeddings is provided.
         """
         # Use the original preprocessing for time series data
         model_input, patched_padding, stats, patched_inputs = self._preprocess_input(
@@ -116,11 +123,18 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
             input_padding=input_padding,
         )
 
-        # Encode text descriptions for each patch
-        text_embeddings = self._encode_patch_text_features(text_descriptions, model_input.shape, model_input.device)
+        # Get or compute text embeddings
+        if text_embeddings is not None:
+            # Use pre-computed embeddings
+            embeddings = text_embeddings
+        elif text_descriptions is not None:
+            # Encode text descriptions for each patch
+            embeddings = self._encode_patch_text_features(text_descriptions, model_input.shape, model_input.device)
+        else:
+            raise ValueError("Either text_descriptions or text_embeddings must be provided")
 
         # Fuse text features with time series features
-        model_input = self.multimodal_fusion(model_input, text_embeddings)
+        model_input = self.multimodal_fusion(model_input, embeddings)
 
         return model_input, patched_padding, stats, patched_inputs
 
@@ -194,7 +208,8 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
         input_ts: torch.Tensor,
         input_padding: torch.LongTensor,
         freq: torch.Tensor,
-        text_descriptions: list[list[list[str]]],
+        text_descriptions: list[list[list[str]]] | None = None,
+        text_embeddings: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """Forward pass for multimodal decoder.
 
@@ -203,6 +218,9 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
             input_padding: Input padding tensor.
             freq: Frequency encoding tensor.
             text_descriptions: Patch-level text descriptions organized as [batch][patch][texts].
+                             If None, text_embeddings must be provided.
+            text_embeddings: Pre-computed text embeddings of shape (batch_size, num_patches, embedding_dim).
+                            If provided, text_descriptions is ignored.
 
         Returns:
             Output tensor with forecasting predictions.
@@ -214,6 +232,7 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
             input_ts=input_ts,
             input_padding=input_padding,
             text_descriptions=text_descriptions,
+            text_embeddings=text_embeddings,
         )
 
         # Add frequency embedding (same as original)
@@ -234,7 +253,8 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
         paddings: torch.Tensor,
         freq: torch.Tensor,
         horizon_len: int,
-        text_descriptions: list[list[list[str]]],
+        text_descriptions: list[list[list[str]]] | None = None,
+        text_embeddings: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Direct multi-step forecasting with multimodal support following TimesFM interface.
 
@@ -253,7 +273,9 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
                         the model's configured horizon_len, only the first min(horizon_len,
                         config.horizon_len) predictions will be returned.
             text_descriptions: Nested list [batch][patch][texts] containing text descriptions
-                              for each patch of each batch sample.
+                              for each patch of each batch sample. If None, text_embeddings must be provided.
+            text_embeddings: Pre-computed text embeddings of shape (batch_size, num_patches, embedding_dim).
+                            If provided, text_descriptions is ignored.
 
         Returns:
             Tuple containing:
@@ -276,7 +298,7 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
         context_input = input_ts[:, -context_len:]
         context_padding = paddings[:, 0 : input_ts.shape[1]][:, -context_len:]
 
-        fprop_outputs = self(context_input, context_padding, freq, text_descriptions)
+        fprop_outputs = self(context_input, context_padding, freq, text_descriptions, text_embeddings)
 
         # The model outputs predictions for self.config.horizon_len steps
         # We need to handle the case where requested horizon_len differs from model's horizon_len

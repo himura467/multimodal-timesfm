@@ -39,6 +39,38 @@ def multimodal_collate_fn(batch: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def cached_multimodal_collate_fn(batch: list[dict[str, Any]]) -> dict[str, Any]:
+    """Collate function for cached multimodal data with pre-computed text embeddings.
+
+    Args:
+        batch: List of samples from the cached dataset.
+
+    Returns:
+        Batched data dictionary with stacked tensors and pre-computed text embeddings.
+    """
+    # Stack time series data
+    context = torch.stack([torch.from_numpy(sample["context"]) for sample in batch])
+    future = torch.stack([torch.from_numpy(sample["future"]) for sample in batch])
+    freq = torch.stack([torch.tensor(sample["freq"]) for sample in batch])
+
+    # Stack pre-computed text embeddings
+    text_embeddings = torch.stack([torch.from_numpy(sample["text_embeddings"]) for sample in batch])
+
+    # Collect metadata for each batch item
+    metadata = []
+    for sample in batch:
+        if "metadata" in sample:
+            metadata.append(sample["metadata"])
+
+    return {
+        "context": context.squeeze(-1),
+        "future": future.squeeze(-1),
+        "freq": freq.unsqueeze(-1),
+        "text_embeddings": text_embeddings,
+        "metadata": metadata,
+    }
+
+
 def baseline_collate_fn(batch: list[dict[str, Any]]) -> dict[str, Any]:
     """Collate function for baseline (non-multimodal) data.
 

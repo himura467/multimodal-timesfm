@@ -71,6 +71,12 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--cache-dir",
+        type=str,
+        help="Directory containing cached datasets (if not provided, loads raw data)",
+    )
+
+    parser.add_argument(
         "--seed",
         type=int,
         help="Random seed for reproducibility (if not provided, no seed will be set)",
@@ -119,6 +125,7 @@ def train_and_evaluate(
     val_domains: list[str],
     test_domains: list[str],
     device: torch.device,
+    cache_dir: Path | None = None,
 ) -> dict[str, float]:
     """Train baseline model with hyperparameters from WandB config and evaluate on test dataset.
 
@@ -175,9 +182,12 @@ def train_and_evaluate(
         train_domains=train_domains,
         val_domains=val_domains,
         test_domains=test_domains,
+        split_ratio=1.0,
         patch_len=training_args.patch_len,
         context_len=training_args.context_len,
         horizon_len=training_args.horizon_len,
+        text_encoder_type=None,
+        cache_dir=cache_dir,
     )
 
     logger.info(f"Training samples: {len(train_dataset)}")
@@ -301,6 +311,13 @@ def main() -> int:
     device = resolve_device(base_training_args.device)
     logger.info(f"Using device: {device}")
 
+    # Cache directory (if provided)
+    cache_dir_path = Path(parsed_args.cache_dir) if parsed_args.cache_dir else None
+    if cache_dir_path:
+        logger.info(f"Using cached datasets from: {cache_dir_path}")
+    else:
+        logger.info("Loading raw datasets (no cache)")
+
     # Define function for each sweep run
     def run() -> None:
         """Execute a single hyperparameter configuration trial."""
@@ -317,6 +334,7 @@ def main() -> int:
                     val_domains=val_domains,
                     test_domains=test_domains,
                     device=device,
+                    cache_dir=cache_dir_path,
                 )
 
                 logger.info(f"Sweep run {run.id} completed. Test metrics: {metrics}")
