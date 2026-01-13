@@ -12,6 +12,7 @@ from torch.utils.data import ConcatDataset, DataLoader
 from multimodal_timesfm.multimodal_dataset import MultimodalDatasetBase
 from multimodal_timesfm.multimodal_patched_decoder import MultimodalPatchedDecoder
 from multimodal_timesfm.training_args import TrainingArguments
+from multimodal_timesfm.utils.cached_dataset import CachedDataset
 from multimodal_timesfm.utils.collate import cached_multimodal_collate_fn, multimodal_collate_fn
 from multimodal_timesfm.utils.device import get_pin_memory, move_to_device, resolve_device
 from multimodal_timesfm.utils.logging import setup_logger
@@ -113,9 +114,10 @@ class MultimodalTrainer:
         """
         # Check if it's a ConcatDataset - if so, check the first sub-dataset
         if isinstance(dataset, ConcatDataset):
-            if len(dataset.datasets) > 0:
-                first_dataset = dataset.datasets[0]
-                return self._get_collate_fn(first_dataset)
+            return self._get_collate_fn(dataset.datasets[0])
+
+        # Check if it's a CachedDataset
+        if isinstance(dataset, CachedDataset):
             return cached_multimodal_collate_fn
 
         # Default to regular multimodal collate function
