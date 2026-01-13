@@ -12,7 +12,7 @@ from torch.utils.data import ConcatDataset, DataLoader
 from multimodal_timesfm.multimodal_dataset import MultimodalDatasetBase
 from multimodal_timesfm.multimodal_patched_decoder import MultimodalPatchedDecoder
 from multimodal_timesfm.training_args import TrainingArguments
-from multimodal_timesfm.utils.collate import multimodal_collate_fn
+from multimodal_timesfm.utils.collate import cached_multimodal_collate_fn, multimodal_collate_fn
 from multimodal_timesfm.utils.device import get_pin_memory, move_to_device, resolve_device
 from multimodal_timesfm.utils.logging import setup_logger
 
@@ -54,13 +54,16 @@ class MultimodalTrainer:
         self.device = resolve_device(args.device)
         self.model.to(self.device)
 
+        # Detect whether we're using cached datasets and select appropriate collate function
+        collate_fn = self._get_collate_fn(train_dataset)
+
         # Set up data loaders
         self.train_loader: DataLoader[dict[str, Any]] = DataLoader(
             train_dataset,
             batch_size=args.per_device_train_batch_size,
             shuffle=True,
             num_workers=0,
-            collate_fn=multimodal_collate_fn,
+            collate_fn=collate_fn,
             pin_memory=get_pin_memory(self.device),
         )
         self.val_loader: DataLoader[dict[str, Any]] = DataLoader(
@@ -68,7 +71,7 @@ class MultimodalTrainer:
             batch_size=args.per_device_eval_batch_size,
             shuffle=False,
             num_workers=0,
-            collate_fn=multimodal_collate_fn,
+            collate_fn=collate_fn,
             pin_memory=get_pin_memory(self.device),
         )
 
@@ -98,6 +101,25 @@ class MultimodalTrainer:
         self.current_epoch = 0
         self.best_val_loss = float("inf")
         self.init_wandb = init_wandb
+
+    def _get_collate_fn(self, dataset: Any) -> Any:
+        """Determine the appropriate collate function based on dataset type.
+
+        Args:
+            dataset: The dataset to check.
+
+        Returns:
+            The appropriate collate function (either cached or regular).
+        """
+        # Check if it's a ConcatDataset - if so, check the first sub-dataset
+        if isinstance(dataset, ConcatDataset):
+            if len(dataset.datasets) > 0:
+                first_dataset = dataset.datasets[0]
+                return self._get_collate_fn(first_dataset)
+            return cached_multimodal_collate_fn
+
+        # Default to regular multimodal collate function
+        return multimodal_collate_fn
 
     def train_epoch(self) -> float:
         """Train one epoch.
