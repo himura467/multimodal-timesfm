@@ -10,10 +10,11 @@ import json
 import shutil
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import torch
 import wandb
-from torch.utils.data import DataLoader
+from torch.utils.data import ConcatDataset, DataLoader
 
 from examples.time_mmd.configs.model import ModelConfig
 from examples.time_mmd.data.cross_validation import create_fold_datasets, get_all_domains
@@ -21,12 +22,34 @@ from multimodal_timesfm.evaluation import evaluate_multimodal_model
 from multimodal_timesfm.multimodal_patched_decoder import MultimodalPatchedDecoder, MultimodalTimesFMConfig
 from multimodal_timesfm.trainer import MultimodalTrainer
 from multimodal_timesfm.training_args import TrainingArguments
-from multimodal_timesfm.utils.collate import multimodal_collate_fn
+from multimodal_timesfm.utils.cached_dataset import CachedDataset
+from multimodal_timesfm.utils.collate import cached_multimodal_collate_fn, multimodal_collate_fn
 from multimodal_timesfm.utils.device import get_pin_memory, resolve_device
 from multimodal_timesfm.utils.logging import get_logger, setup_logger
 from multimodal_timesfm.utils.model import create_multimodal_model as create_multimodal_model_core
 from multimodal_timesfm.utils.seed import set_seed
 from multimodal_timesfm.utils.yaml import load_yaml
+
+
+def _get_collate_fn(dataset: Any) -> Any:
+    """Determine the appropriate collate function based on dataset type.
+
+    Args:
+        dataset: The dataset to check.
+
+    Returns:
+        The appropriate collate function (either cached or regular).
+    """
+    # Check if it's a ConcatDataset - if so, check the first sub-dataset
+    if isinstance(dataset, ConcatDataset):
+        return _get_collate_fn(dataset.datasets[0])
+
+    # Check if it's a CachedDataset
+    if isinstance(dataset, CachedDataset):
+        return cached_multimodal_collate_fn
+
+    # Default to regular multimodal collate function
+    return multimodal_collate_fn
 
 
 def parse_args() -> argparse.Namespace:
@@ -250,13 +273,14 @@ def train_and_evaluate(
     logger.info(f"Training completed. Best validation loss: {val_loss:.6f}")
     logger.info("Evaluating best model on test dataset (Energy)...")
 
-    # Create test dataloader for evaluation
+    # Create test dataloader for evaluation with appropriate collate function
+    test_collate_fn = _get_collate_fn(test_dataset)
     test_dataloader = DataLoader(
         test_dataset,
         batch_size=training_args.per_device_eval_batch_size,
         shuffle=False,
         num_workers=0,
-        collate_fn=multimodal_collate_fn,
+        collate_fn=test_collate_fn,
         pin_memory=get_pin_memory(device),
     )
 
