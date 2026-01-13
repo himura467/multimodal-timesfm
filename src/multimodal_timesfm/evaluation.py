@@ -41,13 +41,22 @@ def evaluate_multimodal_model(
             context = batch_tensors["context"]
             future = batch_tensors["future"]
             freq = batch_tensors["freq"]
-            patched_texts = batch["patched_texts"]
 
             # Create input_padding tensor (zeros for now)
             input_padding = torch.zeros_like(context)
 
-            # Forward pass with text
-            predictions = model(context, input_padding.float(), freq, patched_texts)
+            # Handle both cached (text_embeddings) and regular (patched_texts) batches
+            if "text_embeddings" in batch:
+                # Cached dataset with pre-computed embeddings
+                text_embeddings = move_to_device({"text_embeddings": batch["text_embeddings"]}, device)[
+                    "text_embeddings"
+                ]
+                predictions = model(context, input_padding.float(), freq, text_embeddings=text_embeddings)
+            else:
+                # Regular dataset with text descriptions
+                patched_texts = batch["patched_texts"]
+                predictions = model(context, input_padding.float(), freq, text_descriptions=patched_texts)
+
             predictions_mean = predictions[..., 0]  # [B, patches, horizon_len]
             last_patch_pred = predictions_mean[:, -1, :]  # [B, horizon_len]
 
