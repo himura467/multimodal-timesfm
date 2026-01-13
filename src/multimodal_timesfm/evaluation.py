@@ -55,7 +55,7 @@ def evaluate_multimodal_model(
             else:
                 # Regular dataset with text descriptions
                 patched_texts = batch["patched_texts"]
-                predictions = model(context, input_padding.float(), freq, patched_texts)
+                predictions = model(context, input_padding.float(), freq, patched_texts=patched_texts)
 
             predictions_mean = predictions[..., 0]  # [B, patches, horizon_len]
             last_patch_pred = predictions_mean[:, -1, :]  # [B, horizon_len]
