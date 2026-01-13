@@ -122,6 +122,61 @@ class TestMultimodalFusion:
         assert fusion.text_projection[4].in_features == hidden_dim
         assert fusion.text_projection[4].out_features == 1280
 
+    def test_init_multi_layer_2_layers_no_bias(self) -> None:
+        """Tests initialization with 2-layer projection network without bias."""
+        fusion = MultimodalFusion(ts_feature_dim=1280, text_feature_dim=384, num_layers=2, use_bias=False)
+
+        assert fusion.ts_feature_dim == 1280
+        assert fusion.text_feature_dim == 384
+        assert fusion.num_layers == 2
+        assert fusion.use_bias is False
+        assert isinstance(fusion.text_projection, nn.Sequential)
+
+        # Check layer structure: Linear -> ReLU -> Linear -> ReLU
+        assert len(fusion.text_projection) == 4
+        assert isinstance(fusion.text_projection[0], nn.Linear)
+        assert isinstance(fusion.text_projection[1], nn.ReLU)
+        assert isinstance(fusion.text_projection[2], nn.Linear)
+        assert isinstance(fusion.text_projection[3], nn.ReLU)
+
+        # Check that all linear layers have no bias
+        assert fusion.text_projection[0].bias is None
+        assert fusion.text_projection[2].bias is None
+
+        # Check dimensions
+        hidden_dim = (384 + 1280) // 2
+        assert fusion.text_projection[0].in_features == 384
+        assert fusion.text_projection[0].out_features == hidden_dim
+        assert fusion.text_projection[2].in_features == hidden_dim
+        assert fusion.text_projection[2].out_features == 1280
+
+    def test_init_multi_layer_3_layers_no_bias(self) -> None:
+        """Tests initialization with 3-layer projection network without bias."""
+        fusion = MultimodalFusion(ts_feature_dim=1280, text_feature_dim=384, num_layers=3, use_bias=False)
+
+        assert fusion.ts_feature_dim == 1280
+        assert fusion.text_feature_dim == 384
+        assert fusion.num_layers == 3
+        assert fusion.use_bias is False
+        assert isinstance(fusion.text_projection, nn.Sequential)
+
+        # Check layer structure: Linear -> ReLU -> Linear -> ReLU -> Linear -> ReLU
+        assert len(fusion.text_projection) == 6
+
+        # Check that all linear layers have no bias
+        assert fusion.text_projection[0].bias is None
+        assert fusion.text_projection[2].bias is None
+        assert fusion.text_projection[4].bias is None
+
+        # Check dimensions
+        hidden_dim = (384 + 1280) // 2
+        assert fusion.text_projection[0].in_features == 384
+        assert fusion.text_projection[0].out_features == hidden_dim
+        assert fusion.text_projection[2].in_features == hidden_dim
+        assert fusion.text_projection[2].out_features == hidden_dim
+        assert fusion.text_projection[4].in_features == hidden_dim
+        assert fusion.text_projection[4].out_features == 1280
+
     def test_weight_initialization(self) -> None:
         """Tests that weights are properly initialized."""
         fusion = MultimodalFusion(ts_feature_dim=128, text_feature_dim=64)
