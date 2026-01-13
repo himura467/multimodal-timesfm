@@ -83,14 +83,15 @@ def parse_args() -> argparse.Namespace:
 
 
 def create_multimodal_model(
-    model_config: ModelConfig, device: torch.device, use_bias: bool = True
+    model_config: ModelConfig, device: torch.device, num_fusion_layers: int = 1, use_bias: bool = True
 ) -> MultimodalPatchedDecoder:
     """Create multimodal model from configuration and load pretrained TimesFM weights.
 
     Args:
         model_config: Model configuration.
         device: Device to create model on.
-        use_bias: Whether to use bias in the fusion projection layer.
+        num_fusion_layers: Number of linear layers in the fusion projection network (1-3).
+        use_bias: Whether to use bias in the fusion projection layers.
 
     Returns:
         Multimodal model with pretrained weights.
@@ -111,6 +112,7 @@ def create_multimodal_model(
         dtype=model_config.timesfm.dtype,
         use_positional_embedding=model_config.timesfm.use_positional_embedding,
         text_encoder_type=model_config.text_encoder.text_encoder_type,
+        num_fusion_layers=num_fusion_layers,
         use_bias=use_bias,
     )
 
@@ -146,6 +148,9 @@ def train_and_evaluate(
     # Get hyperparameters from wandb.config (set by sweep agent)
     config = wandb.config
 
+    # Get num_fusion_layers parameter (default to 1 if not in sweep config)
+    num_fusion_layers: int = config.get("num_fusion_layers", 1)  # type: ignore[no-untyped-call]
+
     # Get use_bias parameter (default to True if not in sweep config)
     use_bias: bool = config.get("use_bias", True)  # type: ignore[no-untyped-call]
 
@@ -154,13 +159,26 @@ def train_and_evaluate(
 
     # Create a unique run name for this sweep trial
     run_name = f"sweep_{config.learning_rate:.0e}_bs{config.batch_size}_wd{config.weight_decay:.0e}"
-    # Only add bias suffix if use_bias is explicitly set in the sweep config
+
+    # Build list of suffixes to add
+    suffixes = []
+
+    # Add num_fusion_layers suffix if explicitly set in sweep config
+    if "num_fusion_layers" in config:
+        suffixes.append(f"layers{num_fusion_layers}")
+
+    # Add bias suffix if explicitly set in sweep config
     if "use_bias" in config:
         bias_str = "bias" if use_bias else "nobias"
-        run_name = f"{run_name}_{bias_str}"
-    # Add seed to run name if it's specified in sweep config
+        suffixes.append(bias_str)
+
+    # Add seed suffix if specified in sweep config
     if "seed" in config:
-        run_name = f"{run_name}_seed{seed}"
+        suffixes.append(f"seed{seed}")
+
+    # Append all suffixes to run name
+    if suffixes:
+        run_name = f"{run_name}_{'_'.join(suffixes)}"
 
     # Override training args with sweep hyperparameters
     training_args = replace(
@@ -182,6 +200,7 @@ def train_and_evaluate(
     logger.info(f"  Weight decay: {training_args.weight_decay}")
     logger.info(f"  Num epochs: {training_args.num_train_epochs}")
     logger.info(f"  Seed: {seed}")
+    logger.info(f"  Num fusion layers: {num_fusion_layers}")
     logger.info(f"  Use bias: {use_bias}")
 
     # Create datasets
@@ -203,7 +222,7 @@ def train_and_evaluate(
     logger.info(f"Test samples: {len(test_dataset)}")
 
     # Create model
-    model = create_multimodal_model(model_config, device, use_bias=use_bias)
+    model = create_multimodal_model(model_config, device, num_fusion_layers=num_fusion_layers, use_bias=use_bias)
 
     # Create trainer
     trainer = MultimodalTrainer(
