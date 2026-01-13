@@ -115,7 +115,7 @@ def main() -> int:
 
     # Setup logging
     log_dir = Path("outputs/logs")
-    log_dir.mkdir(exist_ok=True)
+    log_dir.mkdir(parents=True, exist_ok=True)
     setup_logger(log_file=log_dir / "cache_generation.log")
     logger = get_logger()
 
