@@ -297,8 +297,12 @@ class TestMultimodalPatchedDecoder:
         text_encoder = cast(EnglishTextEncoder | JapaneseTextEncoder, decoder.text_encoder)
         text_encoder_param = next(text_encoder.sentence_transformer.parameters())
         assert text_encoder_param.requires_grad
-        assert decoder.multimodal_fusion.text_projection.weight.requires_grad
-        assert decoder.multimodal_fusion.text_projection.bias.requires_grad
+
+        # Check fusion projection parameters (first linear layer in Sequential)
+        fusion_first_layer = decoder.multimodal_fusion.text_projection[0]
+        assert isinstance(fusion_first_layer, torch.nn.Linear)
+        assert fusion_first_layer.weight.requires_grad
+        assert fusion_first_layer.bias.requires_grad
 
         # Check that some TimesFM parameters are also unfrozen
         timesfm_param = next(decoder.input_ff_layer.parameters())
@@ -309,8 +313,8 @@ class TestMultimodalPatchedDecoder:
 
         # Check that text components are frozen
         assert not text_encoder_param.requires_grad
-        assert not decoder.multimodal_fusion.text_projection.weight.requires_grad
-        assert not decoder.multimodal_fusion.text_projection.bias.requires_grad
+        assert not fusion_first_layer.weight.requires_grad
+        assert not fusion_first_layer.bias.requires_grad
 
         # Check that TimesFM parameters are also frozen
         assert not timesfm_param.requires_grad
@@ -323,8 +327,8 @@ class TestMultimodalPatchedDecoder:
 
         # Check that text components are unfrozen
         assert text_encoder_param.requires_grad
-        assert decoder.multimodal_fusion.text_projection.weight.requires_grad
-        assert decoder.multimodal_fusion.text_projection.bias.requires_grad
+        assert fusion_first_layer.weight.requires_grad
+        assert fusion_first_layer.bias.requires_grad
 
         # Check that TimesFM parameters are also unfrozen
         assert timesfm_param.requires_grad
@@ -338,8 +342,12 @@ class TestMultimodalPatchedDecoder:
         text_encoder = cast(EnglishTextEncoder | JapaneseTextEncoder, decoder.text_encoder)
         text_encoder_param = next(text_encoder.sentence_transformer.parameters())
         assert text_encoder_param.requires_grad
-        assert decoder.multimodal_fusion.text_projection.weight.requires_grad
-        assert decoder.multimodal_fusion.text_projection.bias.requires_grad
+
+        # Check fusion projection parameters (first linear layer in Sequential)
+        fusion_first_layer = decoder.multimodal_fusion.text_projection[0]
+        assert isinstance(fusion_first_layer, torch.nn.Linear)
+        assert fusion_first_layer.weight.requires_grad
+        assert fusion_first_layer.bias.requires_grad
 
         # Check that components are not frozen initially
         frozen_status = decoder.is_text_frozen()
@@ -350,8 +358,8 @@ class TestMultimodalPatchedDecoder:
         decoder.freeze_text_components()
 
         assert not text_encoder_param.requires_grad
-        assert not decoder.multimodal_fusion.text_projection.weight.requires_grad
-        assert not decoder.multimodal_fusion.text_projection.bias.requires_grad
+        assert not fusion_first_layer.weight.requires_grad
+        assert not fusion_first_layer.bias.requires_grad
 
         # Check that components are frozen
         frozen_status = decoder.is_text_frozen()
@@ -362,8 +370,8 @@ class TestMultimodalPatchedDecoder:
         decoder.unfreeze_text_components()
 
         assert text_encoder_param.requires_grad
-        assert decoder.multimodal_fusion.text_projection.weight.requires_grad
-        assert decoder.multimodal_fusion.text_projection.bias.requires_grad
+        assert fusion_first_layer.weight.requires_grad
+        assert fusion_first_layer.bias.requires_grad
 
         # Check that components are unfrozen
         frozen_status = decoder.is_text_frozen()

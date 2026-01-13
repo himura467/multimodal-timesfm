@@ -35,3 +35,7 @@ parameters:
   # Number of training epochs
   num_epochs:
     values: [5, 10, 15, 20]
+
+  # Number of fusion layers (1-layer, 2-layer, or 3-layer projection network)
+  num_fusion_layers:
+    values: [1, 2, 3]
