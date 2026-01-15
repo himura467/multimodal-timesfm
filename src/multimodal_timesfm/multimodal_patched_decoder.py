@@ -21,11 +21,15 @@ class MultimodalTimesFMConfig(TimesFMConfig):  # type: ignore[misc]
     Attributes:
         text_encoder_type: Type of text encoder to use ('english' or 'japanese').
         num_fusion_layers: Number of linear layers in the fusion projection network (1-3). Defaults to 1.
+        fusion_hidden_dims: Hidden dimensions for multi-layer fusion projection as a tuple. Should
+                           contain (num_fusion_layers - 1) dimensions. If None, uses the average of text and time
+                           series dimensions for all hidden layers. Only used when num_fusion_layers > 1.
         use_bias: Whether to use bias in the fusion projection layers. Defaults to True.
     """
 
     text_encoder_type: Literal["english", "japanese"] = "english"
     num_fusion_layers: int = 1
+    fusion_hidden_dims: tuple[int, ...] | None = None
     use_bias: bool = True
 
 
@@ -77,6 +81,7 @@ class MultimodalPatchedDecoder(PatchedTimeSeriesDecoder):  # type: ignore[misc]
             ts_feature_dim=config.hidden_size,
             text_feature_dim=self.text_encoder.embedding_dim,
             num_layers=config.num_fusion_layers,
+            hidden_dims=config.fusion_hidden_dims,
             use_bias=config.use_bias,
         )
 

@@ -106,7 +106,11 @@ def parse_args() -> argparse.Namespace:
 
 
 def create_multimodal_model(
-    model_config: ModelConfig, device: torch.device, num_fusion_layers: int = 1, use_bias: bool = True
+    model_config: ModelConfig,
+    device: torch.device,
+    num_fusion_layers: int = 1,
+    fusion_hidden_dims: tuple[int, ...] | None = None,
+    use_bias: bool = True,
 ) -> MultimodalPatchedDecoder:
     """Create multimodal model from configuration and load pretrained TimesFM weights.
 
@@ -114,6 +118,9 @@ def create_multimodal_model(
         model_config: Model configuration.
         device: Device to create model on.
         num_fusion_layers: Number of linear layers in the fusion projection network (1-3).
+        fusion_hidden_dims: Hidden dimensions for multi-layer fusion projection as a tuple.
+                           Should contain (num_fusion_layers - 1) dimensions. If None, uses the average of
+                           text and time series dimensions. Only used when num_fusion_layers > 1.
         use_bias: Whether to use bias in the fusion projection layers.
 
     Returns:
@@ -136,6 +143,7 @@ def create_multimodal_model(
         use_positional_embedding=model_config.timesfm.use_positional_embedding,
         text_encoder_type=model_config.text_encoder.text_encoder_type,
         num_fusion_layers=num_fusion_layers,
+        fusion_hidden_dims=fusion_hidden_dims,
         use_bias=use_bias,
     )
 
@@ -174,6 +182,18 @@ def train_and_evaluate(
     # Get num_fusion_layers parameter (default to 1 if not in sweep config)
     num_fusion_layers: int = config.get("num_fusion_layers", 1)  # type: ignore[no-untyped-call]
 
+    # Build fusion_hidden_dims tuple based on num_fusion_layers
+    fusion_hidden_dims: tuple[int, ...] | None = None
+    if num_fusion_layers == 2:
+        fusion_hidden_dim: int | None = config.get("fusion_hidden_dim", None)  # type: ignore[no-untyped-call]
+        if fusion_hidden_dim is not None:
+            fusion_hidden_dims = (fusion_hidden_dim,)
+    elif num_fusion_layers == 3:
+        fusion_hidden_dim_1: int | None = config.get("fusion_hidden_dim_1", None)  # type: ignore[no-untyped-call]
+        fusion_hidden_dim_2: int | None = config.get("fusion_hidden_dim_2", None)  # type: ignore[no-untyped-call]
+        if fusion_hidden_dim_1 is not None and fusion_hidden_dim_2 is not None:
+            fusion_hidden_dims = (fusion_hidden_dim_1, fusion_hidden_dim_2)
+
     # Get use_bias parameter (default to True if not in sweep config)
     use_bias: bool = config.get("use_bias", True)  # type: ignore[no-untyped-call]
 
@@ -189,6 +209,11 @@ def train_and_evaluate(
     # Add num_fusion_layers suffix if explicitly set in sweep config
     if "num_fusion_layers" in config:
         suffixes.append(f"layers{num_fusion_layers}")
+
+    # Add fusion_hidden_dims suffix if explicitly set in sweep config
+    if fusion_hidden_dims is not None:
+        hdims_str = "_".join(str(d) for d in fusion_hidden_dims)
+        suffixes.append(f"hdim{hdims_str}")
 
     # Add bias suffix if explicitly set in sweep config
     if "use_bias" in config:
@@ -224,6 +249,7 @@ def train_and_evaluate(
     logger.info(f"  Num epochs: {training_args.num_train_epochs}")
     logger.info(f"  Seed: {seed}")
     logger.info(f"  Num fusion layers: {num_fusion_layers}")
+    logger.info(f"  Fusion hidden dims: {fusion_hidden_dims}")
     logger.info(f"  Use bias: {use_bias}")
 
     # Create datasets
@@ -245,7 +271,13 @@ def train_and_evaluate(
     logger.info(f"Test samples: {len(test_dataset)}")
 
     # Create model
-    model = create_multimodal_model(model_config, device, num_fusion_layers=num_fusion_layers, use_bias=use_bias)
+    model = create_multimodal_model(
+        model_config,
+        device,
+        num_fusion_layers=num_fusion_layers,
+        fusion_hidden_dims=fusion_hidden_dims,
+        use_bias=use_bias,
+    )
 
     # Create trainer
     trainer = MultimodalTrainer(
