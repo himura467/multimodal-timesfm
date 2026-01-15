@@ -25,6 +25,9 @@ class MultimodalFusion(nn.Module):
         ts_feature_dim: Dimension of time series features.
         text_feature_dim: Dimension of text features.
         num_layers: Number of linear layers in the projection network (1-3). Defaults to 1.
+        hidden_dims: Hidden dimensions for multi-layer projection as a tuple. Should contain
+                    (num_layers - 1) dimensions. If None, uses the average of text and time series
+                    dimensions for all hidden layers. Only used when num_layers > 1.
         use_bias: Whether to use bias in the projection layers. Defaults to True.
 
     Example:
@@ -41,17 +44,28 @@ class MultimodalFusion(nn.Module):
         >>> print(fused.shape)  # torch.Size([2, 32, 1280])
     """
 
-    def __init__(self, ts_feature_dim: int, text_feature_dim: int, num_layers: int = 1, use_bias: bool = True) -> None:
+    def __init__(
+        self,
+        ts_feature_dim: int,
+        text_feature_dim: int,
+        num_layers: int = 1,
+        hidden_dims: tuple[int, ...] | None = None,
+        use_bias: bool = True,
+    ) -> None:
         """Initialize the addition-based fusion module.
 
         Args:
             ts_feature_dim: Dimension of time series features.
             text_feature_dim: Dimension of text features.
             num_layers: Number of linear layers in the projection network (1-3). Defaults to 1.
+            hidden_dims: Hidden dimensions for multi-layer projection. Should contain (num_layers - 1)
+                        dimensions. If None, uses the average of text and time series dimensions for
+                        all hidden layers. Only used when num_layers > 1.
             use_bias: Whether to use bias in the projection layers. Defaults to True.
 
         Raises:
-            ValueError: If feature dimensions are not positive integers or num_layers is not in [1, 3].
+            ValueError: If feature dimensions are not positive integers, num_layers is not in [1, 3],
+                       or hidden_dims length doesn't match (num_layers - 1).
         """
         super().__init__()
 
@@ -62,6 +76,15 @@ class MultimodalFusion(nn.Module):
             raise ValueError(f"text_feature_dim must be a positive integer, got {text_feature_dim}")
         if num_layers < 1 or num_layers > 3:
             raise ValueError(f"num_layers must be between 1 and 3, got {num_layers}")
+        if hidden_dims is not None:
+            expected_len = num_layers - 1
+            if len(hidden_dims) != expected_len:
+                raise ValueError(
+                    f"hidden_dims must have {expected_len} elements for {num_layers} layers, got {len(hidden_dims)}"
+                )
+            for i, dim in enumerate(hidden_dims):
+                if dim <= 0:
+                    raise ValueError(f"hidden_dims[{i}] must be a positive integer, got {dim}")
 
         self.ts_feature_dim = ts_feature_dim
         self.text_feature_dim = text_feature_dim
@@ -75,22 +98,26 @@ class MultimodalFusion(nn.Module):
             # Single-layer projection: text_dim -> ts_dim
             layers.append(nn.Linear(in_features=text_feature_dim, out_features=ts_feature_dim, bias=use_bias))
             layers.append(nn.ReLU())
-        else:
-            # Multi-layer projection with hidden dimension
-            # Use the average of input and output dimensions as hidden dimension
-            hidden_dim = (text_feature_dim + ts_feature_dim) // 2
+        elif num_layers == 2:
+            # Two-layer projection: text_dim -> hidden_dim -> ts_dim
+            default_hidden = (text_feature_dim + ts_feature_dim) // 2
+            hidden_dim_1 = hidden_dims[0] if hidden_dims else default_hidden
 
-            # First layer: text_dim -> hidden_dim
-            layers.append(nn.Linear(in_features=text_feature_dim, out_features=hidden_dim, bias=use_bias))
+            layers.append(nn.Linear(in_features=text_feature_dim, out_features=hidden_dim_1, bias=use_bias))
             layers.append(nn.ReLU())
+            layers.append(nn.Linear(in_features=hidden_dim_1, out_features=ts_feature_dim, bias=use_bias))
+            layers.append(nn.ReLU())
+        else:  # num_layers == 3
+            # Three-layer projection: text_dim -> hidden_dim_1 -> hidden_dim_2 -> ts_dim
+            default_hidden = (text_feature_dim + ts_feature_dim) // 2
+            hidden_dim_1 = hidden_dims[0] if hidden_dims else default_hidden
+            hidden_dim_2 = hidden_dims[1] if hidden_dims else default_hidden
 
-            # Middle layers (if num_layers == 3): hidden_dim -> hidden_dim
-            for _ in range(num_layers - 2):
-                layers.append(nn.Linear(in_features=hidden_dim, out_features=hidden_dim, bias=use_bias))
-                layers.append(nn.ReLU())
-
-            # Final layer: hidden_dim -> ts_dim
-            layers.append(nn.Linear(in_features=hidden_dim, out_features=ts_feature_dim, bias=use_bias))
+            layers.append(nn.Linear(in_features=text_feature_dim, out_features=hidden_dim_1, bias=use_bias))
+            layers.append(nn.ReLU())
+            layers.append(nn.Linear(in_features=hidden_dim_1, out_features=hidden_dim_2, bias=use_bias))
+            layers.append(nn.ReLU())
+            layers.append(nn.Linear(in_features=hidden_dim_2, out_features=ts_feature_dim, bias=use_bias))
             layers.append(nn.ReLU())
 
         # Create sequential projection network

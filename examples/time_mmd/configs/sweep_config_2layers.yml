@@ -1,4 +1,4 @@
-# WandB Sweep Configuration for Multimodal TimesFM Hyperparameter Tuning
+# WandB Sweep Configuration for Multimodal TimesFM Hyperparameter Tuning (2-layer fusion)
 # This configuration uses Climate as validation, Energy as test, and all others as training
 # Optimizes based on test MSE on Energy dataset
 
@@ -36,7 +36,12 @@ parameters:
   num_epochs:
     values: [5, 10, 15, 20]
 
-  # Number of fusion layers (1-layer projection, no hidden dim needed)
-  # For multi-layer sweeps, use sweep_config_2layers.yml or sweep_config_3layers.yml
+  # Number of fusion layers (2-layer projection with single hidden dim)
   num_fusion_layers:
-    value: 1
+    value: 2
+
+  # Hidden dimension for fusion projection
+  fusion_hidden_dim:
+    distribution: int_uniform
+    min: 256
+    max: 2048
