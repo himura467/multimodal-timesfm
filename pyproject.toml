@@ -6,6 +6,7 @@ dependencies = [
     "sentencepiece>=0.2.1",
     "timesfm[torch]",
     "torch>=2.8.0",
+    "wandb>=0.24.2",
 ]
 requires-python = ">=3.11"
 authors = [{name = "Akito Shitara", email = "mitarashidango0927@gmail.com"}]
