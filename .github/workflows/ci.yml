@@ -28,4 +28,4 @@ jobs:
       - name: Run Ruff
         run: uv run ruff check --output-format=github .
       - name: Run pytest
-        run: uv run pytest tests/ -v -m "not ci_unstable"
+        run: uv run pytest tests/ -v
