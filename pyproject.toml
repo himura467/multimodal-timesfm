@@ -4,7 +4,7 @@ version = "0.2.0"
 dependencies = [
     "sentence-transformers>=5.1.0",
     "sentencepiece>=0.2.1",
-    "timesfm[torch]>=1.3.0",
+    "timesfm[torch]",
     "torch>=2.8.0",
 ]
 requires-python = ">=3.11"
@@ -64,6 +64,7 @@ packages = ["src/multimodal_timesfm"]
 package = true
 
 [tool.uv.sources]
+timesfm = { git = "https://github.com/google-research/timesfm" }
 torch = [
     { index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
     { index = "pytorch-cu130", marker = "sys_platform == 'linux'" },
