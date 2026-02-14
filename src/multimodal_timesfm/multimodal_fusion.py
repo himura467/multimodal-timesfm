@@ -28,7 +28,7 @@ class MultimodalFusion(nn.Module):
 
         layers: list[nn.Module] = []
         for i in range(len(dims) - 1):
-            layers.append(nn.Linear(dims[i], dims[i + 1], bias=False))
+            layers.append(nn.Linear(dims[i], dims[i + 1], bias=False))  # bias deemed unnecessary by WandB Sweeps
             layers.append(nn.ReLU())
         self.projection = nn.Sequential(*layers)
 
