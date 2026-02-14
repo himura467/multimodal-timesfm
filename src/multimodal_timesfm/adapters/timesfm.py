@@ -1,11 +1,15 @@
 """TimesFM adapters."""
 
+from __future__ import annotations
+
 import torch
+from huggingface_hub import hf_hub_download
 from safetensors.torch import load_file
 from timesfm.timesfm_2p5.timesfm_2p5_torch import TimesFM_2p5_200M_torch_module
 from timesfm.torch.util import revin, update_running_stats
 
 from multimodal_timesfm.adapters.base import PreprocessResult, TsfmAdapter
+from multimodal_timesfm.utils.logging import get_logger
 
 
 class TimesFM2p5Adapter(TsfmAdapter):
@@ -105,6 +109,30 @@ class TimesFM2p5Adapter(TsfmAdapter):
         """Load a PyTorch TimesFM model from a checkpoint."""
         tensors = load_file(path)
         self._model.load_state_dict(tensors, strict=True)
+
+    @classmethod
+    def from_pretrained(
+        cls,
+        device: torch.device,
+        repo_id: str = "google/timesfm-2.5-200m-pytorch",
+    ) -> TimesFM2p5Adapter:
+        """Create a TimesFM2p5Adapter with pretrained weights loaded.
+
+        Args:
+            device: Device to place the adapter on.
+            repo_id: Hugging Face repository ID for pretrained weights.
+
+        Returns:
+            TimesFM2p5Adapter instance with pretrained weights.
+        """
+        logger = get_logger()
+        instance = cls()
+        instance._model.to(device)
+        logger.info("Downloading checkpoint from Hugging Face repo %s", repo_id)
+        checkpoint_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
+        logger.info("Loading checkpoint from %s", checkpoint_path)
+        instance.load_checkpoint(checkpoint_path)
+        return instance
 
     def freeze_parameters(self) -> None:
         for param in self._model.parameters():
