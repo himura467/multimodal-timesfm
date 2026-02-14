@@ -39,9 +39,12 @@ class MultimodalDecoder:
         horizon: int,
         inputs: torch.Tensor,
         masks: torch.Tensor,
-        text_embeddings: torch.Tensor,
+        text_embeddings: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        """Run the full multimodal forecasting pipeline.
+        """Run the forecasting pipeline.
+
+        When text_embeddings is provided, fusion is applied before decoding.
+        When None, the pipeline runs without fusion.
 
         Args:
             horizon: Number of time steps to forecast.
@@ -53,6 +56,10 @@ class MultimodalDecoder:
             Predictions (batch_size, horizon, num_outputs).
         """
         preprocessed = self.adapter.preprocess(inputs, masks)
-        fused = self.fusion(preprocessed.input_embeddings, text_embeddings)
-        output_embeddings = self.adapter.decode(fused, preprocessed.masks)
+        embeddings = (
+            self.fusion(preprocessed.input_embeddings, text_embeddings)
+            if text_embeddings is not None
+            else preprocessed.input_embeddings
+        )
+        output_embeddings = self.adapter.decode(embeddings, preprocessed.masks)
         return self.adapter.postprocess(horizon, output_embeddings, preprocessed.normalization_stats)
