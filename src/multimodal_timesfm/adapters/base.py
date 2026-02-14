@@ -13,7 +13,7 @@ class PreprocessResult:
     Attributes:
         input_embeddings: Embeddings produced by the adapter's tokenizer.
         masks: Boolean masks. True = padded, False = valid.
-        normalization_stats: Adapter-specific state carried from preprocess to decode.
+        normalization_stats: Adapter-specific normalization statistics.
     """
 
     input_embeddings: torch.Tensor
@@ -24,7 +24,7 @@ class PreprocessResult:
 class TsfmAdapter(ABC):
     """Base interface for time series foundation model adapters.
 
-    Pipeline: preprocess -> [fusion injection point] -> decode
+    Pipeline: preprocess -> [fusion injection point] -> decode -> postprocess
     """
 
     @abstractmethod
@@ -37,9 +37,15 @@ class TsfmAdapter(ABC):
     @abstractmethod
     def decode(
         self,
-        horizon: int,
         input_embeddings: torch.Tensor,
         masks: torch.Tensor,
+    ) -> torch.Tensor: ...
+
+    @abstractmethod
+    def postprocess(
+        self,
+        horizon: int,
+        output_embeddings: torch.Tensor,
         normalization_stats: dict[str, torch.Tensor],
     ) -> torch.Tensor: ...
 

@@ -57,17 +57,31 @@ class TimesFM2p5Adapter(TsfmAdapter):
 
     def decode(
         self,
-        horizon: int,
         input_embeddings: torch.Tensor,
         masks: torch.Tensor,
+    ) -> torch.Tensor:
+        """Run transformer layers.
+
+        Returns:
+            Output embeddings (batch_size, num_patches, model_dims).
+        """
+        output_embeddings = input_embeddings
+        for layer in self._model.stacked_xf:
+            output_embeddings, _ = layer(output_embeddings, masks[..., -1], None)
+        return output_embeddings
+
+    def postprocess(
+        self,
+        horizon: int,
+        output_embeddings: torch.Tensor,
         normalization_stats: dict[str, torch.Tensor],
     ) -> torch.Tensor:
-        """Run transformer layers, project embeddings to forecast quantiles, and reverse RevIN.
+        """Project embeddings to forecast quantiles and reverse RevIN.
 
         horizon must fit within a single output patch (no AR decode).
 
         Returns:
-            Predictions (B, horizon, num_outputs).
+            Predictions (batch_size, horizon, num_outputs).
 
         Raises:
             ValueError: If horizon > output_patch_len.
@@ -77,19 +91,14 @@ class TimesFM2p5Adapter(TsfmAdapter):
                 f"horizon must be <= output_patch_len ({self._model.o}), got {horizon}. AR decode is not supported."
             )
 
-        batch_size = input_embeddings.shape[0]
+        batch_size = output_embeddings.shape[0]
         context_mu = normalization_stats["context_mu"]
         context_sigma = normalization_stats["context_sigma"]
 
-        output_embeddings = input_embeddings
-        for layer in self._model.stacked_xf:
-            output_embeddings, _ = layer(output_embeddings, masks[..., -1], None)
         output_ts = self._model.output_projection_point(output_embeddings)
-
         renormed_outputs = torch.reshape(
             revin(output_ts, context_mu, context_sigma, reverse=True), (batch_size, -1, self._model.o, self._model.q)
         )
-
         return renormed_outputs[:, -1, :horizon, :]
 
     def load_checkpoint(self, path: str) -> None:
