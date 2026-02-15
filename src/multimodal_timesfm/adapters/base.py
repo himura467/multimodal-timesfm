@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 import torch
+from torch import nn
 
 
 @dataclass
@@ -26,6 +27,10 @@ class TsfmAdapter(ABC):
 
     Pipeline: preprocess -> [fusion injection point] -> decode -> postprocess
     """
+
+    @property
+    @abstractmethod
+    def model(self) -> nn.Module: ...
 
     @abstractmethod
     def preprocess(

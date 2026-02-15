@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import torch
 from huggingface_hub import hf_hub_download
 from safetensors.torch import load_file
 from timesfm.timesfm_2p5.timesfm_2p5_torch import TimesFM_2p5_200M_torch_module
 from timesfm.torch.util import revin, update_running_stats
+from torch import nn
 
 from multimodal_timesfm.adapters.base import PreprocessResult, TsfmAdapter
 from multimodal_timesfm.utils.logging import get_logger
@@ -18,6 +21,10 @@ class TimesFM2p5Adapter(TsfmAdapter):
     def __init__(self) -> None:
         super().__init__()
         self._model = TimesFM_2p5_200M_torch_module()
+
+    @property
+    def model(self) -> nn.Module:
+        return cast(nn.Module, self._model)
 
     def preprocess(
         self,
