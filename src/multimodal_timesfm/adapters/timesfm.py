@@ -148,6 +148,3 @@ class TimesFM2p5Adapter(TsfmAdapter):
     def unfreeze_parameters(self) -> None:
         for param in self._model.parameters():
             param.requires_grad = True
-
-    def is_frozen(self) -> bool:
-        return all(not p.requires_grad for p in self._model.parameters())

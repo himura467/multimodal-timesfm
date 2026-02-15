@@ -59,6 +59,3 @@ class TsfmAdapter(ABC):
 
     @abstractmethod
     def unfreeze_parameters(self) -> None: ...
-
-    @abstractmethod
-    def is_frozen(self) -> bool: ...

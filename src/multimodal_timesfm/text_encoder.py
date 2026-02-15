@@ -46,11 +46,6 @@ class TextEncoderBase(nn.Module, ABC):
         """Unfreeze all parameters for training."""
         raise NotImplementedError
 
-    @abstractmethod
-    def is_frozen(self) -> bool:
-        """Check if parameters are frozen."""
-        raise NotImplementedError
-
 
 class EnglishTextEncoder(TextEncoderBase):
     """Text encoder for English text using SentenceTransformer models."""
@@ -106,14 +101,6 @@ class EnglishTextEncoder(TextEncoderBase):
         """Unfreeze all parameters of the sentence transformer for training."""
         for param in self.sentence_transformer.parameters():
             param.requires_grad = True
-
-    def is_frozen(self) -> bool:
-        """Check if sentence transformer parameters are frozen.
-
-        Returns:
-            True if all parameters are frozen, False otherwise.
-        """
-        return all(not param.requires_grad for param in self.sentence_transformer.parameters())
 
 
 class JapaneseTextEncoder(TextEncoderBase):
@@ -173,11 +160,3 @@ class JapaneseTextEncoder(TextEncoderBase):
         """Unfreeze all parameters of the Japanese text encoder for training."""
         for param in self.sentence_transformer.parameters():
             param.requires_grad = True
-
-    def is_frozen(self) -> bool:
-        """Check if Japanese text encoder parameters are frozen.
-
-        Returns:
-            True if all parameters are frozen, False otherwise.
-        """
-        return all(not param.requires_grad for param in self.sentence_transformer.parameters())
