@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 import torch
 
-from multimodal_timesfm.adapters.base import TsfmAdapter
+from multimodal_timesfm.tsfm.base import TsfmAdapter
 from multimodal_timesfm.multimodal_fusion import MultimodalFusion
 
 

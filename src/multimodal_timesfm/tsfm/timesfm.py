@@ -11,7 +11,7 @@ from timesfm.timesfm_2p5.timesfm_2p5_torch import TimesFM_2p5_200M_torch_module
 from timesfm.torch.util import revin, update_running_stats
 from torch import nn
 
-from multimodal_timesfm.adapters.base import PreprocessResult, TsfmAdapter
+from multimodal_timesfm.tsfm.base import PreprocessResult, TsfmAdapter
 from multimodal_timesfm.utils.logging import get_logger
 
 
