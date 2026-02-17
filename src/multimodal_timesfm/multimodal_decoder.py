@@ -61,5 +61,5 @@ class MultimodalDecoder:
             if text_embeddings is not None
             else preprocessed.input_embeddings
         )
-        output_embeddings = self.adapter.decode(embeddings, preprocessed.masks)
+        output_embeddings = self.adapter(embeddings, preprocessed.masks)
         return self.adapter.postprocess(horizon, output_embeddings, preprocessed.normalization_stats)

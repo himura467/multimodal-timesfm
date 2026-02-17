@@ -22,15 +22,11 @@ class PreprocessResult:
     normalization_stats: dict[str, torch.Tensor]
 
 
-class TsfmAdapter(ABC):
+class TsfmAdapter(nn.Module, ABC):
     """Base interface for time series foundation model adapters.
 
     Pipeline: preprocess -> [fusion injection point] -> decode -> postprocess
     """
-
-    @property
-    @abstractmethod
-    def model(self) -> nn.Module: ...
 
     @abstractmethod
     def preprocess(
@@ -40,7 +36,7 @@ class TsfmAdapter(ABC):
     ) -> PreprocessResult: ...
 
     @abstractmethod
-    def decode(
+    def forward(
         self,
         input_embeddings: torch.Tensor,
         masks: torch.Tensor,

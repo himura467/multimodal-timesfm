@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-from typing import cast
-
 import torch
 from huggingface_hub import hf_hub_download
 from safetensors.torch import load_file
 from timesfm.timesfm_2p5.timesfm_2p5_torch import TimesFM_2p5_200M_torch_module
 from timesfm.torch.util import revin, update_running_stats
-from torch import nn
 
 from multimodal_timesfm.tsfm.base import PreprocessResult, TsfmAdapter
 from multimodal_timesfm.utils.logging import get_logger
@@ -21,10 +18,6 @@ class TimesFM2p5Adapter(TsfmAdapter):
     def __init__(self) -> None:
         super().__init__()
         self._model = TimesFM_2p5_200M_torch_module()
-
-    @property
-    def model(self) -> nn.Module:
-        return cast(nn.Module, self._model)
 
     def preprocess(
         self,
@@ -66,7 +59,7 @@ class TimesFM2p5Adapter(TsfmAdapter):
             },
         )
 
-    def decode(
+    def forward(
         self,
         input_embeddings: torch.Tensor,
         masks: torch.Tensor,
@@ -134,7 +127,7 @@ class TimesFM2p5Adapter(TsfmAdapter):
         """
         logger = get_logger()
         instance = cls()
-        instance._model.to(device)
+        instance.to(device)
         logger.info("Downloading checkpoint from Hugging Face repo %s", repo_id)
         checkpoint_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors")
         logger.info("Loading checkpoint from %s", checkpoint_path)
@@ -142,9 +135,9 @@ class TimesFM2p5Adapter(TsfmAdapter):
         return instance
 
     def freeze_parameters(self) -> None:
-        for param in self._model.parameters():
+        for param in self.parameters():
             param.requires_grad = False
 
     def unfreeze_parameters(self) -> None:
-        for param in self._model.parameters():
+        for param in self.parameters():
             param.requires_grad = True
