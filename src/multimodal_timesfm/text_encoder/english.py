@@ -23,14 +23,14 @@ class EnglishTextEncoder(TextEncoderBase):
         super().__init__(embedding_dim, device)
         self.sentence_transformer = SentenceTransformer(model_name, device=self.device.type)
 
-        self._validate(embedding_dim)
+        self._validate()
 
-    def _validate(self, embedding_dim: int) -> None:
+    def _validate(self) -> None:
         actual_dim = self.sentence_transformer.get_sentence_embedding_dimension()
         if actual_dim is None:
             raise ValueError("Could not determine embedding dimension from sentence transformer")
-        if actual_dim != embedding_dim:
-            raise ValueError(f"Embedding dimension mismatch: expected {embedding_dim}, got {actual_dim}.")
+        if actual_dim != self.embedding_dim:
+            raise ValueError(f"Embedding dimension mismatch: expected {self.embedding_dim}, got {actual_dim}.")
 
     def forward(self, texts: str | list[str] | np.ndarray) -> torch.Tensor:
         """Encode texts into embeddings.
