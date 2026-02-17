@@ -3,9 +3,10 @@
 from dataclasses import dataclass, field
 
 import torch
+from torch import nn
 
-from multimodal_timesfm.tsfm.base import TsfmAdapter
 from multimodal_timesfm.multimodal_fusion import MultimodalFusion
+from multimodal_timesfm.tsfm.base import TsfmAdapter
 
 
 @dataclass
@@ -18,13 +19,14 @@ class MultimodalDecoderConfig:
     fusion_hidden_dims: list[int | None] = field(default_factory=list)
 
 
-class MultimodalDecoder:
+class MultimodalDecoder(nn.Module):
     """Decoder for multimodal time series forecasting.
 
-    Pipeline: adapter.preprocess -> fusion -> adapter.decode -> adapter.postprocess
+    Pipeline: adapter.preprocess -> fusion -> adapter.forward -> adapter.postprocess
     """
 
     def __init__(self, adapter: TsfmAdapter, config: MultimodalDecoderConfig) -> None:
+        super().__init__()
         self.adapter = adapter
         self.config = config
         self.fusion = MultimodalFusion(
@@ -34,7 +36,7 @@ class MultimodalDecoder:
             hidden_dims=config.fusion_hidden_dims,
         )
 
-    def forecast(
+    def forward(
         self,
         horizon: int,
         inputs: torch.Tensor,
