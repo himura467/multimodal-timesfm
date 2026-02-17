@@ -1,7 +1,7 @@
 """Multimodal fusion mechanism for combining time series and text embeddings."""
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 
 class MultimodalFusion(nn.Module):
