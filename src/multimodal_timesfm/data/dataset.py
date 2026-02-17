@@ -1,9 +1,11 @@
 """Dataset classes for multimodal time series."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Literal
+from typing import Any
 
 from torch.utils.data import Dataset
+
+from multimodal_timesfm.types import TrainingMode
 
 
 class MultimodalDatasetBase(Dataset[dict[str, Any]], ABC):
@@ -33,7 +35,7 @@ class PreprocessedDataset(Dataset[dict[str, Any]]):
             'baseline' drops text_embeddings if present.
     """
 
-    def __init__(self, data: list[dict[str, Any]], mode: Literal["multimodal", "baseline"]) -> None:
+    def __init__(self, data: list[dict[str, Any]], mode: TrainingMode) -> None:
         self.data = data
         self.mode = mode
 
