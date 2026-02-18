@@ -2,12 +2,13 @@
 
 import pickle
 from pathlib import Path
-from typing import Any, Callable
+from typing import Callable
 
 import torch
 
 from multimodal_timesfm.data.dataset import MultimodalDatasetBase
 from multimodal_timesfm.text_encoder.base import TextEncoderBase
+from multimodal_timesfm.types import PreprocessedSample
 from multimodal_timesfm.utils.logging import get_logger
 
 _logger = get_logger()
@@ -40,14 +41,14 @@ class PreprocessPipeline:
         ]
         return self.cache_dir / ("_".join(parts) + ".pkl")
 
-    def load(self, path: Path) -> list[dict[str, Any]]:
+    def load(self, path: Path) -> list[PreprocessedSample]:
         _logger.info("Loading preprocessed data from %s", path)
         with open(path, "rb") as f:
-            data: list[dict[str, Any]] = pickle.load(f)
+            data: list[PreprocessedSample] = pickle.load(f)
         _logger.info("Loaded %s samples", len(data))
         return data
 
-    def _save(self, path: Path, data: list[dict[str, Any]]) -> None:
+    def _save(self, path: Path, data: list[PreprocessedSample]) -> None:
         _logger.info("Saving %s samples to %s", len(data), path)
         with open(path, "wb") as f:
             pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
@@ -59,7 +60,7 @@ class PreprocessPipeline:
         dataset: MultimodalDatasetBase,
         text_encoder: TextEncoderBase | None,
         device: torch.device | None,
-    ) -> list[dict[str, Any]]:
+    ) -> list[PreprocessedSample]:
         _logger.info(
             "Preprocessing %s samples (%s)",
             len(dataset),
@@ -69,15 +70,15 @@ class PreprocessPipeline:
             if device is None:
                 raise ValueError("device must be provided when text_encoder is specified")
             text_encoder.eval()
-        result = []
+        result: list[PreprocessedSample] = []
         with torch.no_grad():
             for i in range(len(dataset)):
-                sample: dict[str, Any] = dataset[i]
-                entry: dict[str, Any] = {
-                    "context": sample["context"],
-                    "horizon": sample["horizon"],
-                    "metadata": sample["metadata"],
-                }
+                sample = dataset[i]
+                entry = PreprocessedSample(
+                    context=sample["context"],
+                    horizon=sample["horizon"],
+                    metadata=sample["metadata"],
+                )
                 if text_encoder is not None and device is not None:
                     texts = [" ".join(patch) if patch else "" for patch in sample["patched_texts"]]
                     embeddings = text_encoder(texts)
@@ -95,7 +96,7 @@ class PreprocessPipeline:
         text_encoder: TextEncoderBase | None = None,
         device: torch.device | None = None,
         force_rebuild: bool = False,
-    ) -> list[dict[str, Any]]:
+    ) -> list[PreprocessedSample]:
         """Load preprocessed data from disk, or create and save it if absent.
 
         Args:
