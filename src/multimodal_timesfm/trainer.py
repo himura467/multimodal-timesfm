@@ -111,9 +111,14 @@ class MultimodalTrainer:
 
         Returns:
             Average training loss for the epoch.
+
+        Raises:
+            RuntimeError: If the training dataset is empty.
         """
         self.model.train()
         num_batches = len(self.train_loader)
+        if num_batches == 0:
+            raise RuntimeError("Training dataset is empty.")
 
         total_loss = 0.0
         for i, batch in enumerate(self.train_loader):
