@@ -159,3 +159,38 @@ class MultimodalTrainer:
                 )
 
         return total_loss / num_batches
+
+    def validate_epoch(self) -> float:
+        """Run one validation epoch.
+
+        Returns:
+            Average validation loss for the epoch.
+
+        Raises:
+            RuntimeError: If the validation dataset is empty.
+        """
+        self.model.eval()
+        num_batches = len(self.val_loader)
+        if num_batches == 0:
+            raise RuntimeError("Validation dataset is empty.")
+
+        total_loss = 0.0
+        with torch.no_grad():
+            for i, batch in enumerate(self.val_loader):
+                horizon = batch["horizon"].to(self.device)
+                horizon_len = horizon.shape[-1]
+                point_forecast = self._forward_batch(batch, horizon_len)
+
+                loss = self.loss_fn(point_forecast, horizon).item()
+                total_loss += loss
+
+                if i % self.args.logging_steps == 0:
+                    _logger.info(
+                        "Epoch %d, Batch %d/%d, Val Loss: %.6f",
+                        self.current_epoch,
+                        i,
+                        num_batches,
+                        loss,
+                    )
+
+        return total_loss / num_batches
