@@ -28,6 +28,12 @@ class TsfmAdapter(nn.Module, ABC):
     Pipeline: preprocess -> [fusion injection point] -> decode -> postprocess
     """
 
+    @property
+    @abstractmethod
+    def point_forecast_index(self) -> int:
+        """Index into the last dimension of postprocess output that gives the point forecast."""
+        ...
+
     @abstractmethod
     def preprocess(
         self,
