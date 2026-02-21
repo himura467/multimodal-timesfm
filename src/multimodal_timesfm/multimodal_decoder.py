@@ -36,14 +36,14 @@ class MultimodalDecoder(nn.Module):
             hidden_dims=config.fusion_hidden_dims,
         )
 
-    def forward(
+    def forward_full(
         self,
         horizon: int,
         inputs: torch.Tensor,
         masks: torch.Tensor,
         text_embeddings: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        """Run the forecasting pipeline.
+        """Run the forecasting pipeline, returning all output channels.
 
         When text_embeddings is provided, fusion is applied before decoding.
         When None, the pipeline runs without fusion.
@@ -65,3 +65,23 @@ class MultimodalDecoder(nn.Module):
         )
         output_embeddings = self.adapter(embeddings, preprocessed.masks)
         return self.adapter.postprocess(horizon, output_embeddings, preprocessed.normalization_stats)
+
+    def forward(
+        self,
+        horizon: int,
+        inputs: torch.Tensor,
+        masks: torch.Tensor,
+        text_embeddings: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        """Run the forecasting pipeline, returning the point forecast.
+
+        Args:
+            horizon: Number of time steps to forecast.
+            inputs: Input time series (batch_size, context_len).
+            masks: Boolean masks (batch_size, context_len). True = padded, False = valid.
+            text_embeddings: Pre-computed text embeddings (batch_size, num_patches, text_dims).
+
+        Returns:
+            Point forecast (batch_size, horizon).
+        """
+        return self.forward_full(horizon, inputs, masks, text_embeddings)[..., self.adapter.point_forecast_index]
