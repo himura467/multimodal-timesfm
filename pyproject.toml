@@ -4,8 +4,9 @@ version = "0.2.0"
 dependencies = [
     "sentence-transformers>=5.1.0",
     "sentencepiece>=0.2.1",
-    "timesfm[torch]>=1.3.0",
+    "timesfm[torch]",
     "torch>=2.8.0",
+    "wandb>=0.24.2",
 ]
 requires-python = ">=3.11"
 authors = [{name = "Akito Shitara", email = "mitarashidango0927@gmail.com"}]
@@ -64,6 +65,7 @@ packages = ["src/multimodal_timesfm"]
 package = true
 
 [tool.uv.sources]
+timesfm = { git = "https://github.com/google-research/timesfm" }
 torch = [
     { index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
     { index = "pytorch-cu130", marker = "sys_platform == 'linux'" },
@@ -105,9 +107,4 @@ select = [
 ]
 ignore = [
     "E501",  # line-too-long
-]
-
-[tool.pytest.ini_options]
-markers = [
-    "ci_unstable: marks tests that are unstable in CI environments (deselect with '-m \"not ci_unstable\"')",
 ]
