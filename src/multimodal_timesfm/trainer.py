@@ -143,8 +143,8 @@ class MultimodalTrainer:
                             {
                                 "train/loss": scaled_loss,
                                 "train/learning_rate": self.optimizer.param_groups[0]["lr"],
-                                "global_step": self.global_step,
-                            }
+                            },
+                            step=self.global_step,
                         )
 
             total_loss += scaled_loss
@@ -193,4 +193,7 @@ class MultimodalTrainer:
                         loss,
                     )
 
-        return total_loss / num_batches
+        val_loss = total_loss / num_batches
+        if self._wandb_run is not None:
+            self._wandb_run.log({"val/loss": val_loss}, step=self.global_step)
+        return val_loss
