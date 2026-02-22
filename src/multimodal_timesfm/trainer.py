@@ -33,7 +33,7 @@ class MultimodalTrainer:
         train_dataset: ConcatDataset[PreprocessedSample],
         val_dataset: ConcatDataset[PreprocessedSample],
         mode: TrainingMode,
-        use_wandb: bool,
+        wandb_run: wandb.Run | None,
     ) -> None:
         """Initialize MultimodalTrainer.
 
@@ -43,14 +43,14 @@ class MultimodalTrainer:
             train_dataset: Training dataset.
             val_dataset: Validation dataset.
             mode: Training mode — 'multimodal' trains fusion only, 'baseline' fine-tunes adapter.
-            use_wandb: Whether to use W&B for logging.
+            wandb_run: W&B run instance for logging. If None, W&B logging is disabled.
         """
         self.model = model
         self.args = args
         self.train_dataset = train_dataset
         self.val_dataset = val_dataset
         self.mode = mode
-        self.use_wandb = use_wandb
+        self._wandb_run = wandb_run
 
         self.device = resolve_device(args.device)
         self.model.to(self.device)
@@ -138,8 +138,8 @@ class MultimodalTrainer:
                 self.global_step += 1
 
                 if self.global_step % self.args.logging_steps == 0:
-                    if self.use_wandb:
-                        wandb.log(
+                    if self._wandb_run is not None:
+                        self._wandb_run.log(
                             {
                                 "train/loss": scaled_loss,
                                 "train/learning_rate": self.optimizer.param_groups[0]["lr"],
