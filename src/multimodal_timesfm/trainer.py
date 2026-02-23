@@ -239,3 +239,34 @@ class MultimodalTrainer:
             for checkpoint in checkpoints[: -self.args.save_total_limit]:
                 checkpoint.unlink()
                 _logger.info("Deleted old checkpoint: %s", checkpoint.name)
+
+    def save_checkpoint(self, val_loss: float) -> None:
+        """Save model checkpoint.
+
+        For 'epoch' strategy, saves every epoch and separately tracks the best.
+        For 'best' strategy, saves only when val_loss improves.
+
+        Args:
+            val_loss: Current validation loss.
+        """
+        is_best = val_loss < self.best_val_loss
+        if is_best:
+            self.best_val_loss = val_loss
+
+        if self.args.save_strategy == "best" and not is_best:
+            return
+
+        checkpoint = self._build_checkpoint()
+
+        if self.args.save_strategy == "epoch":
+            checkpoint_path = self.args.checkpoint_dir / f"checkpoint_epoch_{self.current_epoch}.pt"
+            torch.save(checkpoint, checkpoint_path)
+            _logger.info("Saved checkpoint at epoch %d", self.current_epoch)
+
+            if self.args.save_total_limit is not None:
+                self._rotate_checkpoints()
+
+        if is_best:
+            best_path = self.args.checkpoint_dir / "best_model.pt"
+            torch.save(checkpoint, best_path)
+            _logger.info("Saved best model checkpoint at epoch %d", self.current_epoch)
