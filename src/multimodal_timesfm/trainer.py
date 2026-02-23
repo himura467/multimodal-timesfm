@@ -226,3 +226,16 @@ class MultimodalTrainer:
             best_val_loss=self.best_val_loss,
             adapter_state_dict=self.model.adapter.state_dict(),
         )
+
+    def _rotate_checkpoints(self) -> None:
+        if self.args.save_total_limit is None:
+            return
+
+        checkpoints = sorted(
+            self.args.checkpoint_dir.glob("checkpoint_epoch_*.pt"),
+            key=lambda p: int(p.stem.rsplit("_", 1)[-1]),
+        )
+        if len(checkpoints) > self.args.save_total_limit:
+            for checkpoint in checkpoints[: -self.args.save_total_limit]:
+                checkpoint.unlink()
+                _logger.info("Deleted old checkpoint: %s", checkpoint.name)
