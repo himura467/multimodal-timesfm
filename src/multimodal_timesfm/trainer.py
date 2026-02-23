@@ -13,7 +13,7 @@ from multimodal_timesfm.data.collate import baseline_collate_fn, multimodal_coll
 from multimodal_timesfm.multimodal_decoder import MultimodalDecoder
 from multimodal_timesfm.training_args import TrainingArguments
 from multimodal_timesfm.types import Batch, PreprocessedSample, TrainingMode
-from multimodal_timesfm.utils.device import pin_memory, resolve_device
+from multimodal_timesfm.utils.device import pin_memory
 from multimodal_timesfm.utils.logging import get_logger
 
 _logger = get_logger()
@@ -33,6 +33,7 @@ class MultimodalTrainer:
         train_dataset: ConcatDataset[PreprocessedSample],
         val_dataset: ConcatDataset[PreprocessedSample],
         mode: TrainingMode,
+        device: torch.device,
         wandb_run: wandb.Run | None,
     ) -> None:
         """Initialize MultimodalTrainer.
@@ -43,6 +44,7 @@ class MultimodalTrainer:
             train_dataset: Training dataset.
             val_dataset: Validation dataset.
             mode: Training mode — 'multimodal' trains fusion only, 'baseline' fine-tunes adapter.
+            device: Device to train on.
             wandb_run: W&B run instance for logging. If None, W&B logging is disabled.
         """
         self.model = model
@@ -50,9 +52,9 @@ class MultimodalTrainer:
         self.train_dataset = train_dataset
         self.val_dataset = val_dataset
         self.mode = mode
+        self.device = device
         self._wandb_run = wandb_run
 
-        self.device = resolve_device(args.device)
         self.model.to(self.device)
 
         if mode == "multimodal":
