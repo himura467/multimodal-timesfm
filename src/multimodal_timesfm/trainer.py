@@ -139,15 +139,17 @@ class MultimodalTrainer:
                 self.optimizer.zero_grad()
                 self.global_step += 1
 
-                if self.global_step % self.args.logging_steps == 0:
-                    if self._wandb_run is not None:
-                        self._wandb_run.log(
-                            {
-                                "train/loss": scaled_loss,
-                                "train/learning_rate": self.optimizer.param_groups[0]["lr"],
-                            },
-                            step=self.global_step,
-                        )
+                if (
+                    self.args.logging_strategy == "steps"
+                    and self.global_step % self.args.logging_steps == 0
+                    and self._wandb_run is not None
+                ):
+                    self._wandb_run.log(
+                        {
+                            "train/loss": scaled_loss,
+                        },
+                        step=self.global_step,
+                    )
 
             total_loss += scaled_loss
 
