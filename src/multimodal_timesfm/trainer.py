@@ -227,6 +227,13 @@ class MultimodalTrainer:
             adapter_state_dict=self.model.adapter.state_dict(),
         )
 
+    def _load_checkpoint_state(self, checkpoint: MultimodalCheckpoint | BaselineCheckpoint) -> None:
+        """Load mode-specific state dict from checkpoint."""
+        if self.mode == "multimodal":
+            self.model.fusion.load_state_dict(cast(MultimodalCheckpoint, checkpoint)["fusion_state_dict"])
+        else:
+            self.model.adapter.load_state_dict(cast(BaselineCheckpoint, checkpoint)["adapter_state_dict"])
+
     def _rotate_checkpoints(self) -> None:
         if self.args.save_total_limit is None:
             return
@@ -270,3 +277,47 @@ class MultimodalTrainer:
             best_path = self.args.checkpoint_dir / "best_model.pt"
             torch.save(checkpoint, best_path)
             _logger.info("Saved best model checkpoint at epoch %d", self.current_epoch)
+
+    def train(self, scheduler: torch.optim.lr_scheduler.LRScheduler | None = None) -> None:
+        """Main training loop.
+
+        Args:
+            scheduler: Learning rate scheduler.
+        """
+        if self.args.eval_strategy != "epoch":
+            raise NotImplementedError(
+                f"eval_strategy={self.args.eval_strategy!r} is not supported; only 'epoch' is implemented."
+            )
+
+        _logger.info("Starting %s training for %d epochs", self.mode, self.args.num_train_epochs)
+        _logger.info("Training on %s", self.device)
+        _logger.info("Train dataset size: %d", len(self.train_dataset))
+        _logger.info("Validation dataset size: %d", len(self.val_dataset))
+
+        for epoch in range(self.args.num_train_epochs):
+            self.current_epoch = epoch
+
+            train_loss = self.train_epoch()
+            val_loss = self.validate_epoch()
+            _logger.info("Epoch %d: Train Loss = %.6f, Val Loss = %.6f", epoch, train_loss, val_loss)
+
+            if self.args.logging_strategy == "epoch" and self._wandb_run is not None:
+                self._wandb_run.log(
+                    {"train/loss": train_loss, "val/loss": val_loss},
+                    step=self.global_step,
+                )
+
+            if scheduler is not None:
+                scheduler.step()
+
+            if self.args.save_strategy in ("epoch", "best"):
+                self.save_checkpoint(val_loss)
+
+        if self.args.load_best_model_at_end:
+            best_path = self.args.checkpoint_dir / "best_model.pt"
+            if best_path.exists():
+                checkpoint = cast(MultimodalCheckpoint | BaselineCheckpoint, torch.load(best_path, weights_only=True))
+                self._load_checkpoint_state(checkpoint)
+                _logger.info("Loaded best model at end of training")
+
+        _logger.info("Training completed")
