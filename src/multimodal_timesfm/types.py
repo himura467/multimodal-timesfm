@@ -35,3 +35,24 @@ class Batch(TypedDict):
     horizon: torch.Tensor
     text_embeddings: NotRequired[torch.Tensor]
     metadata: list[dict[str, Any]]
+
+
+class CheckpointBase(TypedDict):
+    """Base fields shared by all checkpoint types."""
+
+    epoch: int
+    global_step: int
+    optimizer_state_dict: dict[str, Any]
+    best_val_loss: float
+
+
+class MultimodalCheckpoint(CheckpointBase):
+    """Checkpoint for multimodal mode."""
+
+    fusion_state_dict: dict[str, Any]
+
+
+class BaselineCheckpoint(CheckpointBase):
+    """Checkpoint for baseline mode."""
+
+    adapter_state_dict: dict[str, Any]

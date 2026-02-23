@@ -12,7 +12,13 @@ from torch.utils.data import ConcatDataset, DataLoader
 from multimodal_timesfm.data.collate import baseline_collate_fn, multimodal_collate_fn
 from multimodal_timesfm.multimodal_decoder import MultimodalDecoder
 from multimodal_timesfm.training_args import TrainingArguments
-from multimodal_timesfm.types import Batch, PreprocessedSample, TrainingMode
+from multimodal_timesfm.types import (
+    BaselineCheckpoint,
+    Batch,
+    MultimodalCheckpoint,
+    PreprocessedSample,
+    TrainingMode,
+)
 from multimodal_timesfm.utils.device import pin_memory
 from multimodal_timesfm.utils.logging import get_logger
 
@@ -88,8 +94,9 @@ class MultimodalTrainer:
         self.loss_fn = nn.MSELoss()
 
         # Training state
-        self.global_step = 0
         self.current_epoch = 0
+        self.global_step = 0
+        self.best_val_loss = float("inf")
 
     def _get_trainable_params(self) -> Iterator[nn.Parameter]:
         """Return the parameters to optimize based on mode."""
@@ -201,3 +208,21 @@ class MultimodalTrainer:
         if self._wandb_run is not None:
             self._wandb_run.log({"val/loss": val_loss}, step=self.global_step)
         return val_loss
+
+    def _build_checkpoint(self) -> MultimodalCheckpoint | BaselineCheckpoint:
+        """Build a mode-specific checkpoint dict from current training state."""
+        if self.mode == "multimodal":
+            return MultimodalCheckpoint(
+                epoch=self.current_epoch,
+                global_step=self.global_step,
+                optimizer_state_dict=self.optimizer.state_dict(),
+                best_val_loss=self.best_val_loss,
+                fusion_state_dict=self.model.fusion.state_dict(),
+            )
+        return BaselineCheckpoint(
+            epoch=self.current_epoch,
+            global_step=self.global_step,
+            optimizer_state_dict=self.optimizer.state_dict(),
+            best_val_loss=self.best_val_loss,
+            adapter_state_dict=self.model.adapter.state_dict(),
+        )
