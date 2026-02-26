@@ -10,7 +10,7 @@ from torch.optim import AdamW
 from torch.utils.data import ConcatDataset, DataLoader
 
 from multimodal_timesfm.data.collate import baseline_collate_fn, multimodal_collate_fn
-from multimodal_timesfm.multimodal_decoder import MultimodalDecoder
+from multimodal_timesfm.decoder import MultimodalDecoder
 from multimodal_timesfm.training_args import TrainingArguments
 from multimodal_timesfm.types import (
     BaselineCheckpoint,

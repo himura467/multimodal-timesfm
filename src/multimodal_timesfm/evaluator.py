@@ -5,7 +5,7 @@ from typing import cast
 import torch
 from torch.utils.data import DataLoader
 
-from multimodal_timesfm.multimodal_decoder import MultimodalDecoder
+from multimodal_timesfm.decoder import MultimodalDecoder
 from multimodal_timesfm.types import EvaluationMetrics, PreprocessedSample
 
 
