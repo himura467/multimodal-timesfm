@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
-from multimodal_timesfm.utils.yaml import load_yaml
+from multimodal_timesfm.utils.yaml import parse_yaml
 
 
 @dataclass(frozen=True)
@@ -94,5 +94,4 @@ class TrainingArguments:
     @classmethod
     def from_yaml(cls, yaml_path: Path | str) -> TrainingArguments:
         """Load from YAML file."""
-        config_dict = load_yaml(Path(yaml_path))
-        return cls(**config_dict)
+        return parse_yaml(Path(yaml_path), cls)
