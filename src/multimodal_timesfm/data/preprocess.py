@@ -25,7 +25,7 @@ class PreprocessPipeline:
         self,
         dataset_name: str,
         entity: str,
-        lang: str,
+        text_encoder_type: str,
         patch_len: int,
         context_len: int,
         horizon_len: int,
@@ -34,7 +34,7 @@ class PreprocessPipeline:
         parts = [
             dataset_name,
             entity,
-            lang,
+            text_encoder_type,
             f"p{patch_len}",
             f"c{context_len}",
             f"h{horizon_len}",
