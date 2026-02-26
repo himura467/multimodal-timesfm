@@ -14,7 +14,6 @@ from multimodal_timesfm.multimodal_decoder import MultimodalDecoder
 from multimodal_timesfm.training_args import TrainingArguments
 from multimodal_timesfm.types import (
     BaselineCheckpoint,
-    Batch,
     MultimodalCheckpoint,
     PreprocessedSample,
     TrainingMode,
@@ -104,17 +103,6 @@ class MultimodalTrainer:
             return self.model.fusion.parameters()
         return (p for p in self.model.adapter.parameters() if p.requires_grad)
 
-    def _forward_batch(self, batch: Batch, horizon: int) -> torch.Tensor:
-        """Run forward pass on a batch, handling text_embeddings if present.
-
-        Returns:
-            point_forecast tensor of shape (batch_size, horizon).
-        """
-        context = batch["context"].to(self.device)
-        input_padding = torch.zeros_like(context)
-        text_embeddings = batch["text_embeddings"].to(self.device) if "text_embeddings" in batch else None
-        return cast(torch.Tensor, self.model(horizon, context, input_padding, text_embeddings))
-
     def train_epoch(self) -> float:
         """Train one epoch.
 
@@ -131,9 +119,12 @@ class MultimodalTrainer:
 
         total_loss = 0.0
         for i, batch in enumerate(self.train_loader):
+            context = batch["context"].to(self.device)
             horizon = batch["horizon"].to(self.device)
             horizon_len = horizon.shape[-1]
-            point_forecast = self._forward_batch(batch, horizon_len)
+            input_padding = torch.zeros_like(context)
+            text_embeddings = batch["text_embeddings"].to(self.device) if "text_embeddings" in batch else None
+            point_forecast = cast(torch.Tensor, self.model(horizon_len, context, input_padding, text_embeddings))
 
             loss = self.loss_fn(point_forecast, horizon)
             loss = loss / self.args.gradient_accumulation_steps
@@ -188,9 +179,12 @@ class MultimodalTrainer:
         total_loss = 0.0
         with torch.no_grad():
             for i, batch in enumerate(self.val_loader):
+                context = batch["context"].to(self.device)
                 horizon = batch["horizon"].to(self.device)
                 horizon_len = horizon.shape[-1]
-                point_forecast = self._forward_batch(batch, horizon_len)
+                input_padding = torch.zeros_like(context)
+                text_embeddings = batch["text_embeddings"].to(self.device) if "text_embeddings" in batch else None
+                point_forecast = cast(torch.Tensor, self.model(horizon_len, context, input_padding, text_embeddings))
 
                 loss = self.loss_fn(point_forecast, horizon).item()
                 total_loss += loss
