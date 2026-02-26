@@ -36,8 +36,9 @@ class DomainColumnConfig:
 class DomainColumnsConfig:
     """Configuration for all domains in the Time-MMD dataset.
 
-    Each domain can have its own column configuration. If a domain is not explicitly
-    configured, the default configuration will be used.
+    Attributes:
+        default: Fallback configuration applied to domains not listed in `domains`.
+        domains: Per-domain overrides keyed by domain name (e.g., 'Agriculture').
     """
 
     default: DomainColumnConfig
@@ -47,7 +48,7 @@ class DomainColumnsConfig:
         """Get column configuration for a specific domain.
 
         Args:
-            domain: Domain name (e.g., 'Agriculture', 'Environment').
+            domain: Domain name (e.g., 'Agriculture').
 
         Returns:
             DomainColumnConfig for the specified domain, or default if not configured.
@@ -60,13 +61,6 @@ class DomainColumnsConfig:
 
         Args:
             config_dict: Dictionary containing domain column configurations.
-                        Format: {
-                            'default': {...},
-                            'domains': {
-                                'Agriculture': {...},
-                                'Environment': {...}
-                            }
-                        }
 
         Returns:
             DomainColumnsConfig instance.
@@ -80,7 +74,9 @@ class DomainColumnsConfig:
         return cls(default=default_config, domains=domains_dict)
 
 
-# Predefined configurations for Time-MMD domains based on their data structure
+# Predefined column configurations for all Time-MMD domains.
+# Most domains use 'start_date'/'end_date' date columns and 'OT' as the time series column.
+# Health_AFR is the only exception: its start date column is named 'date' instead of 'start_date'.
 DEFAULT_TIME_MMD_CONFIGS = DomainColumnsConfig(
     default=DomainColumnConfig(
         start_date_col="start_date",
