@@ -56,3 +56,10 @@ class BaselineCheckpoint(CheckpointBase):
     """Checkpoint for baseline mode."""
 
     adapter_state_dict: dict[str, Any]
+
+
+class EvaluationMetrics(TypedDict):
+    """Evaluation metrics."""
+
+    mse: float
+    mae: float
