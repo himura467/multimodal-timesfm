@@ -198,10 +198,7 @@ class MultimodalTrainer:
                         loss,
                     )
 
-        val_loss = total_loss / num_batches
-        if self._wandb_run is not None:
-            self._wandb_run.log({"val/loss": val_loss}, step=self.global_step)
-        return val_loss
+        return total_loss / num_batches
 
     def _build_checkpoint(self) -> MultimodalCheckpoint | BaselineCheckpoint:
         """Build a mode-specific checkpoint dict from current training state."""
@@ -295,11 +292,14 @@ class MultimodalTrainer:
             val_loss = self.validate_epoch()
             _logger.info("Epoch %d: Train Loss = %.6f, Val Loss = %.6f", epoch, train_loss, val_loss)
 
-            if self.args.logging_strategy == "epoch" and self._wandb_run is not None:
-                self._wandb_run.log(
-                    {"train/loss": train_loss, "val/loss": val_loss},
-                    step=self.global_step,
-                )
+            if self._wandb_run is not None:
+                if self.args.logging_strategy == "epoch":
+                    self._wandb_run.log(
+                        {"train/loss": train_loss, "val/loss": val_loss},
+                        step=self.global_step,
+                    )
+                else:
+                    self._wandb_run.log({"val/loss": val_loss}, step=self.global_step)
 
             if scheduler is not None:
                 scheduler.step()
