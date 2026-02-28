@@ -15,16 +15,13 @@ class MultimodalFusion(nn.Module):
         ts_embedding_dims: int,
         text_embedding_dims: int,
         num_layers: int = 1,
-        hidden_dims: list[int | None] = [],
+        hidden_dims: list[int] = [],
     ) -> None:
         super().__init__()
 
         self._validate(num_layers, hidden_dims)
 
-        default_hidden_dims = (text_embedding_dims + ts_embedding_dims) // 2
-        dims = [text_embedding_dims]
-        dims.extend(hd if hd is not None else default_hidden_dims for hd in hidden_dims)
-        dims.append(ts_embedding_dims)
+        dims = [text_embedding_dims, *hidden_dims, ts_embedding_dims]
 
         layers: list[nn.Module] = []
         for i in range(len(dims) - 1):
@@ -36,7 +33,7 @@ class MultimodalFusion(nn.Module):
             if isinstance(module, nn.Linear):
                 nn.init.xavier_uniform_(module.weight)
 
-    def _validate(self, num_layers: int, hidden_dims: list[int | None]) -> None:
+    def _validate(self, num_layers: int, hidden_dims: list[int]) -> None:
         if num_layers < 1 or num_layers > 3:
             raise ValueError(f"num_layers must be between 1 and 3, got {num_layers}")
         if len(hidden_dims) != num_layers - 1:
