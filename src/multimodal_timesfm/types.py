@@ -1,5 +1,7 @@
 """Shared types for the multimodal_timesfm package."""
 
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict
 
 if TYPE_CHECKING:

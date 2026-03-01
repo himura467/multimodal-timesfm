@@ -1,10 +1,11 @@
 """Trainer for multimodal and baseline time series forecasting."""
 
+from __future__ import annotations
+
 from collections.abc import Iterator
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import torch
-import wandb
 from torch import nn
 from torch.optim import AdamW
 from torch.utils.data import ConcatDataset, DataLoader
@@ -21,6 +22,9 @@ from multimodal_timesfm.types import (
 )
 from multimodal_timesfm.utils.device import pin_memory
 from multimodal_timesfm.utils.logging import get_logger
+
+if TYPE_CHECKING:
+    import wandb
 
 _logger = get_logger()
 
