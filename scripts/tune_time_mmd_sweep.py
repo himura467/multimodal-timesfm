@@ -46,7 +46,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--model-config", type=str, help="Path to a model config YAML file.")
     parser.add_argument("--forecast-config", type=str, help="Path to a forecast config YAML file.")
     parser.add_argument("--data-path", type=str, default="data/Time-MMD", help="Root path of the dataset.")
-    parser.add_argument("--cache-dir", type=str, required=True, help="Directory with pre-computed cached datasets.")
+    parser.add_argument("--cache-dir", type=str, default="data/cache", help="Directory with pre-computed cached datasets.")
     parser.add_argument("--seed", type=int, help="Random seed for reproducibility.")
 
     return parser.parse_args()
