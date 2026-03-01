@@ -211,3 +211,6 @@ outputs/
 
 # W&B
 wandb/
+
+# Time-MMD dataset (cloned via setup_time_mmd.sh)
+data/Time-MMD/

@@ -4,6 +4,6 @@ RUN apt update -y && \
   wget -qO- https://astral.sh/uv/install.sh | sh && \
   git clone https://github.com/himura467/multimodal-timesfm.git && \
   cd multimodal-timesfm && \
-  git submodule update --init && \
+  ./setup_time_mmd.sh && \
   $HOME/.local/bin/uv sync
 WORKDIR /multimodal-timesfm
