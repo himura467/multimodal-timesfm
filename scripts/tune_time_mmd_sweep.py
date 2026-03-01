@@ -264,7 +264,7 @@ def main() -> int:
         _logger.info("Using default ForecastConfig")
 
     base_training_args = TrainingArguments(
-        output_dir="outputs/sweeps",
+        output_dir="outputs/sweeps/multimodal",
         logging_strategy="steps",
         logging_steps=100,
         eval_strategy="epoch",
