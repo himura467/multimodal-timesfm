@@ -2,11 +2,11 @@
 name = "multimodal-timesfm"
 version = "0.2.0"
 dependencies = [
+    "pandas>=2.3.1",
     "sentence-transformers>=5.1.0",
     "sentencepiece>=0.2.1",
     "timesfm[torch]",
     "torch>=2.8.0",
-    "wandb>=0.24.2",
 ]
 requires-python = ">=3.11"
 authors = [{name = "Akito Shitara", email = "mitarashidango0927@gmail.com"}]
@@ -26,15 +26,11 @@ Repository = "https://github.com/himura467/multimodal-timesfm"
 "Bug Tracker" = "https://github.com/himura467/multimodal-timesfm/issues"
 
 [project.optional-dependencies]
-experiment = [
-    "statsmodels>=0.14.5",
-]
-plot = [
-    "matplotlib>=3.10.7",
+sweep = [
+    "wandb>=0.25.0",
 ]
 all = [
-    "matplotlib>=3.10.7",
-    "statsmodels>=0.14.5",
+    "wandb>=0.25.0",
 ]
 
 [dependency-groups]
@@ -87,10 +83,6 @@ exclude = [".venv"]
 
 [[tool.mypy.overrides]]
 module = "timesfm.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "statsmodels.*"
 ignore_missing_imports = true
 
 [tool.ruff]
