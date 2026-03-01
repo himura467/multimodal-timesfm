@@ -23,7 +23,7 @@ class PreprocessedDataset(Dataset[PreprocessedSample]):
     Args:
         data: List of preprocessed samples.
         mode: 'multimodal' requires text_embeddings in every sample;
-            'baseline' drops text_embeddings if present.
+            'baseline' does not use text_embeddings.
     """
 
     def __init__(self, data: list[PreprocessedSample], mode: TrainingMode) -> None:
@@ -35,9 +35,6 @@ class PreprocessedDataset(Dataset[PreprocessedSample]):
     def _validate(self) -> None:
         if self.mode == "multimodal" and not all("text_embeddings" in s for s in self.data):
             raise ValueError("All samples must contain 'text_embeddings' for multimodal mode")
-        if self.mode == "baseline":
-            for s in self.data:
-                s.pop("text_embeddings", None)
 
     def __getitem__(self, index: int) -> PreprocessedSample:
         return self.data[index]
