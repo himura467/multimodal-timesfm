@@ -209,5 +209,5 @@ __marimo__/
 # Outputs
 outputs/
 
-# WandB
+# W&B
 wandb/
