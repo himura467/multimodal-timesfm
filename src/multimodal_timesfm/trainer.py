@@ -132,7 +132,8 @@ class MultimodalTrainer:
             scaled_loss = loss.item() * self.args.gradient_accumulation_steps
 
             if (i + 1) % self.args.gradient_accumulation_steps == 0:
-                nn.utils.clip_grad_norm_(self._get_trainable_params(), self.args.max_grad_norm)
+                if self.args.max_grad_norm > 0:
+                    nn.utils.clip_grad_norm_(self._get_trainable_params(), self.args.max_grad_norm)
                 self.optimizer.step()
                 self.optimizer.zero_grad()
                 self.global_step += 1
