@@ -2,9 +2,10 @@
 name = "multimodal-timesfm"
 version = "0.2.0"
 dependencies = [
+    "pandas>=2.3.1",
     "sentence-transformers>=5.1.0",
     "sentencepiece>=0.2.1",
-    "timesfm[torch]>=1.3.0",
+    "timesfm[torch]",
     "torch>=2.8.0",
 ]
 requires-python = ">=3.11"
@@ -25,15 +26,11 @@ Repository = "https://github.com/himura467/multimodal-timesfm"
 "Bug Tracker" = "https://github.com/himura467/multimodal-timesfm/issues"
 
 [project.optional-dependencies]
-experiment = [
-    "statsmodels>=0.14.5",
-]
-plot = [
-    "matplotlib>=3.10.7",
+sweep = [
+    "wandb>=0.25.0",
 ]
 all = [
-    "matplotlib>=3.10.7",
-    "statsmodels>=0.14.5",
+    "wandb>=0.25.0",
 ]
 
 [dependency-groups]
@@ -64,6 +61,7 @@ packages = ["src/multimodal_timesfm"]
 package = true
 
 [tool.uv.sources]
+timesfm = { git = "https://github.com/google-research/timesfm" }
 torch = [
     { index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
     { index = "pytorch-cu130", marker = "sys_platform == 'linux'" },
@@ -87,10 +85,6 @@ exclude = [".venv"]
 module = "timesfm.*"
 ignore_missing_imports = true
 
-[[tool.mypy.overrides]]
-module = "statsmodels.*"
-ignore_missing_imports = true
-
 [tool.ruff]
 target-version = "py311"
 exclude = ["data/Time-MMD"]
@@ -105,9 +99,4 @@ select = [
 ]
 ignore = [
     "E501",  # line-too-long
-]
-
-[tool.pytest.ini_options]
-markers = [
-    "ci_unstable: marks tests that are unstable in CI environments (deselect with '-m \"not ci_unstable\"')",
 ]

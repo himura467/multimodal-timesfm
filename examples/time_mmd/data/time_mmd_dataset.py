@@ -1,13 +1,13 @@
 """Time-MMD dataset loader for multimodal time series forecasting."""
 
 from pathlib import Path
-from typing import Literal
 
 import numpy as np
 import pandas as pd
 
 from examples.time_mmd.configs.domain_columns import DEFAULT_TIME_MMD_CONFIGS, DomainColumnConfig
-from multimodal_timesfm.multimodal_dataset import MultimodalDatasetBase
+from multimodal_timesfm.data.dataset import MultimodalDatasetBase
+from multimodal_timesfm.types import RawSample
 
 
 class TimeMmdDataset(MultimodalDatasetBase):
@@ -20,8 +20,6 @@ class TimeMmdDataset(MultimodalDatasetBase):
     Expected directory structure:
         data_dir/
         ├── numerical/
-        │   ├── Agriculture/
-        │   │   └── Agriculture.csv
         │   └── (Domain)/
         │       └── (Domain).csv
         └── textual/
@@ -34,10 +32,8 @@ class TimeMmdDataset(MultimodalDatasetBase):
         self,
         data_dir: Path,
         domain: str,
-        split_ratio: float = 0.8,
-        split: Literal["train", "test"] = "train",
         patch_len: int = 32,
-        context_len: int = 128,
+        context_len: int = 32,
         horizon_len: int = 32,
         column_config: DomainColumnConfig | None = None,
     ) -> None:
@@ -46,28 +42,48 @@ class TimeMmdDataset(MultimodalDatasetBase):
         Args:
             data_dir: Root directory containing Time-MMD dataset.
             domain: Domain name (e.g., 'Agriculture').
-            split_ratio: Train/test split ratio (default 0.8 for 80% train).
-            split: Dataset split ('train' or 'test').
             patch_len: Length of input patches for temporal alignment with time series data.
-            context_len: Length of context window for input sequences.
-                        context_len must be an integer multiple of patch_len.
-            horizon_len: Length of forecasting horizon.
-                        horizon_len must be an integer multiple of patch_len.
+            context_len: Length of context for input sequences.
+                context_len must be an integer multiple of patch_len.
+            horizon_len: Length of horizon.
+                horizon_len must be an integer multiple of patch_len.
             column_config: Optional column configuration for this domain.
-                          If None, uses the default configuration from DEFAULT_TIME_MMD_CONFIGS.
+                If None, uses the default configuration from DEFAULT_TIME_MMD_CONFIGS.
         """
+        self.data_dir = Path(data_dir)
         self.domain = domain
+        self.patch_len = patch_len
+        self.context_len = context_len
+        self.horizon_len = horizon_len
         self.column_config = column_config or DEFAULT_TIME_MMD_CONFIGS.get_config_for_domain(domain)
-        super().__init__(data_dir, split_ratio, split, patch_len, context_len, horizon_len)
+        self.data: list[RawSample] = []
+
+        self._validate()
+
+        self._load_data()
+
+    def _validate(self) -> None:
+        """Validates dataset configuration parameters.
+
+        Raises:
+            FileNotFoundError: If data_dir does not exist.
+            ValueError: If context_len or horizon_len is not an integer multiple of patch_len.
+        """
+        if not self.data_dir.exists():
+            raise FileNotFoundError(f"Data directory not found: {self.data_dir}")
+        if self.context_len % self.patch_len != 0:
+            raise ValueError(
+                f"context_len ({self.context_len}) must be an integer multiple of patch_len ({self.patch_len})"
+            )
+        if self.horizon_len % self.patch_len != 0:
+            raise ValueError(
+                f"horizon_len ({self.horizon_len}) must be an integer multiple of patch_len ({self.patch_len})"
+            )
 
     def _sanitize_time_series(
         self, time_series_values: np.ndarray, start_dates: pd.Series, end_dates: pd.Series
     ) -> tuple[np.ndarray, pd.Series, pd.Series] | None:
         """Sanitize time series by removing leading/trailing invalid values and interpolating all invalid values.
-
-        This function performs the following operations:
-        1. Strips leading and trailing NaN/inf/None values from the time series
-        2. Interpolates any remaining invalid values (NaN/inf/None) in the middle of the series
 
         Args:
             time_series_values: Raw time series values from the dataset.
@@ -83,18 +99,17 @@ class TimeMmdDataset(MultimodalDatasetBase):
 
         # Strip leading and trailing invalid values (NaN/inf/None)
         valid_mask = pd.notna(sanitized_values) & np.isfinite(sanitized_values)
-
         valid_indices = np.where(valid_mask)[0]
         if len(valid_indices) == 0:
             return None
 
-        first_valid_idx = valid_indices[0]
-        last_valid_idx = valid_indices[-1]
+        first_valid_index = valid_indices[0]
+        last_valid_index = valid_indices[-1]
 
         # Trim to valid range (remove leading/trailing invalid values)
-        sanitized_values = sanitized_values[first_valid_idx : last_valid_idx + 1]
-        trimmed_start_dates = start_dates.iloc[first_valid_idx : last_valid_idx + 1].reset_index(drop=True)
-        trimmed_end_dates = end_dates.iloc[first_valid_idx : last_valid_idx + 1].reset_index(drop=True)
+        sanitized_values = sanitized_values[first_valid_index : last_valid_index + 1]
+        trimmed_start_dates = start_dates.iloc[first_valid_index : last_valid_index + 1].reset_index(drop=True)
+        trimmed_end_dates = end_dates.iloc[first_valid_index : last_valid_index + 1].reset_index(drop=True)
 
         # Interpolate any remaining invalid values in the middle of the series
         # This handles NaN, inf, and -inf values uniformly
@@ -110,167 +125,36 @@ class TimeMmdDataset(MultimodalDatasetBase):
 
         return sanitized_values, trimmed_start_dates, trimmed_end_dates
 
-    def _normalize_sample(self, context: np.ndarray, future: np.ndarray) -> tuple[np.ndarray, np.ndarray, float, float]:
-        """Normalize context and future using z-score normalization based on context statistics.
+    def _normalize_sample(
+        self, context: np.ndarray, horizon: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray, float, float]:
+        """Normalize context and horizon using z-score normalization based on context statistics.
 
         This ensures that samples from different domains with vastly different scales
         (e.g., Energy: 0.95-1.75 vs Security: millions-billions) are normalized to
         comparable ranges for stable training.
 
         Args:
-            context: Context window values of shape (context_len, 1).
-            future: Future values to predict of shape (horizon_len, 1).
+            context: Context values of shape (context_len,).
+            horizon: Horizon values of shape (horizon_len,).
 
         Returns:
-            Tuple of (normalized_context, normalized_future, context_mean, context_std).
+            Tuple of (normalized_context, normalized_horizon, context_mean, context_std).
             The normalization parameters can be used to denormalize predictions.
         """
-        # Calculate statistics from context window
         context_mean = np.mean(context)
         context_std = np.std(context)
 
         # Avoid division by zero
-        epsilon = 1e-7
+        epsilon = 1e-6
         if context_std < epsilon:
             context_std = 1.0
 
-        # Normalize both context and future using context statistics
+        # Normalize both context and horizon using context statistics
         context_normalized = (context - context_mean) / context_std
-        future_normalized = (future - context_mean) / context_std
+        horizon_normalized = (horizon - context_mean) / context_std
 
-        return context_normalized, future_normalized, float(context_mean), float(context_std)
-
-    def _load_data(self) -> None:
-        """Loads Time-MMD dataset from files."""
-        numerical_file = self.data_dir / "numerical" / self.domain / f"{self.domain}.csv"
-        textual_dir = self.data_dir / "textual" / self.domain
-
-        if not numerical_file.exists():
-            raise FileNotFoundError(f"Numerical data file not found: {numerical_file}")
-
-        # Load numerical time series data
-        numerical_df = pd.read_csv(numerical_file)
-
-        # Sort numerical_df by start_date to ensure chronological order
-        start_date_col = self.column_config.start_date_col
-        if start_date_col in numerical_df.columns:
-            numerical_df = numerical_df.sort_values(start_date_col).reset_index(drop=True)
-
-        # Load textual data if available
-        report_file = textual_dir / f"{self.domain}_report.csv"
-        search_file = textual_dir / f"{self.domain}_search.csv"
-
-        textual_data = {}
-        if report_file.exists():
-            textual_data["reports"] = pd.read_csv(report_file)
-        if search_file.exists():
-            textual_data["search"] = pd.read_csv(search_file)
-
-        self._process_data(numerical_df, textual_data)
-
-    def _process_data(self, numerical_df: pd.DataFrame, textual_data: dict[str, pd.DataFrame]) -> None:
-        """Processes loaded dataframes into internal format.
-
-        Args:
-            numerical_df: Dataframe containing numerical time series data.
-            textual_data: Dictionary containing textual dataframes (reports, search).
-        """
-        # Use column configuration to determine which columns to use
-        numeric_cols = self.column_config.get_time_series_columns(all_columns=numerical_df.columns.tolist())
-
-        if not numeric_cols:
-            raise ValueError(f"No time series columns found for domain '{self.domain}' with the given configuration")
-
-        # Get date columns from configuration
-        start_date_col = self.column_config.start_date_col
-        end_date_col = self.column_config.end_date_col
-
-        # Prepare date series for efficient lookup
-        if start_date_col not in numerical_df.columns:
-            raise ValueError(
-                f"Start date column '{start_date_col}' not found in numerical data. "
-                f"Available columns: {numerical_df.columns.tolist()}"
-            )
-
-        if end_date_col not in numerical_df.columns:
-            raise ValueError(
-                f"End date column '{end_date_col}' not found in numerical data. "
-                f"Available columns: {numerical_df.columns.tolist()}"
-            )
-
-        full_start_dates = numerical_df[start_date_col]
-        full_end_dates = numerical_df[end_date_col]
-
-        # Process each numeric column as a separate time series
-        for column in numeric_cols:
-            # Extract time series from this column
-            time_series_values = numerical_df.loc[:, column].to_numpy()
-
-            # Sanitize time series: strip leading/trailing invalid values and interpolate middle ones
-            sanitized = self._sanitize_time_series(time_series_values, full_start_dates, full_end_dates)
-            if sanitized is None:
-                continue
-            sanitized_values, trimmed_start_dates, trimmed_end_dates = sanitized
-
-            # Split data based on split_ratio
-            split_idx = int(len(sanitized_values) * self.split_ratio)
-
-            if self.split == "train":
-                ts_data = sanitized_values[:split_idx]
-                start_dates = trimmed_start_dates.iloc[:split_idx]
-                end_dates = trimmed_end_dates.iloc[:split_idx]
-            else:  # test
-                ts_data = sanitized_values[split_idx:]
-                start_dates = trimmed_start_dates.iloc[split_idx:]
-                end_dates = trimmed_end_dates.iloc[split_idx:]
-
-            # Skip if insufficient data after split
-            if len(ts_data) < self.context_len + self.horizon_len:
-                continue
-
-            # Create windowed samples from this time series
-            for start_idx in range(0, len(ts_data) - self.context_len - self.horizon_len + 1, self.horizon_len):
-                # Extract context
-                context_end = start_idx + self.context_len
-                context = ts_data[start_idx:context_end].reshape(-1, 1)
-
-                # Extract future
-                future_end = context_end + self.horizon_len
-                future = ts_data[context_end:future_end].reshape(-1, 1)
-
-                # Normalize context and future using context statistics
-                context_normalized, future_normalized, context_mean, context_std = self._normalize_sample(
-                    context, future
-                )
-
-                # Get associated text for this context
-                window_start_date = str(start_dates.iloc[start_idx])
-                window_end_date = str(end_dates.iloc[context_end - 1])
-
-                # Calculate frequency based on interval between start_date values
-                freq = self._calculate_frequency_for_sample(start_dates, start_idx, context_end)
-
-                # Calculate number of text patches based on context_len / patch_len
-                text_patches_num = self.context_len // self.patch_len
-
-                patched_texts = self._get_patched_texts_for_period(
-                    window_start_date, window_end_date, textual_data, text_patches_num
-                )
-
-                sample = {
-                    "context": context_normalized.astype(np.float32),
-                    "future": future_normalized.astype(np.float32),
-                    "freq": freq,
-                    "patched_texts": patched_texts,
-                    "metadata": {
-                        "domain": self.domain,
-                        "column": column,
-                        "start_index": start_idx,
-                        "mean": context_mean,
-                        "std": context_std,
-                    },
-                }
-                self.data.append(sample)
+        return context_normalized, horizon_normalized, float(context_mean), float(context_std)
 
     def _clean_and_validate_text(self, text: str | None) -> str | None:
         """Clean and validate text, returning cleaned text if valid or None if invalid.
@@ -302,42 +186,6 @@ class TimeMmdDataset(MultimodalDatasetBase):
 
         return text_str
 
-    def _calculate_frequency_for_sample(self, dates: pd.Series, start_idx: int, end_idx: int) -> int:
-        """Calculate frequency value based on interval between date values.
-
-        Args:
-            dates: Series of dates for the time series.
-            start_idx: Starting index of the sample.
-            end_idx: Ending index of the sample.
-
-        Returns:
-            Frequency value:
-            - 0 for daily or lower granularity
-            - 1 for weekly or monthly granularity
-            - 2 for quarterly or higher granularity
-        """
-        if end_idx - start_idx < 1:
-            return 0  # Default to daily if insufficient data
-
-        # Convert to datetime and calculate intervals for the entire sample range
-        sample_dates = pd.to_datetime(dates.iloc[start_idx:end_idx])
-        intervals = sample_dates.diff().dropna()
-
-        if len(intervals) == 0:
-            return 0  # Default to daily
-
-        # Calculate average interval across all data points in the sample
-        avg_interval = intervals.mean()
-        avg_days = pd.Timedelta(avg_interval).total_seconds() / (24 * 3600)  # Convert to days
-
-        # Classify based on average interval
-        if avg_days < 3:
-            return 0
-        elif avg_days < 35:  # Weekly to monthly (up to ~5 weeks)
-            return 1
-        else:  # Quarterly or higher
-            return 2
-
     def _get_patched_texts_for_period(
         self, start_date: str, end_date: str, textual_data: dict[str, pd.DataFrame], text_patches_num: int
     ) -> list[list[str]]:
@@ -353,18 +201,14 @@ class TimeMmdDataset(MultimodalDatasetBase):
             List of lists where each inner list contains text data for one patch period.
             Returns text_patches_num number of lists.
         """
-        # Convert dates to pandas datetime for comparison
         period_start = pd.to_datetime(start_date)
         period_end = pd.to_datetime(end_date)
-
-        # Divide the time period into equal parts
         period_duration = period_end - period_start
         patch_duration = period_duration / text_patches_num
 
         patches = []
 
         for i in range(text_patches_num):
-            # Calculate patch time boundaries
             patch_start = period_start + i * patch_duration
             patch_end = period_start + (i + 1) * patch_duration
 
@@ -417,3 +261,135 @@ class TimeMmdDataset(MultimodalDatasetBase):
             patches.append(patch_reports)
 
         return patches
+
+    def _process_data(self, numerical_df: pd.DataFrame, textual_data: dict[str, pd.DataFrame]) -> None:
+        """Processes loaded dataframes into internal format.
+
+        Args:
+            numerical_df: Dataframe containing numerical time series data.
+            textual_data: Dictionary containing textual dataframes (reports, search).
+        """
+        # Use column configuration to determine which columns to use
+        numeric_cols = self.column_config.get_time_series_columns(all_columns=numerical_df.columns.tolist())
+        if not numeric_cols:
+            raise ValueError(f"No time series columns found for domain {self.domain!r} with the given configuration")
+
+        start_date_col = self.column_config.start_date_col
+        end_date_col = self.column_config.end_date_col
+        if start_date_col not in numerical_df.columns:
+            raise ValueError(
+                f"Start date column {start_date_col!r} not found in numerical data. "
+                f"Available columns: {numerical_df.columns.tolist()}"
+            )
+        if end_date_col not in numerical_df.columns:
+            raise ValueError(
+                f"End date column {end_date_col!r} not found in numerical data. "
+                f"Available columns: {numerical_df.columns.tolist()}"
+            )
+        full_start_dates = numerical_df[start_date_col]
+        full_end_dates = numerical_df[end_date_col]
+
+        # Process each numeric column as a separate time series
+        for column in numeric_cols:
+            # Extract time series from this column
+            time_series_values = numerical_df.loc[:, column].to_numpy()
+
+            sanitized = self._sanitize_time_series(time_series_values, full_start_dates, full_end_dates)
+            if sanitized is None:
+                continue
+            sanitized_values, trimmed_start_dates, trimmed_end_dates = sanitized
+
+            ts_data = sanitized_values
+            start_dates = trimmed_start_dates
+            end_dates = trimmed_end_dates
+
+            # Skip if insufficient data
+            if len(ts_data) < self.context_len + self.horizon_len:
+                continue
+
+            # Create windowed samples from this time series
+            for start_index in range(0, len(ts_data) - self.context_len - self.horizon_len + 1, self.horizon_len):
+                context_end = start_index + self.context_len
+                context = ts_data[start_index:context_end]
+
+                horizon_end = context_end + self.horizon_len
+                horizon = ts_data[context_end:horizon_end]
+
+                context_normalized, horizon_normalized, context_mean, context_std = self._normalize_sample(
+                    context, horizon
+                )
+
+                window_start_date = str(start_dates.iloc[start_index])
+                window_end_date = str(end_dates.iloc[context_end - 1])
+                text_patches_num = self.context_len // self.patch_len
+                patched_texts = self._get_patched_texts_for_period(
+                    window_start_date, window_end_date, textual_data, text_patches_num
+                )
+
+                sample = RawSample(
+                    context=context_normalized.astype(np.float32),
+                    horizon=horizon_normalized.astype(np.float32),
+                    patched_texts=patched_texts,
+                    metadata={
+                        "domain": self.domain,
+                        "column": column,
+                        "start_index": start_index,
+                        "mean": context_mean,
+                        "std": context_std,
+                    },
+                )
+                self.data.append(sample)
+
+    def _load_data(self) -> None:
+        """Loads Time-MMD dataset from files."""
+        numerical_file = self.data_dir / "numerical" / self.domain / f"{self.domain}.csv"
+        textual_dir = self.data_dir / "textual" / self.domain
+
+        if not numerical_file.exists():
+            raise FileNotFoundError(f"Numerical data file not found: {numerical_file}")
+
+        numerical_df = pd.read_csv(numerical_file)
+
+        # Sort numerical_df by start_date to ensure chronological order
+        start_date_col = self.column_config.start_date_col
+        if start_date_col in numerical_df.columns:
+            numerical_df = numerical_df.sort_values(start_date_col).reset_index(drop=True)
+
+        report_file = textual_dir / f"{self.domain}_report.csv"
+        search_file = textual_dir / f"{self.domain}_search.csv"
+        textual_data = {}
+        if report_file.exists():
+            textual_data["reports"] = pd.read_csv(report_file)
+        if search_file.exists():
+            textual_data["search"] = pd.read_csv(search_file)
+
+        self._process_data(numerical_df, textual_data)
+
+    @classmethod
+    def get_domains(cls, path: Path) -> list[str]:
+        """Return all available domain names from a Time-MMD dataset directory.
+
+        Args:
+            path: Root directory containing Time-MMD dataset.
+
+        Returns:
+            Sorted list of domain names.
+
+        Raises:
+            FileNotFoundError: If the numerical data directory does not exist.
+        """
+        numerical_dir = path / "numerical"
+        if not numerical_dir.exists():
+            raise FileNotFoundError(f"Numerical data directory not found: {numerical_dir}")
+
+        domains = [d.name for d in numerical_dir.iterdir() if d.is_dir()]
+        domains.sort()
+        return domains
+
+    def __getitem__(self, index: int) -> RawSample:
+        if index >= len(self.data):
+            raise IndexError(f"Index {index} out of range for dataset of size {len(self.data)}")
+        return self.data[index]
+
+    def __len__(self) -> int:
+        return len(self.data)

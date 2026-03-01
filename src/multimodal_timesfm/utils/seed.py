@@ -1,4 +1,4 @@
-"""Random seed utilities for reproducibility."""
+"""Random seed utilities."""
 
 import random
 

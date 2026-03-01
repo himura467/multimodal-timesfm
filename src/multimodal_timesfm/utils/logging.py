@@ -6,7 +6,7 @@ def setup_logger(
     name: str = __name__,
     level: int = INFO,
     log_file: Path | None = None,
-    format_string: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    fmt: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 ) -> Logger:
     logger = getLogger(name)
 
@@ -15,11 +15,11 @@ def setup_logger(
 
     logger.setLevel(level)
 
-    formatter = Formatter(format_string)
+    formatter = Formatter(fmt)
 
-    console_handler = StreamHandler()
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+    stream_handler = StreamHandler()
+    stream_handler.setFormatter(formatter)
+    logger.addHandler(stream_handler)
 
     if log_file:
         log_file.parent.mkdir(parents=True, exist_ok=True)
