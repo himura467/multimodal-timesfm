@@ -121,7 +121,8 @@ def main() -> int:
 
     data_path = Path(parsed_args.data_path)
     if parsed_args.domains:
-        _logger.info("Caching specified domains: %s", parsed_args.domains)
+        domains = parsed_args.domains
+        _logger.info("Caching specified domains: %s", domains)
     else:
         domains = TimeMmdDataset.get_domains(data_path)
         _logger.info("Caching all %d domains: %s", len(domains), domains)
