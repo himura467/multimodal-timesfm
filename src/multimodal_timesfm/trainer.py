@@ -122,7 +122,7 @@ class MultimodalTrainer:
             context = batch["context"].to(self.device)
             horizon = batch["horizon"].to(self.device)
             horizon_len = horizon.shape[-1]
-            input_padding = torch.zeros_like(context)
+            input_padding = torch.zeros_like(context, dtype=torch.bool)
             text_embeddings = batch["text_embeddings"].to(self.device) if "text_embeddings" in batch else None
             point_forecast = cast(torch.Tensor, self.model(horizon_len, context, input_padding, text_embeddings))
 
@@ -183,7 +183,7 @@ class MultimodalTrainer:
                 context = batch["context"].to(self.device)
                 horizon = batch["horizon"].to(self.device)
                 horizon_len = horizon.shape[-1]
-                input_padding = torch.zeros_like(context)
+                input_padding = torch.zeros_like(context, dtype=torch.bool)
                 text_embeddings = batch["text_embeddings"].to(self.device) if "text_embeddings" in batch else None
                 point_forecast = cast(torch.Tensor, self.model(horizon_len, context, input_padding, text_embeddings))
 
