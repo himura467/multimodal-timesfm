@@ -9,6 +9,6 @@ if [[ -d "$TIME_MMD_DIR" ]]; then
   echo "Time-MMD dataset already exists at $TIME_MMD_DIR, skipping clone."
 else
   mkdir -p "$SCRIPT_DIR/data"
-  git clone https://github.com/AdityaLab/Time-MMD.git "$TIME_MMD_DIR"
+  git clone --depth 1 https://github.com/AdityaLab/Time-MMD.git "$TIME_MMD_DIR"
   echo "Time-MMD dataset cloned to $TIME_MMD_DIR."
 fi
