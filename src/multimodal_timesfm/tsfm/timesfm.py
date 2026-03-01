@@ -30,8 +30,17 @@ class TimesFM2p5Adapter(TsfmAdapter):
         inputs: torch.Tensor,
         masks: torch.Tensor,
     ) -> PreprocessResult:
-        """Patch, normalize (RevIN), and tokenize input time series."""
+        """Patch, normalize (RevIN), and tokenize input time series.
+
+        Raises:
+            ValueError: If context length is not divisible by patch length, or
+                if masks shape does not match inputs shape.
+        """
         batch_size, context = inputs.shape[0], inputs.shape[1]
+        if context % self._model.p != 0:
+            raise ValueError(f"context length ({context}) must be divisible by patch length ({self._model.p})")
+        if masks.shape != inputs.shape:
+            raise ValueError(f"masks shape {masks.shape} must match inputs shape {inputs.shape}")
         num_input_patches = context // self._model.p
 
         patched_inputs = inputs.reshape(batch_size, -1, self._model.p)
