@@ -14,6 +14,7 @@ from multimodal_timesfm.decoder import MultimodalDecoder
 from multimodal_timesfm.training_args import TrainingArguments
 from multimodal_timesfm.types import (
     BaselineCheckpoint,
+    Batch,
     MultimodalCheckpoint,
     PreprocessedSample,
     TrainingMode,
@@ -68,21 +69,27 @@ class MultimodalTrainer:
             self.model.adapter.unfreeze_parameters()
 
         collate_fn = multimodal_collate_fn if mode == "multimodal" else baseline_collate_fn
-        self.train_loader: DataLoader[PreprocessedSample] = DataLoader(
-            train_dataset,
-            batch_size=args.per_device_train_batch_size,
-            shuffle=True,
-            num_workers=0,
-            collate_fn=collate_fn,
-            pin_memory=pin_memory(self.device),
+        self.train_loader = cast(
+            DataLoader[Batch],
+            DataLoader(
+                train_dataset,
+                batch_size=args.per_device_train_batch_size,
+                shuffle=True,
+                num_workers=0,
+                collate_fn=collate_fn,
+                pin_memory=pin_memory(self.device),
+            ),
         )
-        self.val_loader: DataLoader[PreprocessedSample] = DataLoader(
-            val_dataset,
-            batch_size=args.per_device_eval_batch_size,
-            shuffle=False,
-            num_workers=0,
-            collate_fn=collate_fn,
-            pin_memory=pin_memory(self.device),
+        self.val_loader = cast(
+            DataLoader[Batch],
+            DataLoader(
+                val_dataset,
+                batch_size=args.per_device_eval_batch_size,
+                shuffle=False,
+                num_workers=0,
+                collate_fn=collate_fn,
+                pin_memory=pin_memory(self.device),
+            ),
         )
 
         self.optimizer = AdamW(

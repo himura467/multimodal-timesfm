@@ -6,7 +6,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from multimodal_timesfm.decoder import MultimodalDecoder
-from multimodal_timesfm.types import EvaluationMetrics, PreprocessedSample
+from multimodal_timesfm.types import Batch, EvaluationMetrics
 
 
 class MultimodalEvaluator:
@@ -26,7 +26,7 @@ class MultimodalEvaluator:
         self.model = model
         self.device = device
 
-    def evaluate(self, dataloader: DataLoader[PreprocessedSample]) -> EvaluationMetrics:
+    def evaluate(self, dataloader: DataLoader[Batch]) -> EvaluationMetrics:
         """Evaluate the model on the given dataloader and return aggregated metrics.
 
         Args:
