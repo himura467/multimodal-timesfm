@@ -96,6 +96,7 @@ select = [
     "E",  # pycodestyle Error
     "W",  # pycodestyle Warning
     "F",  # Pyflakes
+    "G004",  # logging-f-string
 ]
 ignore = [
     "E501",  # line-too-long
