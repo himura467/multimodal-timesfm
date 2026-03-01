@@ -56,7 +56,13 @@ class MultimodalDecoder(nn.Module):
 
         Returns:
             Predictions (batch_size, horizon, num_outputs).
+
+        Raises:
+            ValueError: If masks shape does not match inputs shape.
         """
+        if masks.shape != inputs.shape:
+            raise ValueError(f"masks shape {masks.shape} must match inputs shape {inputs.shape}")
+        masks = masks.bool()
         preprocessed = self.adapter.preprocess(inputs, masks)
         embeddings = (
             self.fusion(preprocessed.input_embeddings, text_embeddings)
