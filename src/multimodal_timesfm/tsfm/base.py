@@ -30,6 +30,18 @@ class TsfmAdapter(nn.Module, ABC):
 
     @property
     @abstractmethod
+    def model_dims(self) -> int:
+        """Hidden dimension of the adapter's transformer."""
+        ...
+
+    @property
+    @abstractmethod
+    def patch_len(self) -> int:
+        """Number of raw time series steps per input patch."""
+        ...
+
+    @property
+    @abstractmethod
     def point_forecast_index(self) -> int:
         """Index into the last dimension of postprocess output that gives the point forecast."""
         ...

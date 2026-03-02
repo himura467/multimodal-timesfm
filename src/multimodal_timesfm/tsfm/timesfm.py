@@ -22,6 +22,14 @@ class TimesFM2p5Adapter(TsfmAdapter):
         self._model = TimesFM_2p5_200M_torch_module()
 
     @property
+    def model_dims(self) -> int:
+        return cast(int, self._model.md)
+
+    @property
+    def patch_len(self) -> int:
+        return cast(int, self._model.p)
+
+    @property
     def point_forecast_index(self) -> int:
         return cast(int, self._model.config.decode_index)
 
