@@ -74,7 +74,6 @@ def _create_baseline_model(model_config: ModelConfig, device: torch.device) -> M
     )
     adapter = TimesFM2p5Adapter.from_pretrained(device, repo_id=model_config.adapter.pretrained_repo)
     config = MultimodalDecoderConfig(
-        ts_embedding_dims=model_config.fusion.ts_embedding_dims,
         text_embedding_dims=model_config.fusion.text_embedding_dims,
         num_fusion_layers=model_config.fusion.num_fusion_layers,
         fusion_hidden_dims=model_config.fusion.fusion_hidden_dims,

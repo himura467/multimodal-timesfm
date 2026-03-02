@@ -23,7 +23,6 @@ class FusionConfig:
     """Configuration for the multimodal fusion layer."""
 
     text_encoder_type: Literal["english", "japanese"] = "english"
-    ts_embedding_dims: int = 1280
     text_embedding_dims: int = 384
     num_fusion_layers: int = 1
     fusion_hidden_dims: list[int] = field(default_factory=list)

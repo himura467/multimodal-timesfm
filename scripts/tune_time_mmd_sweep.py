@@ -113,7 +113,6 @@ def _create_multimodal_model(
     )
     adapter = TimesFM2p5Adapter.from_pretrained(device, repo_id=model_config.adapter.pretrained_repo)
     config = MultimodalDecoderConfig(
-        ts_embedding_dims=model_config.fusion.ts_embedding_dims,
         text_embedding_dims=model_config.fusion.text_embedding_dims,
         num_fusion_layers=num_fusion_layers,
         fusion_hidden_dims=fusion_hidden_dims,
