@@ -13,7 +13,7 @@ from multimodal_timesfm.utils.yaml import load_yaml
 class AdapterConfig:
     """Configuration for the time series foundation model adapter."""
 
-    type: Literal["timesfm"] = "timesfm"
+    type: Literal["chronos", "timesfm"] = "timesfm"
     pretrained_repo: str = "google/timesfm-2.5-200m-pytorch"
     patch_len: int = 32
 

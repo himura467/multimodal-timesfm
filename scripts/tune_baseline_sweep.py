@@ -20,6 +20,8 @@ from multimodal_timesfm.decoder import MultimodalDecoder, MultimodalDecoderConfi
 from multimodal_timesfm.evaluator import MultimodalEvaluator
 from multimodal_timesfm.trainer import MultimodalTrainer
 from multimodal_timesfm.training_args import TrainingArguments
+from multimodal_timesfm.tsfm.base import TsfmAdapter
+from multimodal_timesfm.tsfm.chronos import Chronos2Adapter
 from multimodal_timesfm.tsfm.timesfm import TimesFM2p5Adapter
 from multimodal_timesfm.types import BaselineCheckpoint, Batch
 from multimodal_timesfm.utils.device import pin_memory, resolve_device
@@ -72,7 +74,14 @@ def _create_baseline_model(model_config: ModelConfig, device: torch.device) -> M
         model_config.adapter.pretrained_repo,
         device,
     )
-    adapter = TimesFM2p5Adapter.from_pretrained(device, repo_id=model_config.adapter.pretrained_repo)
+    adapter: TsfmAdapter
+    match model_config.adapter.type:
+        case "chronos":
+            adapter = Chronos2Adapter.from_pretrained(device, repo_id=model_config.adapter.pretrained_repo)
+        case "timesfm":
+            adapter = TimesFM2p5Adapter.from_pretrained(device, repo_id=model_config.adapter.pretrained_repo)
+        case _:
+            raise NotImplementedError(f"Unsupported adapter type: {model_config.adapter.type!r}")
     config = MultimodalDecoderConfig(
         text_embedding_dims=model_config.fusion.text_embedding_dims,
         num_fusion_layers=model_config.fusion.num_fusion_layers,
