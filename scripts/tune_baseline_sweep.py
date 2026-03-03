@@ -82,6 +82,12 @@ def _create_baseline_model(model_config: ModelConfig, device: torch.device) -> M
             adapter = TimesFM2p5Adapter.from_pretrained(device, repo_id=model_config.adapter.pretrained_repo)
         case _:
             raise NotImplementedError(f"Unsupported adapter type: {model_config.adapter.type!r}")
+    if adapter.patch_len != model_config.adapter.patch_len:
+        raise ValueError(
+            f"adapter.patch_len ({adapter.patch_len}) does not match "
+            f"model_config.adapter.patch_len ({model_config.adapter.patch_len}); "
+            "the cached dataset was built with the config value — rebuild the cache or fix the config."
+        )
     config = MultimodalDecoderConfig(
         text_embedding_dims=model_config.fusion.text_embedding_dims,
         num_fusion_layers=model_config.fusion.num_fusion_layers,
