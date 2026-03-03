@@ -2,6 +2,7 @@
 name = "multimodal-timesfm"
 version = "0.3.0"
 dependencies = [
+    "chronos-forecasting>=2.2.2",
     "pandas>=2.3.1",
     "sentence-transformers>=5.1.0",
     "sentencepiece>=0.2.1",
