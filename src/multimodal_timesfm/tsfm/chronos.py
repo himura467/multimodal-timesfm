@@ -41,7 +41,7 @@ class Chronos2Adapter(TsfmAdapter):
 
         Returns:
             PreprocessResult with input_embeddings (batch_size, num_context_patches, model_dims),
-            masks in Chronos-2 convention (True = valid), and normalization_stats
+            masks in project convention (True = padded), and normalization_stats
             containing "loc" and "scale" each of shape (batch_size, 1).
         """
         # Flip to Chronos-2 convention: 1.0 = valid, 0.0 = padded.
@@ -55,7 +55,7 @@ class Chronos2Adapter(TsfmAdapter):
 
         return PreprocessResult(
             input_embeddings=input_embeds,
-            masks=attention_mask,
+            masks=attention_mask == 0,
             normalization_stats={"loc": loc, "scale": scale},
         )
 
@@ -99,7 +99,9 @@ class Chronos2Adapter(TsfmAdapter):
             torch.cat([future_time_enc, patched_future_covariates, patched_future_covariates_mask], dim=-1)
         )
 
-        attention_mask = masks.to(dtype)
+        # Flip to Chronos-2 convention: 1.0 = valid, 0.0 = padded.
+        attention_mask = (~masks).to(dtype)
+
         future_attention_mask = torch.ones(batch_size, num_output_patches, dtype=dtype, device=device)
         if self._model.chronos_config.use_reg_token:
             reg_input_ids = torch.full((batch_size, 1), self._model.config.reg_token_id, device=device)
