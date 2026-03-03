@@ -129,7 +129,7 @@ class TimesFM2p5Adapter(TsfmAdapter):
         return renormed_outputs[:, -1, :horizon, :]
 
     def load_checkpoint(self, path: str) -> None:
-        """Load a PyTorch TimesFM model from a checkpoint."""
+        """Load a TimesFM 2.5 model from a checkpoint."""
         tensors = load_file(path)
         self._model.load_state_dict(tensors, strict=True)
 
