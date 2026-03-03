@@ -9,7 +9,7 @@ dependencies = [
     "torch>=2.8.0",
 ]
 requires-python = ">=3.11"
-authors = [{name = "Akito Shitara", email = "mitarashidango0927@gmail.com"}]
+authors = [{name = "Akito Shitara", email = "akitoshitara@gmail.com"}]
 description = "Multimodal extension of Google's TimesFM for time series forecasting with text"
 readme = "README.md"
 license = { file = "LICENSE" }
