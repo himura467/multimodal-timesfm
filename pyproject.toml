@@ -85,7 +85,7 @@ exclude = [".venv"]
 all = "error"
 
 [tool.ty.analysis]
-allowed-unresolved-imports = ["timesfm.*"]
+allowed-unresolved-imports = ["chronos.*", "timesfm.*"]
 
 [tool.ruff]
 target-version = "py311"
