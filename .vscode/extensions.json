@@ -3,7 +3,7 @@
     // IntelliSense
     "ms-python.python",
     // Linting / Formatting
-    "ms-python.mypy-type-checker",
+    "astral-sh.ty",
     "charliermarsh.ruff",
     "streetsidesoftware.code-spell-checker",
     // Showing todo comments

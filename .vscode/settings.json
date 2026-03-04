@@ -20,10 +20,6 @@
   "python.testing.unittestEnabled": false,
   "python.testing.pytestEnabled": true,
   "ruff.configuration": "${workspaceFolder}/pyproject.toml",
-  // https://github.com/microsoft/vscode-mypy
-  "mypy-type-checker.args": [
-    "--config-file=pyproject.toml"
-  ],
   // Ensure enough terminal history is preserved when running tests
   "terminal.integrated.scrollback": 10000,
   // Configure todo-tree to exclude .venv

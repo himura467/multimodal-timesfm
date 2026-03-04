@@ -6,7 +6,7 @@ This project provides a multimodal extension of Google's [TimesFM](https://githu
 
 ## Bash Commands
 
-- `uv run mypy src/ scripts/ examples/ tests/`: Type checking
+- `uv run ty check`: Type checking
 - `uv run ruff check`: Linting
 - `uv run ruff format`: Code formatting
 - `uv run pytest tests/ -v`: Run test suite
