@@ -13,7 +13,7 @@ from multimodal_timesfm.utils.yaml import load_yaml
 class AdapterConfig:
     """Configuration for the time series foundation model adapter."""
 
-    type: Literal["timesfm"] = "timesfm"
+    type: Literal["chronos", "timesfm"] = "timesfm"
     pretrained_repo: str = "google/timesfm-2.5-200m-pytorch"
     patch_len: int = 32
 
@@ -23,7 +23,6 @@ class FusionConfig:
     """Configuration for the multimodal fusion layer."""
 
     text_encoder_type: Literal["english", "japanese"] = "english"
-    ts_embedding_dims: int = 1280
     text_embedding_dims: int = 384
     num_fusion_layers: int = 1
     fusion_hidden_dims: list[int] = field(default_factory=list)

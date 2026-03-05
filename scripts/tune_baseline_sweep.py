@@ -20,6 +20,8 @@ from multimodal_timesfm.decoder import MultimodalDecoder, MultimodalDecoderConfi
 from multimodal_timesfm.evaluator import MultimodalEvaluator
 from multimodal_timesfm.trainer import MultimodalTrainer
 from multimodal_timesfm.training_args import TrainingArguments
+from multimodal_timesfm.tsfm.base import TsfmAdapter
+from multimodal_timesfm.tsfm.chronos import Chronos2Adapter
 from multimodal_timesfm.tsfm.timesfm import TimesFM2p5Adapter
 from multimodal_timesfm.types import BaselineCheckpoint, Batch
 from multimodal_timesfm.utils.device import pin_memory, resolve_device
@@ -72,9 +74,21 @@ def _create_baseline_model(model_config: ModelConfig, device: torch.device) -> M
         model_config.adapter.pretrained_repo,
         device,
     )
-    adapter = TimesFM2p5Adapter.from_pretrained(device, repo_id=model_config.adapter.pretrained_repo)
+    adapter: TsfmAdapter
+    match model_config.adapter.type:
+        case "chronos":
+            adapter = Chronos2Adapter.from_pretrained(device, repo_id=model_config.adapter.pretrained_repo)
+        case "timesfm":
+            adapter = TimesFM2p5Adapter.from_pretrained(device, repo_id=model_config.adapter.pretrained_repo)
+        case _:
+            raise NotImplementedError(f"Unsupported adapter type: {model_config.adapter.type!r}")
+    if adapter.patch_len != model_config.adapter.patch_len:
+        raise ValueError(
+            f"adapter.patch_len ({adapter.patch_len}) does not match "
+            f"model_config.adapter.patch_len ({model_config.adapter.patch_len}); "
+            "the cached dataset was built with the config value — rebuild the cache or fix the config."
+        )
     config = MultimodalDecoderConfig(
-        ts_embedding_dims=model_config.fusion.ts_embedding_dims,
         text_embedding_dims=model_config.fusion.text_embedding_dims,
         num_fusion_layers=model_config.fusion.num_fusion_layers,
         fusion_hidden_dims=model_config.fusion.fusion_hidden_dims,

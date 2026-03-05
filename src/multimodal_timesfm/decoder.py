@@ -13,7 +13,6 @@ from multimodal_timesfm.tsfm.base import TsfmAdapter
 class MultimodalDecoderConfig:
     """Configuration for MultimodalDecoder."""
 
-    ts_embedding_dims: int = 1280
     text_embedding_dims: int = 384
     num_fusion_layers: int = 1
     fusion_hidden_dims: list[int] = field(default_factory=list)
@@ -30,7 +29,7 @@ class MultimodalDecoder(nn.Module):
         self.adapter = adapter
         self.config = config
         self.fusion = MultimodalFusion(
-            ts_embedding_dims=config.ts_embedding_dims,
+            ts_embedding_dims=adapter.model_dims,
             text_embedding_dims=config.text_embedding_dims,
             num_layers=config.num_fusion_layers,
             hidden_dims=config.fusion_hidden_dims,

@@ -22,6 +22,14 @@ class TimesFM2p5Adapter(TsfmAdapter):
         self._model = TimesFM_2p5_200M_torch_module()
 
     @property
+    def model_dims(self) -> int:
+        return cast(int, self._model.md)
+
+    @property
+    def patch_len(self) -> int:
+        return cast(int, self._model.p)
+
+    @property
     def point_forecast_index(self) -> int:
         return cast(int, self._model.config.decode_index)
 
@@ -121,7 +129,7 @@ class TimesFM2p5Adapter(TsfmAdapter):
         return renormed_outputs[:, -1, :horizon, :]
 
     def load_checkpoint(self, path: str) -> None:
-        """Load a PyTorch TimesFM model from a checkpoint."""
+        """Load a TimesFM 2.5 model from a checkpoint."""
         tensors = load_file(path)
         self._model.load_state_dict(tensors, strict=True)
 
