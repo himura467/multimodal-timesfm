@@ -92,42 +92,42 @@ def main() -> int:
     Returns:
         Exit code — 0 on success.
     """
-    parsed_args = _parse_args()
+    args = _parse_args()
 
-    if parsed_args.model_config:
-        model_config = ModelConfig.from_yaml(Path(parsed_args.model_config))
-        _logger.info("Loaded model config from %s", parsed_args.model_config)
+    if args.model_config:
+        model_config = ModelConfig.from_yaml(Path(args.model_config))
+        _logger.info("Loaded model config from %s", args.model_config)
     else:
         model_config = ModelConfig()
         _logger.info("Using default ModelConfig")
 
-    if parsed_args.forecast_config:
-        forecast_config = ForecastConfig.from_yaml(Path(parsed_args.forecast_config))
-        _logger.info("Loaded forecast config from %s", parsed_args.forecast_config)
+    if args.forecast_config:
+        forecast_config = ForecastConfig.from_yaml(Path(args.forecast_config))
+        _logger.info("Loaded forecast config from %s", args.forecast_config)
     else:
         forecast_config = ForecastConfig()
         _logger.info("Using default ForecastConfig")
 
-    if parsed_args.seed is not None:
-        _logger.info("Setting random seed to %d", parsed_args.seed)
-        set_seed(parsed_args.seed)
+    if args.seed is not None:
+        _logger.info("Setting random seed to %d", args.seed)
+        set_seed(args.seed)
 
-    text_encoder_type: Literal["english", "japanese"] = parsed_args.text_encoder_type
+    text_encoder_type: Literal["english", "japanese"] = args.text_encoder_type
 
     device = resolve_device()
     _logger.info("Using device: %s", device)
 
     text_encoder = _build_text_encoder(text_encoder_type, device)
 
-    data_path = Path(parsed_args.data_path)
-    if parsed_args.domains:
-        domains = parsed_args.domains
+    data_path = Path(args.data_path)
+    if args.domains:
+        domains = args.domains
         _logger.info("Caching specified domains: %s", domains)
     else:
         domains = TimeMmdDataset.get_domains(data_path)
         _logger.info("Caching all %d domains: %s", len(domains), domains)
 
-    pipeline = PreprocessPipeline(Path(parsed_args.cache_dir))
+    pipeline = PreprocessPipeline(Path(args.cache_dir))
 
     for domain in domains:
         _logger.info("Processing domain: %s", domain)
@@ -154,7 +154,7 @@ def main() -> int:
             dataset_factory=_dataset_factory,
             text_encoder=text_encoder,
             device=device,
-            force_rebuild=parsed_args.force_rebuild,
+            force_rebuild=args.force_rebuild,
         )
         _logger.info("Done: %s -> %s", domain, cache_path)
 

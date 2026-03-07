@@ -14,7 +14,6 @@ from torch.utils.data import DataLoader
 from examples.time_mmd.configs.forecast import ForecastConfig
 from examples.time_mmd.configs.model import ModelConfig
 from examples.time_mmd.cross_validation import load_fold_datasets
-from examples.time_mmd.data.time_mmd_dataset import TimeMmdDataset
 from multimodal_timesfm.data.collate import baseline_collate_fn
 from multimodal_timesfm.decoder import MultimodalDecoder, MultimodalDecoderConfig
 from multimodal_timesfm.evaluator import MultimodalEvaluator
@@ -47,7 +46,6 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--count", type=int, help="Number of sweep runs for the agent to execute.")
     parser.add_argument("--model-config", type=str, help="Path to a model config YAML file.")
     parser.add_argument("--forecast-config", type=str, help="Path to a forecast config YAML file.")
-    parser.add_argument("--data-path", type=str, default="data/Time-MMD", help="Root path of the dataset.")
     parser.add_argument(
         "--cache-dir", type=str, default="data/cache", help="Directory with pre-computed cached datasets."
     )
@@ -215,18 +213,18 @@ def main() -> int:
         Exit code — 0 on success, 1 if neither --sweep-id nor
         --sweep-config is provided.
     """
-    parsed_args = _parse_args()
+    args = _parse_args()
 
-    if parsed_args.model_config:
-        model_config = ModelConfig.from_yaml(Path(parsed_args.model_config))
-        _logger.info("Loaded model config from %s", parsed_args.model_config)
+    if args.model_config:
+        model_config = ModelConfig.from_yaml(Path(args.model_config))
+        _logger.info("Loaded model config from %s", args.model_config)
     else:
         model_config = ModelConfig()
         _logger.info("Using default ModelConfig")
 
-    if parsed_args.forecast_config:
-        forecast_config = ForecastConfig.from_yaml(Path(parsed_args.forecast_config))
-        _logger.info("Loaded forecast config from %s", parsed_args.forecast_config)
+    if args.forecast_config:
+        forecast_config = ForecastConfig.from_yaml(Path(args.forecast_config))
+        _logger.info("Loaded forecast config from %s", args.forecast_config)
     else:
         forecast_config = ForecastConfig()
         _logger.info("Using default ForecastConfig")
@@ -237,20 +235,16 @@ def main() -> int:
         logging_steps=100,
         eval_strategy="epoch",
         save_strategy="best",
-        seed=parsed_args.seed,
+        seed=args.seed,
     )
 
-    if parsed_args.seed is not None:
-        _logger.info("Setting random seed to %d", parsed_args.seed)
-        set_seed(parsed_args.seed)
+    if args.seed is not None:
+        _logger.info("Setting random seed to %d", args.seed)
+        set_seed(args.seed)
 
-    data_path = Path(parsed_args.data_path)
-    all_domains = TimeMmdDataset.get_domains(data_path)
-    _logger.info("Discovered %d domains in %s: %s", len(all_domains), data_path, all_domains)
-
-    val_domains = ["Climate"]
-    test_domains = ["Energy"]
-    train_domains = [d for d in all_domains if d not in val_domains and d not in test_domains]
+    train_domains = ["Environment_train"]
+    val_domains = ["Environment_val"]
+    test_domains = ["Environment_test"]
 
     device = resolve_device()
     _logger.info("Using device: %s", device)
@@ -267,22 +261,22 @@ def main() -> int:
                 val_domains=val_domains,
                 test_domains=test_domains,
                 device=device,
-                cache_dir=Path(parsed_args.cache_dir),
+                cache_dir=Path(args.cache_dir),
             )
 
-    if parsed_args.sweep_id:
-        sweep_id = parsed_args.sweep_id
+    if args.sweep_id:
+        sweep_id = args.sweep_id
         _logger.info("Joining existing sweep %s", sweep_id)
     else:
-        if not parsed_args.sweep_config:
+        if not args.sweep_config:
             _logger.error("Either --sweep-id or --sweep-config must be provided.")
             return 1
-        sweep_config = load_yaml(Path(parsed_args.sweep_config))
+        sweep_config = load_yaml(Path(args.sweep_config))
         sweep_id = wandb.sweep(sweep=sweep_config, project="baseline-timesfm-time-mmd")
         _logger.info("Created new sweep %s", sweep_id)
 
-    _logger.info("Starting W&B agent (count=%s)", parsed_args.count)
-    wandb.agent(sweep_id, function=_sweep_fn, project="baseline-timesfm-time-mmd", count=parsed_args.count)
+    _logger.info("Starting W&B agent (count=%s)", args.count)
+    wandb.agent(sweep_id, function=_sweep_fn, project="baseline-timesfm-time-mmd", count=args.count)
     _logger.info("Sweep agent finished")
 
     return 0
