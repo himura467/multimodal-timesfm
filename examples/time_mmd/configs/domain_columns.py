@@ -57,7 +57,7 @@ class DomainColumnsConfig:
         """
         for suffix in ("_train", "_val", "_test"):
             if domain.endswith(suffix):
-                domain = domain[: -len(suffix)]
+                domain = domain.removesuffix(suffix)
                 break
         return self.domains.get(domain, self.default)
 
