@@ -282,8 +282,7 @@ def main() -> int:
 
     base_training_args = TrainingArguments(
         output_dir="outputs/sweeps/multimodal",
-        logging_strategy="steps",
-        logging_steps=100,
+        logging_strategy="epoch",
         eval_strategy="epoch",
         save_strategy="best",
         seed=args.seed,
