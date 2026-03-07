@@ -142,7 +142,9 @@ def main() -> int:
     numerical_dir = data_path / "numerical"
     textual_dir = data_path / "textual"
 
-    domains = args.domains or TimeMmdDataset.get_domains(data_path)
+    domains = args.domains or [
+        d for d in TimeMmdDataset.get_domains(data_path) if not any(d.endswith(f"_{s}") for s in _SPLITS)
+    ]
     test_ratio = 1.0 - args.train_ratio - args.val_ratio
     _logger.info("Domains: %s", domains)
     _logger.info("Ratios — train: %s, val: %s, test: %.2f", args.train_ratio, args.val_ratio, test_ratio)
