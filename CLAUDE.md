@@ -13,7 +13,7 @@ This project provides a multimodal extension of Google's [TimesFM](https://githu
 
 ## Data Access
 
-The Time-MMD dataset is cloned into `data/Time-MMD/` via `scripts/setup_time_mmd.sh`. It contains:
+The Time-MMD dataset is cloned into `data/Time-MMD/` via `scripts/clone_time_mmd.sh`. It contains:
 
 - **Numerical data**: `data/Time-MMD/numerical/[domain]/[domain].csv` - Time series data for 10 domains
 - **Textual data**: `data/Time-MMD/textual/[domain]/[domain]_report.csv` and `[domain]_search.csv` - Text descriptions

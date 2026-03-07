@@ -12,10 +12,10 @@ pip install multimodal-timesfm[all]
 
 ### 1. Setup
 
-Clone and setup the Time-MMD dataset:
+Clone the Time-MMD dataset:
 
 ```sh
-./scripts/setup_time_mmd.sh
+./scripts/clone_time_mmd.sh
 ```
 
 ### 2. Pre-compute Text Embeddings
