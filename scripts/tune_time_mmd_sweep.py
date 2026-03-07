@@ -153,7 +153,7 @@ def _train_and_evaluate(
 
     Reads hyperparameters from the active W&B run config, trains the fusion
     head, loads the best checkpoint, evaluates on the test set, and logs
-    val/loss, test/mse, and test/mae.
+    val/best_loss, test/mse, and test/mae.
     The checkpoint directory is removed after evaluation.
 
     Args:
@@ -220,7 +220,7 @@ def _train_and_evaluate(
     best_checkpoint_path = training_args.checkpoint_dir / "best_model.pt"
     _logger.info("Loading best checkpoint from %s", best_checkpoint_path)
     checkpoint = cast(MultimodalCheckpoint, torch.load(best_checkpoint_path, weights_only=True))
-    val_loss = checkpoint["best_val_loss"]
+    best_val_loss = checkpoint["best_val_loss"]
     model.fusion.load_state_dict(checkpoint["fusion_state_dict"])
 
     test_dataloader = cast(
@@ -240,14 +240,14 @@ def _train_and_evaluate(
     test_metrics = evaluator.evaluate(test_dataloader)
 
     _logger.info(
-        "Run %s — val_loss: %.6f, test_mse: %.6f, test_mae: %.6f",
+        "Run %s — best_val_loss: %.6f, test_mse: %.6f, test_mae: %.6f",
         run.id,
-        val_loss,
+        best_val_loss,
         test_metrics["mse"],
         test_metrics["mae"],
     )
     run.log(
-        {"val/loss": val_loss, "test/mse": test_metrics["mse"], "test/mae": test_metrics["mae"]},
+        {"val/best_loss": best_val_loss, "test/mse": test_metrics["mse"], "test/mae": test_metrics["mae"]},
         step=trainer.global_step,
     )
 
@@ -282,8 +282,7 @@ def main() -> int:
 
     base_training_args = TrainingArguments(
         output_dir="outputs/sweeps/multimodal",
-        logging_strategy="steps",
-        logging_steps=100,
+        logging_strategy="epoch",
         eval_strategy="epoch",
         save_strategy="best",
         seed=args.seed,
