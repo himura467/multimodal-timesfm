@@ -5,6 +5,10 @@ RUN apt update -y && \
   export PATH="$HOME/.local/bin:$PATH" && \
   git clone https://github.com/himura467/multimodal-timesfm.git && \
   cd multimodal-timesfm && \
-  uv sync --extra sweep && \
-  ./scripts/setup_time_mmd.sh
+  ./scripts/clone_time_mmd.sh && \
+  uv sync --extra sweep
 WORKDIR /multimodal-timesfm
+ENV PYTHONPATH=/multimodal-timesfm
+RUN uv run scripts/split_time_mmd_datasets.py \
+  --train-ratio 0.8 \
+  --val-ratio 0.1
