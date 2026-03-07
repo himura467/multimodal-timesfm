@@ -30,7 +30,19 @@ class PreprocessPipeline:
         context_len: int,
         horizon_len: int,
     ) -> Path:
-        """Generate a unique file path for the given configuration."""
+        """Generate a unique file path for the given configuration.
+
+        Args:
+            dataset_name: Name of the dataset (e.g. 'time_mmd').
+            entity: Domain or split-domain identifier (e.g. 'Environment_train').
+            text_encoder_type: Text encoder type string.
+            patch_len: Patch length.
+            context_len: Context length.
+            horizon_len: Horizon length.
+
+        Returns:
+            Path to the cache file.
+        """
         parts = [
             dataset_name,
             entity,
