@@ -22,7 +22,7 @@ Split the dataset into train / val / test:
 
 ```sh
 PYTHONPATH=. uv run python scripts/split_time_mmd_datasets.py \
-    --train-ratio 0.8 \
+    --train-ratio 0.7 \
     --val-ratio 0.1
 ```
 
