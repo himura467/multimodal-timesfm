@@ -47,12 +47,18 @@ class DomainColumnsConfig:
     def get_config_for_domain(self, domain: str) -> DomainColumnConfig:
         """Get column configuration for a specific domain.
 
+        Strips any '_train', '_val', or '_test' suffix before lookup.
+
         Args:
-            domain: Domain name (e.g., 'Agriculture').
+            domain: Domain name, optionally with a split suffix (e.g., 'Environment_train').
 
         Returns:
             DomainColumnConfig for the specified domain, or default if not configured.
         """
+        for suffix in ("_train", "_val", "_test"):
+            if domain.endswith(suffix):
+                domain = domain.removesuffix(suffix)
+                break
         return self.domains.get(domain, self.default)
 
     @classmethod
