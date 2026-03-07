@@ -292,9 +292,28 @@ def main() -> int:
         _logger.info("Setting random seed to %d", args.seed)
         set_seed(args.seed)
 
-    train_domains = ["Environment_train"]
-    val_domains = ["Environment_val"]
-    test_domains = ["Environment_test"]
+    # Selected for high-quality textual data (low NA rates) and sufficient numerical data points.
+    train_domains = [
+        "Agriculture_train",
+        "Economy_train",
+        "Environment_train",
+        "Health_US_train",
+        "Traffic_train",
+    ]
+    val_domains = [
+        "Agriculture_val",
+        "Economy_val",
+        "Environment_val",
+        "Health_US_val",
+        "Traffic_val",
+    ]
+    test_domains = [
+        "Agriculture_test",
+        "Economy_test",
+        "Environment_test",
+        "Health_US_test",
+        "Traffic_test",
+    ]
 
     device = resolve_device()
     _logger.info("Using device: %s", device)
