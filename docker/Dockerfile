@@ -5,6 +5,6 @@ RUN apt update -y && \
   export PATH="$HOME/.local/bin:$PATH" && \
   git clone https://github.com/himura467/multimodal-timesfm.git && \
   cd multimodal-timesfm && \
-  uv sync && \
+  uv sync --extra sweep && \
   ./scripts/setup_time_mmd.sh
 WORKDIR /multimodal-timesfm
