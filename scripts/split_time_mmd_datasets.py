@@ -60,8 +60,10 @@ def _split_numerical(
 
     df = pd.read_csv(src)
     date_col = DEFAULT_TIME_MMD_CONFIGS.get_config_for_domain(domain).start_date_col
-    if date_col in df.columns:
-        df = df.sort_values(date_col).reset_index(drop=True)
+    if date_col not in df.columns:
+        _logger.error("Date column %r not found in %s — cannot split chronologically", date_col, src)
+        return
+    df = df.sort_values(date_col).reset_index(drop=True)
 
     n = len(df)
     train_end = int(n * train_ratio)
