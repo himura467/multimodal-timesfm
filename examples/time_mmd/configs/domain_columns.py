@@ -50,7 +50,7 @@ class DomainColumnsConfig:
         Strips any '_train', '_val', or '_test' suffix before lookup.
 
         Args:
-            domain: Domain name, optionally with a split suffix
+            domain: Domain name, optionally with a split suffix (e.g., 'Environment_train').
 
         Returns:
             DomainColumnConfig for the specified domain, or default if not configured.
