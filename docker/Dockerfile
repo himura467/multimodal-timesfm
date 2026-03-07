@@ -9,6 +9,6 @@ RUN git clone https://github.com/himura467/multimodal-timesfm.git && \
   uv sync --extra sweep
 WORKDIR /multimodal-timesfm
 ENV PYTHONPATH=/multimodal-timesfm
-RUN uv run scripts/split_time_mmd_datasets.py \
+RUN uv run python scripts/split_time_mmd_datasets.py \
   --train-ratio 0.8 \
   --val-ratio 0.1
