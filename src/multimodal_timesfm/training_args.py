@@ -1,3 +1,4 @@
+# Adapted from https://github.com/huggingface/transformers/blob/main/src/transformers/training_args.py
 """Training arguments for multimodal time series forecasting."""
 
 from __future__ import annotations
