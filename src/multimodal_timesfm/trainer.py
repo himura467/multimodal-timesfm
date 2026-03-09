@@ -60,7 +60,8 @@ class MultimodalTrainer:
             mode: Training mode — 'multimodal' trains fusion only, 'baseline' fine-tunes adapter.
             device: Device to train on.
             wandb_run: W&B run instance for logging. If None, W&B logging is disabled.
-            optimizers: A tuple containing the optimizer and the scheduler to use.
+            optimizers: A tuple of (optimizer, lr_scheduler). If either element is None,
+                a default is created from args.
         """
         self.model = model
         self.args = args
