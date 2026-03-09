@@ -366,6 +366,7 @@ class MultimodalTrainer:
 
         for epoch in range(self.args.num_train_epochs):
             self.current_epoch = epoch
+            epoch_lr = self.optimizer.param_groups[0]["lr"]
 
             train_loss = self.train_epoch()
             val_loss = self.validate_epoch()
@@ -376,7 +377,7 @@ class MultimodalTrainer:
                     self._wandb_run.log(
                         {
                             "train/loss": train_loss,
-                            "train/lr": self.optimizer.param_groups[0]["lr"],
+                            "train/lr": epoch_lr,
                             "val/loss": val_loss,
                         },
                         step=self.global_step,
