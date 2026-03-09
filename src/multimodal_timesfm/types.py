@@ -45,6 +45,7 @@ class CheckpointBase(TypedDict):
     epoch: int
     global_step: int
     optimizer_state_dict: dict[str, Any]
+    scheduler_state_dict: dict[str, Any]
     best_val_loss: float
 
 

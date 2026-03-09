@@ -177,6 +177,8 @@ def _train_and_evaluate(
         per_device_train_batch_size=config.batch_size,
         num_train_epochs=config.num_epochs,
         learning_rate=config.learning_rate,
+        lr_scheduler_type=config.lr_scheduler_type,
+        warmup_steps=config.warmup_steps,
         weight_decay=config.weight_decay,
         gradient_accumulation_steps=config.gradient_accumulation_steps,
     )

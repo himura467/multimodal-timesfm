@@ -19,6 +19,14 @@ parameters:
     min: 1e-6
     max: 1e-4
 
+  lr_scheduler_type:
+    values: ["linear", "cosine"]
+
+  warmup_steps:
+    distribution: uniform
+    min: 0.0
+    max: 0.1
+
   weight_decay:
     distribution: log_uniform_values
     min: 1e-4

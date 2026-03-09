@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterator
 from typing import TYPE_CHECKING, cast
 
 import torch
 from torch import nn
-from torch.optim import AdamW
+from torch.optim import AdamW, Optimizer
+from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data import ConcatDataset, DataLoader
 
 from multimodal_timesfm.data.collate import baseline_collate_fn, multimodal_collate_fn
 from multimodal_timesfm.decoder import MultimodalDecoder
+from multimodal_timesfm.optimization import get_cosine_schedule_with_warmup, get_linear_schedule_with_warmup
 from multimodal_timesfm.training_args import TrainingArguments
 from multimodal_timesfm.types import (
     BaselineCheckpoint,
@@ -45,6 +48,7 @@ class MultimodalTrainer:
         mode: TrainingMode,
         device: torch.device,
         wandb_run: wandb.Run | None,
+        optimizers: tuple[Optimizer | None, LRScheduler | None] = (None, None),
     ) -> None:
         """Initialize MultimodalTrainer.
 
@@ -56,6 +60,8 @@ class MultimodalTrainer:
             mode: Training mode — 'multimodal' trains fusion only, 'baseline' fine-tunes adapter.
             device: Device to train on.
             wandb_run: W&B run instance for logging. If None, W&B logging is disabled.
+            optimizers: A tuple of (optimizer, lr_scheduler). If either element is None,
+                a default is created from args.
         """
         self.model = model
         self.args = args
@@ -96,12 +102,14 @@ class MultimodalTrainer:
             ),
         )
 
-        self.optimizer = AdamW(
-            self._get_trainable_params(),
-            lr=args.learning_rate,
-            weight_decay=args.weight_decay,
-        )
         self.loss_fn = nn.MSELoss()
+
+        optimizer, lr_scheduler = optimizers
+        num_training_steps = args.num_train_epochs * math.ceil(
+            len(self.train_loader) / args.gradient_accumulation_steps
+        )
+        self.optimizer = self._resolve_optimizer(optimizer)
+        self.lr_scheduler = self._resolve_scheduler(lr_scheduler, num_training_steps)
 
         # Training state
         self.current_epoch = 0
@@ -113,6 +121,66 @@ class MultimodalTrainer:
         if self.mode == "multimodal":
             return self.model.fusion.parameters()
         return (p for p in self.model.adapter.parameters() if p.requires_grad)
+
+    def _create_optimizer(self) -> Optimizer:
+        """Create the optimizer.
+
+        Returns:
+            The optimizer instance.
+        """
+        return AdamW(
+            self._get_trainable_params(),
+            lr=self.args.learning_rate,
+            weight_decay=self.args.weight_decay,
+        )
+
+    def _create_scheduler(
+        self,
+        num_training_steps: int,
+    ) -> LRScheduler:
+        """Create the scheduler.
+
+        Args:
+            num_training_steps: The number of training steps to do.
+
+        Returns:
+            The learning rate scheduler instance.
+        """
+        num_warmup_steps = self.args.get_warmup_steps(num_training_steps)
+        match self.args.lr_scheduler_type:
+            case "linear":
+                return get_linear_schedule_with_warmup(self.optimizer, num_warmup_steps, num_training_steps)
+            case "cosine":
+                return get_cosine_schedule_with_warmup(self.optimizer, num_warmup_steps, num_training_steps)
+            case _:
+                raise NotImplementedError(f"Unsupported lr_scheduler_type: {self.args.lr_scheduler_type!r}")
+
+    def _resolve_optimizer(self, optimizer: Optimizer | None) -> Optimizer:
+        """Return the provided optimizer or create one if None.
+
+        Args:
+            optimizer: An externally provided optimizer, or None to create a default one.
+
+        Returns:
+            The optimizer instance.
+        """
+        if optimizer is not None:
+            return optimizer
+        return self._create_optimizer()
+
+    def _resolve_scheduler(self, lr_scheduler: LRScheduler | None, num_training_steps: int) -> LRScheduler:
+        """Return the provided scheduler or create one if None.
+
+        Args:
+            lr_scheduler: An externally provided scheduler, or None to create a default one.
+            num_training_steps: The total number of training steps.
+
+        Returns:
+            The learning rate scheduler instance.
+        """
+        if lr_scheduler is not None:
+            return lr_scheduler
+        return self._create_scheduler(num_training_steps)
 
     def train_epoch(self) -> float:
         """Train one epoch.
@@ -142,11 +210,12 @@ class MultimodalTrainer:
             loss.backward()
             scaled_loss = loss.item() * self.args.gradient_accumulation_steps
 
-            if (i + 1) % self.args.gradient_accumulation_steps == 0:
+            if (i + 1) % self.args.gradient_accumulation_steps == 0 or (i + 1) == num_batches:
                 if self.args.max_grad_norm > 0:
                     nn.utils.clip_grad_norm_(self._get_trainable_params(), self.args.max_grad_norm)
                 self.optimizer.step()
                 self.optimizer.zero_grad()
+                self.lr_scheduler.step()
                 self.global_step += 1
 
                 if (
@@ -157,6 +226,7 @@ class MultimodalTrainer:
                     self._wandb_run.log(
                         {
                             "train/loss": scaled_loss,
+                            "train/lr": self.optimizer.param_groups[0]["lr"],
                         },
                         step=self.global_step,
                     )
@@ -219,6 +289,7 @@ class MultimodalTrainer:
                 epoch=self.current_epoch,
                 global_step=self.global_step,
                 optimizer_state_dict=self.optimizer.state_dict(),
+                scheduler_state_dict=self.lr_scheduler.state_dict(),
                 best_val_loss=self.best_val_loss,
                 fusion_state_dict=self.model.fusion.state_dict(),
             )
@@ -226,6 +297,7 @@ class MultimodalTrainer:
             epoch=self.current_epoch,
             global_step=self.global_step,
             optimizer_state_dict=self.optimizer.state_dict(),
+            scheduler_state_dict=self.lr_scheduler.state_dict(),
             best_val_loss=self.best_val_loss,
             adapter_state_dict=self.model.adapter.state_dict(),
         )
@@ -281,12 +353,8 @@ class MultimodalTrainer:
             torch.save(checkpoint, best_path)
             _logger.info("Saved best model checkpoint at epoch %d", self.current_epoch)
 
-    def train(self, scheduler: torch.optim.lr_scheduler.LRScheduler | None = None) -> None:
-        """Main training loop.
-
-        Args:
-            scheduler: Learning rate scheduler.
-        """
+    def train(self) -> None:
+        """Main training loop."""
         if self.args.eval_strategy != "epoch":
             raise NotImplementedError(
                 f"eval_strategy={self.args.eval_strategy!r} is not supported; only 'epoch' is implemented."
@@ -299,6 +367,7 @@ class MultimodalTrainer:
 
         for epoch in range(self.args.num_train_epochs):
             self.current_epoch = epoch
+            epoch_lr = self.optimizer.param_groups[0]["lr"]
 
             train_loss = self.train_epoch()
             val_loss = self.validate_epoch()
@@ -307,14 +376,15 @@ class MultimodalTrainer:
             if self._wandb_run is not None:
                 if self.args.logging_strategy == "epoch":
                     self._wandb_run.log(
-                        {"train/loss": train_loss, "val/loss": val_loss},
+                        {
+                            "train/loss": train_loss,
+                            "train/lr": epoch_lr,
+                            "val/loss": val_loss,
+                        },
                         step=self.global_step,
                     )
                 else:
                     self._wandb_run.log({"val/loss": val_loss}, step=self.global_step)
-
-            if scheduler is not None:
-                scheduler.step()
 
             if self.args.save_strategy in ("epoch", "best"):
                 self.save_checkpoint(val_loss)
