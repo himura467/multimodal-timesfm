@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -18,8 +19,18 @@ class TrainingArguments:
     per_device_train_batch_size: int = field(default=8, metadata={"help": "The batch size per device for training."})
     num_train_epochs: int = field(default=10, metadata={"help": "Total number of training epochs to perform."})
 
-    # --- Learning Rate ---
+    # --- Learning Rate & Scheduler ---
     learning_rate: float = field(default=1e-4, metadata={"help": "The initial learning rate for the optimizer."})
+    lr_scheduler_type: Literal["linear", "cosine"] = field(
+        default="linear",
+        metadata={"help": "The learning rate scheduler type to use."},
+    )
+    warmup_steps: float = field(
+        default=0.0,
+        metadata={
+            "help": "Number of steps for a linear warmup from 0 to `learning_rate`. Can be an integer (exact steps) or a float in [0, 1) (ratio of total steps)."
+        },
+    )
 
     # --- Optimizer ---
     weight_decay: float = field(default=0.0, metadata={"help": "Weight decay coefficient applied by the optimizer."})
@@ -95,3 +106,14 @@ class TrainingArguments:
     def from_yaml(cls, yaml_path: Path | str) -> TrainingArguments:
         """Load from YAML file."""
         return parse_yaml(Path(yaml_path), cls)
+
+    def get_warmup_steps(self, num_training_steps: int) -> int:
+        """Retrieve the number of steps used for linear warmup.
+
+        Args:
+            num_training_steps: Total number of optimizer steps across all epochs.
+
+        Returns:
+            Number of warmup steps.
+        """
+        return int(self.warmup_steps) if self.warmup_steps >= 1 else math.ceil(num_training_steps * self.warmup_steps)
