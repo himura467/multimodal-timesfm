@@ -29,6 +29,7 @@ class PreprocessPipeline:
         patch_len: int,
         context_len: int,
         horizon_len: int,
+        augment: bool = False,
     ) -> Path:
         """Generate a unique file path for the given configuration.
 
@@ -39,6 +40,7 @@ class PreprocessPipeline:
             patch_len: Patch length.
             context_len: Context length.
             horizon_len: Horizon length.
+            augment: Whether patch-boundary shift augmentation was applied.
 
         Returns:
             Path to the cache file.
@@ -51,6 +53,8 @@ class PreprocessPipeline:
             f"c{context_len}",
             f"h{horizon_len}",
         ]
+        if augment:
+            parts.append("aug")
         return self.cache_dir / ("_".join(parts) + ".pkl")
 
     def load(self, path: Path) -> list[PreprocessedSample]:
