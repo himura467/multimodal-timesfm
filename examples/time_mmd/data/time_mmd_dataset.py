@@ -36,6 +36,7 @@ class TimeMmdDataset(MultimodalDatasetBase):
         context_len: int = 32,
         horizon_len: int = 32,
         column_config: DomainColumnConfig | None = None,
+        augment: bool = False,
     ) -> None:
         """Initializes Time-MMD dataset loader.
 
@@ -49,6 +50,8 @@ class TimeMmdDataset(MultimodalDatasetBase):
                 horizon_len must be an integer multiple of patch_len.
             column_config: Optional column configuration for this domain.
                 If None, uses the default configuration from DEFAULT_TIME_MMD_CONFIGS.
+            augment: If True, generate one sample set per shift in range(patch_len),
+                increasing dataset size by up to patch_len times.
         """
         self.data_dir = Path(data_dir)
         self.domain = domain
@@ -56,6 +59,7 @@ class TimeMmdDataset(MultimodalDatasetBase):
         self.context_len = context_len
         self.horizon_len = horizon_len
         self.column_config = column_config or DEFAULT_TIME_MMD_CONFIGS.get_config_for_domain(domain)
+        self.augment = augment
         self.data: list[RawSample] = []
 
         self._validate()
@@ -307,38 +311,44 @@ class TimeMmdDataset(MultimodalDatasetBase):
             if len(ts_data) < self.context_len + self.horizon_len:
                 continue
 
-            # Create windowed samples from this time series
-            for start_index in range(0, len(ts_data) - self.context_len - self.horizon_len + 1, self.horizon_len):
-                context_end = start_index + self.context_len
-                context = ts_data[start_index:context_end]
+            # Augmentation generates patch_len variants by shifting the sliding-window start position by 0..patch_len-1 steps.
+            shifts = range(self.patch_len) if self.augment else range(1)
 
-                horizon_end = context_end + self.horizon_len
-                horizon = ts_data[context_end:horizon_end]
+            text_patches_num = self.context_len // self.patch_len
+            for shift in shifts:
+                for start_index in range(
+                    shift, len(ts_data) - self.context_len - self.horizon_len + 1, self.horizon_len
+                ):
+                    context_end = start_index + self.context_len
+                    context = ts_data[start_index:context_end]
 
-                context_normalized, horizon_normalized, context_mean, context_std = self._normalize_sample(
-                    context, horizon
-                )
+                    horizon_end = context_end + self.horizon_len
+                    horizon = ts_data[context_end:horizon_end]
 
-                window_start_date = str(start_dates.iloc[start_index])
-                window_end_date = str(end_dates.iloc[context_end - 1])
-                text_patches_num = self.context_len // self.patch_len
-                patched_texts = self._get_patched_texts_for_period(
-                    window_start_date, window_end_date, textual_data, text_patches_num
-                )
+                    context_normalized, horizon_normalized, context_mean, context_std = self._normalize_sample(
+                        context, horizon
+                    )
 
-                sample = RawSample(
-                    context=context_normalized.astype(np.float32),
-                    horizon=horizon_normalized.astype(np.float32),
-                    patched_texts=patched_texts,
-                    metadata={
-                        "domain": self.domain,
-                        "column": column,
-                        "start_index": start_index,
-                        "mean": context_mean,
-                        "std": context_std,
-                    },
-                )
-                self.data.append(sample)
+                    window_start_date = str(start_dates.iloc[start_index])
+                    window_end_date = str(end_dates.iloc[context_end - 1])
+                    patched_texts = self._get_patched_texts_for_period(
+                        window_start_date, window_end_date, textual_data, text_patches_num
+                    )
+
+                    sample = RawSample(
+                        context=context_normalized.astype(np.float32),
+                        horizon=horizon_normalized.astype(np.float32),
+                        patched_texts=patched_texts,
+                        metadata={
+                            "domain": self.domain,
+                            "column": column,
+                            "shift": shift,
+                            "start_index": start_index,
+                            "mean": context_mean,
+                            "std": context_std,
+                        },
+                    )
+                    self.data.append(sample)
 
     def _load_data(self) -> None:
         """Loads Time-MMD dataset from files."""
