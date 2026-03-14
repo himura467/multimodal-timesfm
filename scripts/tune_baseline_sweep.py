@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 
 from examples.time_mmd.configs.forecast import ForecastConfig
 from examples.time_mmd.configs.model import ModelConfig
-from examples.time_mmd.cross_validation import load_fold_datasets
+from examples.time_mmd.cross_validation import DomainSpec, load_fold_datasets
 from multimodal_timesfm.data.collate import baseline_collate_fn
 from multimodal_timesfm.decoder import MultimodalDecoder, MultimodalDecoderConfig
 from multimodal_timesfm.evaluator import MultimodalEvaluator
@@ -46,6 +46,13 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--count", type=int, help="Number of sweep runs for the agent to execute.")
     parser.add_argument("--model-config", type=str, help="Path to a model config YAML file.")
     parser.add_argument("--forecast-config", type=str, help="Path to a forecast config YAML file.")
+    parser.add_argument(
+        "--augment",
+        nargs="*",
+        choices=["train", "val", "test"],
+        default=["train"],
+        help="Splits to load from augmented cache.",
+    )
     parser.add_argument(
         "--cache-dir", type=str, default="data/cache", help="Directory with pre-computed cached datasets."
     )
@@ -99,9 +106,9 @@ def _train_and_evaluate(
     base_training_args: TrainingArguments,
     model_config: ModelConfig,
     forecast_config: ForecastConfig,
-    train_domains: list[str],
-    val_domains: list[str],
-    test_domains: list[str],
+    train_domain_specs: list[DomainSpec],
+    val_domain_specs: list[DomainSpec],
+    test_domain_specs: list[DomainSpec],
     device: torch.device,
     cache_dir: Path,
 ) -> None:
@@ -117,9 +124,9 @@ def _train_and_evaluate(
         base_training_args: Base training arguments partially overridden by sweep config.
         model_config: Static model architecture configuration.
         forecast_config: Forecasting parameters (context / horizon lengths).
-        train_domains: Domain names used for training.
-        val_domains: Domain names used for validation.
-        test_domains: Domain names used for test evaluation.
+        train_domain_specs: Domain specs used for training.
+        val_domain_specs: Domain specs used for validation.
+        test_domain_specs: Domain specs used for test evaluation.
         device: Device to train and evaluate on.
         cache_dir: Directory containing pre-computed cached datasets.
     """
@@ -139,14 +146,14 @@ def _train_and_evaluate(
 
     _logger.info(
         "Loading datasets — train: %s, val: %s, test: %s",
-        train_domains,
-        val_domains,
-        test_domains,
+        train_domain_specs,
+        val_domain_specs,
+        test_domain_specs,
     )
     train_dataset, val_dataset, test_dataset = load_fold_datasets(
-        train_domains=train_domains,
-        val_domains=val_domains,
-        test_domains=test_domains,
+        train_domain_specs=train_domain_specs,
+        val_domain_specs=val_domain_specs,
+        test_domain_specs=test_domain_specs,
         text_encoder_type=model_config.fusion.text_encoder_type,
         patch_len=model_config.adapter.patch_len,
         context_len=forecast_config.context_len,
@@ -186,7 +193,7 @@ def _train_and_evaluate(
         ),
     )
 
-    _logger.info("Evaluating on test domains: %s", test_domains)
+    _logger.info("Evaluating on test domains: %s", test_domain_specs)
     evaluator = MultimodalEvaluator(model, device)
     test_metrics = evaluator.evaluate(test_dataloader)
 
@@ -244,27 +251,19 @@ def main() -> int:
         set_seed(args.seed)
 
     # Selected for high-quality textual data (low NA rates) and sufficient numerical data points.
-    train_domains = [
+    augment_splits = set(args.augment)
+    _train_domain_names = [
         "Agriculture_train",
         "Economy_train",
         "Environment_train",
         "Health_US_train",
         "Traffic_train",
     ]
-    val_domains = [
-        "Agriculture_val",
-        "Economy_val",
-        "Environment_val",
-        "Health_US_val",
-        "Traffic_val",
-    ]
-    test_domains = [
-        "Agriculture_test",
-        "Economy_test",
-        "Environment_test",
-        "Health_US_test",
-        "Traffic_test",
-    ]
+    train_domain_specs = [DomainSpec(name=d, augment="train" in augment_splits) for d in _train_domain_names]
+    _val_domain_names = ["Agriculture_val", "Economy_val", "Environment_val", "Health_US_val", "Traffic_val"]
+    val_domain_specs = [DomainSpec(name=d, augment="val" in augment_splits) for d in _val_domain_names]
+    _test_domain_names = ["Agriculture_test", "Economy_test", "Environment_test", "Health_US_test", "Traffic_test"]
+    test_domain_specs = [DomainSpec(name=d, augment="test" in augment_splits) for d in _test_domain_names]
 
     device = resolve_device()
     _logger.info("Using device: %s", device)
@@ -277,9 +276,9 @@ def main() -> int:
                 base_training_args=base_training_args,
                 model_config=model_config,
                 forecast_config=forecast_config,
-                train_domains=train_domains,
-                val_domains=val_domains,
-                test_domains=test_domains,
+                train_domain_specs=train_domain_specs,
+                val_domain_specs=val_domain_specs,
+                test_domain_specs=test_domain_specs,
                 device=device,
                 cache_dir=Path(args.cache_dir),
             )

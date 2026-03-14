@@ -52,6 +52,7 @@ def _parse_args() -> argparse.Namespace:
         nargs="+",
         help="Subset of domains to cache. Defaults to all available domains.",
     )
+    parser.add_argument("--augment", action="store_true", help="Apply patch-boundary shift augmentation.")
     parser.add_argument("--cache-dir", type=str, default="data/cache", help="Directory to write cached datasets.")
     parser.add_argument("--force-rebuild", action="store_true", help="Overwrite existing cache files.")
     parser.add_argument("--seed", type=int, help="Random seed for reproducibility.")
@@ -138,6 +139,7 @@ def main() -> int:
             patch_len=model_config.adapter.patch_len,
             context_len=forecast_config.context_len,
             horizon_len=forecast_config.horizon_len,
+            augment=args.augment,
         )
 
         def _dataset_factory() -> TimeMmdDataset:
@@ -147,6 +149,7 @@ def main() -> int:
                 patch_len=model_config.adapter.patch_len,
                 context_len=forecast_config.context_len,
                 horizon_len=forecast_config.horizon_len,
+                augment=args.augment,
             )
 
         pipeline.prepare(
