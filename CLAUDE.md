@@ -1,8 +1,8 @@
-# Multimodal TimesFM
+# Mutex
 
 ## Overview
 
-This project provides a multimodal extension of Google's [TimesFM](https://github.com/google-research/timesfm) to support time series forecasting with text inputs. It consists of a core Python package and example implementations using the [Time-MMD](https://github.com/AdityaLab/Time-MMD) dataset.
+This project provides a unified framework for multimodal time series foundation models (TSFMs), enabling diverse input modalities such as text. It consists of a core Python package (`mutex`) and example implementations using the [Time-MMD](https://github.com/AdityaLab/Time-MMD) dataset.
 
 ## Bash Commands
 
