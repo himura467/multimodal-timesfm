@@ -1,17 +1,11 @@
-# Multimodal TimesFM
+# Mutex
 
-> [!IMPORTANT]
-> This repository is being renamed to **Mutex**. We encourage all users to migrate to the new repository.
->
-> - New repository: [himura467/mutex](https://github.com/himura467/mutex)
-> - New package: `pip install mutex`
-
-A multimodal extension of Google's [TimesFM](https://github.com/google-research/timesfm) for time series forecasting with text inputs.
+**MUTEX** (**M**UTEX **U**nifies **T**SFMs **E**nabling **X**-modalities) is a unified framework for multimodal time series foundation models. It brings together multiple TSFMs (including [TimesFM](https://github.com/google-research/timesfm) and [Chronos](https://github.com/amazon-science/chronos-forecasting)) and extends them to support diverse input modalities such as text.
 
 ## Installation
 
 ```sh
-pip install multimodal-timesfm[all]
+pip install mutex[all]
 ```
 
 ## Quick Start
