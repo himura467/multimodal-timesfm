@@ -1,5 +1,5 @@
 [project]
-name = "multimodal-timesfm"
+name = "mutex"
 version = "0.6.0"
 dependencies = [
     "chronos-forecasting>=2.2.2",
