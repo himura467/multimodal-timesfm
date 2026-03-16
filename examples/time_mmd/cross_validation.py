@@ -6,9 +6,9 @@ from typing import Literal
 
 from torch.utils.data import ConcatDataset, Dataset
 
-from multimodal_timesfm.data.dataset import PreprocessedDataset
-from multimodal_timesfm.data.preprocess import PreprocessPipeline
-from multimodal_timesfm.types import PreprocessedSample
+from mutex.data.dataset import PreprocessedDataset
+from mutex.data.preprocess import PreprocessPipeline
+from mutex.types import PreprocessedSample
 
 
 @dataclass

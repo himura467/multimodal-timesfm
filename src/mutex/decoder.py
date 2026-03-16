@@ -5,8 +5,8 @@ from dataclasses import dataclass, field
 import torch
 from torch import nn
 
-from multimodal_timesfm.fusion import MultimodalFusion
-from multimodal_timesfm.tsfm.base import TsfmAdapter
+from mutex.fusion import MultimodalFusion
+from mutex.tsfm.base import TsfmAdapter
 
 
 @dataclass

@@ -14,19 +14,19 @@ from torch.utils.data import DataLoader
 from examples.time_mmd.configs.forecast import ForecastConfig
 from examples.time_mmd.configs.model import ModelConfig
 from examples.time_mmd.cross_validation import DomainSpec, load_fold_datasets
-from multimodal_timesfm.data.collate import baseline_collate_fn
-from multimodal_timesfm.decoder import MultimodalDecoder, MultimodalDecoderConfig
-from multimodal_timesfm.evaluator import MultimodalEvaluator
-from multimodal_timesfm.trainer import MultimodalTrainer
-from multimodal_timesfm.training_args import TrainingArguments
-from multimodal_timesfm.tsfm.base import TsfmAdapter
-from multimodal_timesfm.tsfm.chronos import Chronos2Adapter
-from multimodal_timesfm.tsfm.timesfm import TimesFM2p5Adapter
-from multimodal_timesfm.types import BaselineCheckpoint, Batch
-from multimodal_timesfm.utils.device import pin_memory, resolve_device
-from multimodal_timesfm.utils.logging import setup_logger
-from multimodal_timesfm.utils.seed import set_seed
-from multimodal_timesfm.utils.yaml import load_yaml
+from mutex.data.collate import baseline_collate_fn
+from mutex.decoder import MultimodalDecoder, MultimodalDecoderConfig
+from mutex.evaluator import MultimodalEvaluator
+from mutex.trainer import MultimodalTrainer
+from mutex.training_args import TrainingArguments
+from mutex.tsfm.base import TsfmAdapter
+from mutex.tsfm.chronos import Chronos2Adapter
+from mutex.tsfm.timesfm import TimesFM2p5Adapter
+from mutex.types import BaselineCheckpoint, Batch
+from mutex.utils.device import pin_memory, resolve_device
+from mutex.utils.logging import setup_logger
+from mutex.utils.seed import set_seed
+from mutex.utils.yaml import load_yaml
 
 _logger = setup_logger()
 

@@ -6,8 +6,8 @@ import numpy as np
 import pandas as pd
 
 from examples.time_mmd.configs.domain_columns import DEFAULT_TIME_MMD_CONFIGS, DomainColumnConfig
-from multimodal_timesfm.data.dataset import MultimodalDatasetBase
-from multimodal_timesfm.types import RawSample
+from mutex.data.dataset import MultimodalDatasetBase
+from mutex.types import RawSample
 
 
 class TimeMmdDataset(MultimodalDatasetBase):

@@ -6,10 +6,10 @@ from typing import Callable
 
 import torch
 
-from multimodal_timesfm.data.dataset import MultimodalDatasetBase
-from multimodal_timesfm.text_encoder.base import TextEncoderBase
-from multimodal_timesfm.types import PreprocessedSample
-from multimodal_timesfm.utils.logging import get_logger
+from mutex.data.dataset import MultimodalDatasetBase
+from mutex.text_encoder.base import TextEncoderBase
+from mutex.types import PreprocessedSample
+from mutex.utils.logging import get_logger
 
 _logger = get_logger()
 

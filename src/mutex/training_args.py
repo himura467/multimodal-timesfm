@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
-from multimodal_timesfm.utils.yaml import parse_yaml
+from mutex.utils.yaml import parse_yaml
 
 
 @dataclass(frozen=True)

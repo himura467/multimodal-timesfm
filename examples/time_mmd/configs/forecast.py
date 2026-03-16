@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from multimodal_timesfm.utils.yaml import parse_yaml
+from mutex.utils.yaml import parse_yaml
 
 
 @dataclass

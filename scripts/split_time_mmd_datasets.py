@@ -10,7 +10,7 @@ import pandas as pd
 
 from examples.time_mmd.configs.domain_columns import DEFAULT_TIME_MMD_CONFIGS
 from examples.time_mmd.data.time_mmd_dataset import TimeMmdDataset
-from multimodal_timesfm.utils.logging import setup_logger
+from mutex.utils.logging import setup_logger
 
 _logger = setup_logger()
 

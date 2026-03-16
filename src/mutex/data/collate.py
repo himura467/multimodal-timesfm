@@ -3,7 +3,7 @@
 import numpy as np
 import torch
 
-from multimodal_timesfm.types import Batch, PreprocessedSample
+from mutex.types import Batch, PreprocessedSample
 
 
 def _build_batch(batch: list[PreprocessedSample]) -> Batch:
