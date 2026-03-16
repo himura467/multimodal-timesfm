@@ -15,6 +15,7 @@ description = "Mutex: unified framework for multimodal time series foundation mo
 readme = "README.md"
 license = { file = "LICENSE" }
 classifiers = [
+    "Development Status :: 5 - Production/Stable",
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
