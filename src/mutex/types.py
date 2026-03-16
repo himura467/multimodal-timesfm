@@ -1,4 +1,4 @@
-"""Shared types for the multimodal_timesfm package."""
+"""Shared types for the mutex package."""
 
 from __future__ import annotations
 

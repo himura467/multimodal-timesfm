@@ -440,12 +440,14 @@ wheels = [
 ]
 
 [[package]]
-name = "multimodal-timesfm"
-version = "0.6.0"
+name = "mutex"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "chronos-forecasting" },
+    { name = "numpy" },
     { name = "pandas" },
+    { name = "pyyaml" },
     { name = "sentence-transformers" },
     { name = "sentencepiece" },
     { name = "timesfm", extra = ["torch"] },
@@ -475,7 +477,9 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "chronos-forecasting", specifier = ">=2.2.2" },
+    { name = "numpy", specifier = ">=2.4.2" },
     { name = "pandas", specifier = ">=2.3.1" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "sentence-transformers", specifier = ">=5.1.0" },
     { name = "sentencepiece", specifier = ">=0.2.1" },
     { name = "timesfm", extras = ["torch"], git = "https://github.com/google-research/timesfm" },

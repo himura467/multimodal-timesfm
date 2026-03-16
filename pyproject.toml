@@ -1,9 +1,11 @@
 [project]
-name = "multimodal-timesfm"
-version = "0.6.0"
+name = "mutex"
+version = "1.0.0"
 dependencies = [
     "chronos-forecasting>=2.2.2",
+    "numpy>=2.4.2",
     "pandas>=2.3.1",
+    "pyyaml>=6.0.3",
     "sentence-transformers>=5.1.0",
     "sentencepiece>=0.2.1",
     "timesfm[torch]",
@@ -11,21 +13,21 @@ dependencies = [
 ]
 requires-python = ">=3.11"
 authors = [{name = "Akito Shitara", email = "akitoshitara@gmail.com"}]
-description = "Multimodal extension of Google's TimesFM for time series forecasting with text"
+description = "Mutex: unified framework for multimodal time series foundation models supporting diverse modalities"
 readme = "README.md"
 license = { file = "LICENSE" }
 classifiers = [
+    "Development Status :: 5 - Production/Stable",
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
-    "Development Status :: 7 - Inactive",
 ]
 
 [project.urls]
-Homepage = "https://github.com/himura467/multimodal-timesfm"
-Documentation = "https://github.com/himura467/multimodal-timesfm"
-Repository = "https://github.com/himura467/multimodal-timesfm"
-"Bug Tracker" = "https://github.com/himura467/multimodal-timesfm/issues"
+Homepage = "https://github.com/himura467/mutex"
+Documentation = "https://github.com/himura467/mutex"
+Repository = "https://github.com/himura467/mutex"
+"Bug Tracker" = "https://github.com/himura467/mutex/issues"
 
 [project.optional-dependencies]
 sweep = [
@@ -51,13 +53,13 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.sdist]
 include = [
-    "src/multimodal_timesfm",
+    "src/mutex",
     "LICENSE",
     "README.md",
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/multimodal_timesfm"]
+packages = ["src/mutex"]
 
 [tool.uv]
 package = true

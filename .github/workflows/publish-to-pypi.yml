@@ -11,7 +11,7 @@ jobs:
     timeout-minutes: 10
     environment:
       name: pypi
-      url: https://pypi.org/p/multimodal-timesfm
+      url: https://pypi.org/p/mutex
     permissions:
       id-token: write # IMPORTANT: mandatory for trusted publishing
     steps:

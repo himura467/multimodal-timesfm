@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from torch import nn
 
-from multimodal_timesfm.utils.device import resolve_device
+from mutex.utils.device import resolve_device
 
 
 class TextEncoderBase(nn.Module, ABC):

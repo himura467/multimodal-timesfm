@@ -14,19 +14,19 @@ from torch.utils.data import DataLoader
 from examples.time_mmd.configs.forecast import ForecastConfig
 from examples.time_mmd.configs.model import ModelConfig
 from examples.time_mmd.cross_validation import DomainSpec, load_fold_datasets
-from multimodal_timesfm.data.collate import multimodal_collate_fn
-from multimodal_timesfm.decoder import MultimodalDecoder, MultimodalDecoderConfig
-from multimodal_timesfm.evaluator import MultimodalEvaluator
-from multimodal_timesfm.trainer import MultimodalTrainer
-from multimodal_timesfm.training_args import TrainingArguments
-from multimodal_timesfm.tsfm.base import TsfmAdapter
-from multimodal_timesfm.tsfm.chronos import Chronos2Adapter
-from multimodal_timesfm.tsfm.timesfm import TimesFM2p5Adapter
-from multimodal_timesfm.types import Batch, MultimodalCheckpoint
-from multimodal_timesfm.utils.device import pin_memory, resolve_device
-from multimodal_timesfm.utils.logging import setup_logger
-from multimodal_timesfm.utils.seed import set_seed
-from multimodal_timesfm.utils.yaml import load_yaml
+from mutex.data.collate import multimodal_collate_fn
+from mutex.decoder import MultimodalDecoder, MultimodalDecoderConfig
+from mutex.evaluator import MultimodalEvaluator
+from mutex.trainer import MultimodalTrainer
+from mutex.training_args import TrainingArguments
+from mutex.tsfm.base import TsfmAdapter
+from mutex.tsfm.chronos import Chronos2Adapter
+from mutex.tsfm.timesfm import TimesFM2p5Adapter
+from mutex.types import Batch, MultimodalCheckpoint
+from mutex.utils.device import pin_memory, resolve_device
+from mutex.utils.logging import setup_logger
+from mutex.utils.seed import set_seed
+from mutex.utils.yaml import load_yaml
 
 _logger = setup_logger()
 
@@ -321,7 +321,7 @@ def main() -> int:
 
     def _sweep_fn() -> None:
         """Execute a single sweep trial inside a W&B run context."""
-        with wandb.init(project="multimodal-timesfm-time-mmd") as run:
+        with wandb.init(project="mutex-time-mmd") as run:
             _train_and_evaluate(
                 run=run,
                 base_training_args=base_training_args,
@@ -342,11 +342,11 @@ def main() -> int:
             _logger.error("Either --sweep-id or --sweep-config must be provided.")
             return 1
         sweep_config = load_yaml(Path(args.sweep_config))
-        sweep_id = wandb.sweep(sweep=sweep_config, project="multimodal-timesfm-time-mmd")
+        sweep_id = wandb.sweep(sweep=sweep_config, project="mutex-time-mmd")
         _logger.info("Created new sweep %s", sweep_id)
 
     _logger.info("Starting W&B agent (count=%s)", args.count)
-    wandb.agent(sweep_id, function=_sweep_fn, project="multimodal-timesfm-time-mmd", count=args.count)
+    wandb.agent(sweep_id, function=_sweep_fn, project="mutex-time-mmd", count=args.count)
     _logger.info("Sweep agent finished")
 
     return 0

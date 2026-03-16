@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from sentence_transformers import SentenceTransformer
 
-from multimodal_timesfm.text_encoder.base import TextEncoderBase
+from mutex.text_encoder.base import TextEncoderBase
 
 
 class EnglishTextEncoder(TextEncoderBase):
