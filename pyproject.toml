@@ -11,7 +11,7 @@ dependencies = [
 ]
 requires-python = ">=3.11"
 authors = [{name = "Akito Shitara", email = "akitoshitara@gmail.com"}]
-description = "Multimodal extension of Google's TimesFM for time series forecasting with text"
+description = "Mutex: unified framework for multimodal time series foundation models supporting diverse modalities"
 readme = "README.md"
 license = { file = "LICENSE" }
 classifiers = [
