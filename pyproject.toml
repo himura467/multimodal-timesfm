@@ -1,6 +1,6 @@
 [project]
 name = "mutex"
-version = "0.6.0"
+version = "1.0.0"
 dependencies = [
     "chronos-forecasting>=2.2.2",
     "pandas>=2.3.1",
