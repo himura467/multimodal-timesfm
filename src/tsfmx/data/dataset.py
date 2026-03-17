@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 
 from torch.utils.data import Dataset
 
-from mutex.types import PreprocessedSample, RawSample, TrainingMode
+from tsfmx.types import PreprocessedSample, RawSample, TrainingMode
 
 
 class MultimodalDatasetBase(Dataset[RawSample], ABC):

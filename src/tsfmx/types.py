@@ -1,4 +1,4 @@
-"""Shared types for the mutex package."""
+"""Shared types for the tsfmx package."""
 
 from __future__ import annotations
 

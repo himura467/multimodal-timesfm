@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from sentence_transformers import SentenceTransformer
 
-from mutex.text_encoder.base import TextEncoderBase
+from tsfmx.text_encoder.base import TextEncoderBase
 
 
 class JapaneseTextEncoder(TextEncoderBase):

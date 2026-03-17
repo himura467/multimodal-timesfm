@@ -15,13 +15,13 @@ import torch
 from examples.time_mmd.configs.forecast import ForecastConfig
 from examples.time_mmd.configs.model import ModelConfig
 from examples.time_mmd.data.time_mmd_dataset import TimeMmdDataset
-from mutex.data.preprocess import PreprocessPipeline
-from mutex.text_encoder.base import TextEncoderBase
-from mutex.text_encoder.english import EnglishTextEncoder
-from mutex.text_encoder.japanese import JapaneseTextEncoder
-from mutex.utils.device import resolve_device
-from mutex.utils.logging import setup_logger
-from mutex.utils.seed import set_seed
+from tsfmx.data.preprocess import PreprocessPipeline
+from tsfmx.text_encoder.base import TextEncoderBase
+from tsfmx.text_encoder.english import EnglishTextEncoder
+from tsfmx.text_encoder.japanese import JapaneseTextEncoder
+from tsfmx.utils.device import resolve_device
+from tsfmx.utils.logging import setup_logger
+from tsfmx.utils.seed import set_seed
 
 _logger = setup_logger()
 
