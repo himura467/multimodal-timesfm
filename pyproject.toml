@@ -24,10 +24,10 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/himura467/mutex"
-Documentation = "https://github.com/himura467/mutex"
-Repository = "https://github.com/himura467/mutex"
-"Bug Tracker" = "https://github.com/himura467/mutex/issues"
+Homepage = "https://github.com/himura467/tsfmx"
+Documentation = "https://github.com/himura467/tsfmx"
+Repository = "https://github.com/himura467/tsfmx"
+"Bug Tracker" = "https://github.com/himura467/tsfmx/issues"
 
 [project.optional-dependencies]
 sweep = [
@@ -53,13 +53,13 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.sdist]
 include = [
-    "src/mutex",
+    "src/tsfmx",
     "LICENSE",
     "README.md",
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/mutex"]
+packages = ["src/tsfmx"]
 
 [tool.uv]
 package = true
