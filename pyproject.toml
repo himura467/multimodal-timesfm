@@ -1,5 +1,5 @@
 [project]
-name = "mutex"
+name = "tsfmx"
 version = "1.0.0"
 dependencies = [
     "chronos-forecasting>=2.2.2",
@@ -13,7 +13,7 @@ dependencies = [
 ]
 requires-python = ">=3.11"
 authors = [{name = "Akito Shitara", email = "akitoshitara@gmail.com"}]
-description = "Mutex: unified framework for multimodal time series foundation models supporting diverse modalities"
+description = "Multimodal extension for time series foundation models"
 readme = "README.md"
 license = { file = "LICENSE" }
 classifiers = [
