@@ -1,11 +1,11 @@
-# Mutex
+# TSFMx
 
-**MUTEX** (**M**UTEX **U**nifies **T**SFMs **E**nabling **X**-modalities) is a unified framework for multimodal time series foundation models. It brings together multiple TSFMs (including [TimesFM](https://github.com/google-research/timesfm) and [Chronos](https://github.com/amazon-science/chronos-forecasting)) and extends them to support diverse input modalities such as text.
+**TSFMx** (**T**SFMx **S**tandardizes **F**usion of **M**ultimodal e**x**ogenous features) is a framework for extending TSFMs (including [TimesFM](https://github.com/google-research/timesfm) and [Chronos](https://github.com/amazon-science/chronos-forecasting)) with multimodal inputs such as text.
 
 ## Installation
 
 ```sh
-pip install mutex[all]
+pip install tsfmx[all]
 ```
 
 ## Quick Start

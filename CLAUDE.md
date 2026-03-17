@@ -1,8 +1,8 @@
-# Mutex
+# TSFMx
 
 ## Overview
 
-This project provides a unified framework for multimodal time series foundation models (TSFMs), enabling diverse input modalities such as text. It consists of a core Python package (`mutex`) and example implementations using the [Time-MMD](https://github.com/AdityaLab/Time-MMD) dataset.
+TSFMx extends TSFMs with multimodal inputs such as text. It includes the core `tsfmx` package and example implementations using the [Time-MMD](https://github.com/AdityaLab/Time-MMD) dataset.
 
 ## Bash Commands
 

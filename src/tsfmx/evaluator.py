@@ -5,8 +5,8 @@ from typing import cast
 import torch
 from torch.utils.data import DataLoader
 
-from mutex.decoder import MultimodalDecoder
-from mutex.types import Batch, EvaluationMetrics
+from tsfmx.decoder import MultimodalDecoder
+from tsfmx.types import Batch, EvaluationMetrics
 
 
 class MultimodalEvaluator:

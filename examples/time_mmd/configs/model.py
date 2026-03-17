@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
-from mutex.utils.yaml import load_yaml
+from tsfmx.utils.yaml import load_yaml
 
 
 @dataclass

@@ -10,8 +10,8 @@ from safetensors.torch import load_file
 from timesfm.timesfm_2p5.timesfm_2p5_torch import TimesFM_2p5_200M_torch_module
 from timesfm.torch.util import revin, update_running_stats
 
-from mutex.tsfm.base import PreprocessResult, TsfmAdapter
-from mutex.utils.logging import get_logger
+from tsfmx.tsfm.base import PreprocessResult, TsfmAdapter
+from tsfmx.utils.logging import get_logger
 
 
 class TimesFM2p5Adapter(TsfmAdapter):

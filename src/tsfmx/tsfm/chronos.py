@@ -9,8 +9,8 @@ from chronos import Chronos2Model
 from huggingface_hub import hf_hub_download
 from safetensors.torch import load_file
 
-from mutex.tsfm.base import PreprocessResult, TsfmAdapter
-from mutex.utils.logging import get_logger
+from tsfmx.tsfm.base import PreprocessResult, TsfmAdapter
+from tsfmx.utils.logging import get_logger
 
 
 class Chronos2Adapter(TsfmAdapter):

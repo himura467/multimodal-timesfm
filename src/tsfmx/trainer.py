@@ -12,19 +12,19 @@ from torch.optim import AdamW, Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data import ConcatDataset, DataLoader
 
-from mutex.data.collate import baseline_collate_fn, multimodal_collate_fn
-from mutex.decoder import MultimodalDecoder
-from mutex.optimization import get_cosine_schedule_with_warmup, get_linear_schedule_with_warmup
-from mutex.training_args import TrainingArguments
-from mutex.types import (
+from tsfmx.data.collate import baseline_collate_fn, multimodal_collate_fn
+from tsfmx.decoder import MultimodalDecoder
+from tsfmx.optimization import get_cosine_schedule_with_warmup, get_linear_schedule_with_warmup
+from tsfmx.training_args import TrainingArguments
+from tsfmx.types import (
     BaselineCheckpoint,
     Batch,
     MultimodalCheckpoint,
     PreprocessedSample,
     TrainingMode,
 )
-from mutex.utils.device import pin_memory
-from mutex.utils.logging import get_logger
+from tsfmx.utils.device import pin_memory
+from tsfmx.utils.logging import get_logger
 
 if TYPE_CHECKING:
     import wandb

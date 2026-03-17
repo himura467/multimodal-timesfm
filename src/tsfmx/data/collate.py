@@ -3,7 +3,7 @@
 import numpy as np
 import torch
 
-from mutex.types import Batch, PreprocessedSample
+from tsfmx.types import Batch, PreprocessedSample
 
 
 def _build_batch(batch: list[PreprocessedSample]) -> Batch:

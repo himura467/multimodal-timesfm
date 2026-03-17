@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from mutex.utils.yaml import parse_yaml
+from tsfmx.utils.yaml import parse_yaml
 
 
 @dataclass
