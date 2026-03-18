@@ -1,7 +1,12 @@
 # Multimodal TimesFM
 
-> [!IMPORTANT]
-> This repository is being renamed to **Mutex**. We encourage all users to migrate to the new repository.
->
-> - New repository: [himura467/mutex](https://github.com/himura467/mutex)
-> - New package: `pip install mutex`
+**This package has been renamed to [tsfmx](https://pypi.org/project/tsfmx/).**
+
+`multimodal-timesfm` is no longer maintained. Please migrate to the new package:
+
+```sh
+pip install tsfmx
+```
+
+- GitHub: [himura467/tsfmx](https://github.com/himura467/tsfmx)
+- PyPI: [pypi.org/project/tsfmx](https://pypi.org/project/tsfmx/)
