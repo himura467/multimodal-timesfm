@@ -22,10 +22,10 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/himura467/multimodal-timesfm"
-Documentation = "https://github.com/himura467/multimodal-timesfm"
-Repository = "https://github.com/himura467/multimodal-timesfm"
-"Bug Tracker" = "https://github.com/himura467/multimodal-timesfm/issues"
+Homepage = "https://github.com/himura467/tsfmx"
+Documentation = "https://github.com/himura467/tsfmx"
+Repository = "https://github.com/himura467/tsfmx"
+"Bug Tracker" = "https://github.com/himura467/tsfmx/issues"
 
 [project.optional-dependencies]
 sweep = [
