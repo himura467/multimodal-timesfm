@@ -268,9 +268,11 @@ def main() -> int:
     device = resolve_device()
     _logger.info("Using device: %s", device)
 
+    wandb_project = f"baseline-{model_config.adapter.type}-time-mmd"
+
     def _sweep_fn() -> None:
         """Execute a single sweep trial inside a W&B run context."""
-        with wandb.init(project="baseline-timesfm-time-mmd") as run:
+        with wandb.init(project=wandb_project) as run:
             _train_and_evaluate(
                 run=run,
                 base_training_args=base_training_args,
@@ -291,11 +293,11 @@ def main() -> int:
             _logger.error("Either --sweep-id or --sweep-config must be provided.")
             return 1
         sweep_config = load_yaml(Path(args.sweep_config))
-        sweep_id = wandb.sweep(sweep=sweep_config, project="baseline-timesfm-time-mmd")
+        sweep_id = wandb.sweep(sweep=sweep_config, project=wandb_project)
         _logger.info("Created new sweep %s", sweep_id)
 
     _logger.info("Starting W&B agent (count=%s)", args.count)
-    wandb.agent(sweep_id, function=_sweep_fn, project="baseline-timesfm-time-mmd", count=args.count)
+    wandb.agent(sweep_id, function=_sweep_fn, project=wandb_project, count=args.count)
     _logger.info("Sweep agent finished")
 
     return 0
