@@ -28,23 +28,63 @@ PYTHONPATH=. uv run python scripts/split_time_mmd_datasets.py \
 
 ### 2. Pre-compute Text Embeddings
 
+**TimesFM**:
+
 ```sh
-PYTHONPATH=. uv run python scripts/cache_time_mmd_datasets.py --text-encoder-type english
+PYTHONPATH=. uv run python scripts/cache_time_mmd_datasets.py \
+    --model-config examples/time_mmd/configs/models/timesfm.yml \
+    --text-encoder-type english
+PYTHONPATH=. uv run python scripts/cache_time_mmd_datasets.py \
+    --model-config examples/time_mmd/configs/models/timesfm.yml \
+    --text-encoder-type english --augment
+```
+
+**Chronos**:
+
+```sh
+PYTHONPATH=. uv run python scripts/cache_time_mmd_datasets.py \
+    --model-config examples/time_mmd/configs/models/chronos.yml \
+    --text-encoder-type english
+PYTHONPATH=. uv run python scripts/cache_time_mmd_datasets.py \
+    --model-config examples/time_mmd/configs/models/chronos.yml \
+    --text-encoder-type english --augment
 ```
 
 ### 3. Hyperparameter Tuning
 
 Run a W&B Sweeps search for the multimodal model:
 
+**TimesFM**:
+
 ```sh
 PYTHONPATH=. uv run python scripts/tune_time_mmd_sweep.py \
+    --model-config examples/time_mmd/configs/models/timesfm.yml \
+    --sweep-config examples/time_mmd/configs/sweeps/multimodal_1layer.yml
+```
+
+**Chronos**:
+
+```sh
+PYTHONPATH=. uv run python scripts/tune_time_mmd_sweep.py \
+    --model-config examples/time_mmd/configs/models/chronos.yml \
     --sweep-config examples/time_mmd/configs/sweeps/multimodal_1layer.yml
 ```
 
 To compare against a fine-tuned baseline:
 
+**TimesFM**:
+
 ```sh
 PYTHONPATH=. uv run python scripts/tune_baseline_sweep.py \
+    --model-config examples/time_mmd/configs/models/timesfm.yml \
+    --sweep-config examples/time_mmd/configs/sweeps/baseline.yml
+```
+
+**Chronos**:
+
+```sh
+PYTHONPATH=. uv run python scripts/tune_baseline_sweep.py \
+    --model-config examples/time_mmd/configs/models/chronos.yml \
     --sweep-config examples/time_mmd/configs/sweeps/baseline.yml
 ```
 

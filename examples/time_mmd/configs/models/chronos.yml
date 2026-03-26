@@ -1,0 +1,4 @@
+adapter:
+  type: chronos
+  pretrained_repo: amazon/chronos-2
+  patch_len: 16
