@@ -63,7 +63,6 @@ packages = ["src/tsfmx"]
 
 [tool.uv]
 package = true
-exclude-newer = "7 days"
 
 [tool.uv.sources]
 timesfm = { git = "https://github.com/google-research/timesfm" }
