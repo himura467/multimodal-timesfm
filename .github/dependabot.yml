@@ -6,6 +6,8 @@ updates:
       interval: "daily"
       time: "12:00"
       timezone: "Asia/Tokyo"
+    cooldown:
+      default-days: 7
     target-branch: "main"
     open-pull-requests-limit: 1
   - package-ecosystem: "uv"
@@ -14,5 +16,7 @@ updates:
       interval: "daily"
       time: "12:00"
       timezone: "Asia/Tokyo"
+    cooldown:
+      default-days: 7
     target-branch: "main"
     open-pull-requests-limit: 1
