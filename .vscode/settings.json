@@ -24,6 +24,9 @@
   "terminal.integrated.scrollback": 10000,
   // Configure todo-tree to exclude .venv
   "todo-tree.filtering.excludeGlobs": ["**/.venv"],
+  "cSpell.words": [
+    "multimodal"
+  ],
   "files.watcherExclude": {
     "**/.git/objects/**": true,
     "**/.venv/**": true
