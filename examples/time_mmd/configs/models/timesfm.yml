@@ -1,0 +1,4 @@
+adapter:
+  type: timesfm
+  pretrained_repo: google/timesfm-2.5-200m-pytorch
+  patch_len: 32
